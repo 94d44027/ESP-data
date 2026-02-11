@@ -141,7 +141,7 @@ Represents Mitre Technique/Subtechnique
 | execution_min         | float   | NO   | 0.1667  | Minimum execution time                       |
 | execution_max         | float   | NO   | 120     | Maximum execution time                       |
 #### Note
-Technique and subtechnique are represented by teh same type of tag, subtechnique has an extra relationship to its parent.
+Technique and subtechnique are represented by the same type of tag, subtechnique has an extra relationship to its parent.
 Technique ID is the same as in MITRE.
 
 
