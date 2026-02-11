@@ -1,6 +1,6 @@
 # ESP01 NebulaGraph 3.8 Schema - Complete Documentation
 **Generated:** February 10, 2026 3:16 PM MSK  
-**Space:** ESP01 (Cyber Security / MITRE ATT&CK Model)  
+**Space:** ESP01 (IT Infrastructure / MITRE ATT&CK Model)  
 **Source:** Full NebulaGraph Studio console, author's comments
 
 
@@ -33,28 +33,28 @@ MITRE Tactic/Technique pairs and their patterns
 #### Used for
 Represents an asset in IT Infrastructure
 #### Tag properties
-| Field            | Type    | Null | Default | Comment                  |
-|------------------|---------|------|---------|--------------------------|
-| Asset_ID         | string  | NO   | _EMPTY_ | like A0001               |
-| Asset_Name       | string  | NO   | _EMPTY_ | like CRM-SRV-01          |
-| Asset_Description| string  | YES  | _EMPTY_ | like primary CRM server  |
-| Asset_Note       | string  | YES  | _EMPTY_ | any useful information   |
-| Asset_Version    | string  | YES  | 1.0     | _EMPTY_                  |
-| is_entrance      | bool    | NO   | false   | entry point?             |
-| is_target        | bool    | NO   | false   | attack target?           |
-| priority         | int16   | YES  | 4       | lower = more critical    |
-| has_vulnerability| bool    | YES  | false   | critical vuln present?   |
-| TTB              | int32   | YES  | 10      | Time To Bypass           |
+| Field             | Type   | Null | Default | Comment                 |
+|-------------------|--------|------|---------|-------------------------|
+| Asset_ID          | string | NO   | _EMPTY_ | like A0001              |
+| Asset_Name        | string | NO   | _EMPTY_ | like CRM-SRV-01         |
+| Asset_Description | string | YES  | _EMPTY_ | like primary CRM server |
+| Asset_Note        | string | YES  | _EMPTY_ | any useful information  |
+| Asset_Version     | string | YES  | 1.0     | _EMPTY_                 |
+| is_entrance       | bool   | NO   | false   | entry point?            |
+| is_target         | bool   | NO   | false   | attack target?          |
+| priority          | int16  | YES  | 4       | lower = more critical   |
+| has_vulnerability | bool   | YES  | false   | critical vuln present?  |
+| TTB               | int32  | YES  | 10      | Time To Bypass          |
 
 #### Notes
-Asset IDs and VIDs (here and for all tags ID for a tag is its VID as well), are in a format like "A00001". The specific index format can be later substitued for GUID, or longer string. This format is chose for simplicity and clarilty.
+Asset IDs and VIDs (here and for all tags ID for a tag is its VID as well), are in a format like "A00001". The specific index format can be later substituted for GUID, or longer string. This format is chose for simplicity and clarity.
 TTB stands for time to bypass - teh calculated time the hacker needs to traverse (bypass) this very node.
 Asset Version field is reserved for future use.
-has vulnerability is used to indicate that there is a vulberability on this host.
+has vulnerability is used to indicate that there is a vulnerability on this host.
 
 ### Asset_Type
 #### Used for
-Type of an asset, like Server, Workstation, etc.
+Type of asset like Server, Workstation, etc.
 #### Tag properties
 | Field             | Type    | Null | Default | Comment |
 |-------------------|---------|------|---------|---------|
@@ -66,15 +66,15 @@ Asset Type IDs have the format like "DT001".
 
 ### Network_Segment
 #### Used for
-Network segment that assset belongs to, such as DMZ, DC Lan, etc.
+Network segment that asset belongs to, such as DMZ, DC Lan, etc.
 #### Tag properties
-| Field              | Type    | Null | Default | Comment              |
-|--------------------|---------|------|---------|----------------------|
-| Segment_ID         | string  | YES  | _EMPTY_ | Like SEG0001         |
-| Segment_Name       | string  | YES  | _EMPTY_ | Like Office_Wifi     |
-| Segment_Description| string  | YES  | _EMPTY_ | Any meaningful info  |
-| Segment_Version    | string  | NO   | 1.0     | Version              |
-| Segment_Date       | date    | YES  | _EMPTY_ | When created         |
+| Field               | Type   | Null | Default | Comment             |
+|---------------------|--------|------|---------|---------------------|
+| Segment_ID          | string | YES  | _EMPTY_ | Like SEG0001        |
+| Segment_Name        | string | YES  | _EMPTY_ | Like Office_Wifi    |
+| Segment_Description | string | YES  | _EMPTY_ | Any meaningful info |
+| Segment_Version     | string | NO   | 1.0     | Version             |
+| Segment_Date        | date   | YES  | _EMPTY_ | When created        |
 #### Note
 Segment IDs have format like "SEG00001".
 
@@ -103,7 +103,7 @@ This tag is used to represent MITRE mitigation applied to a host.
 | Description        | string  | YES  | NULL       | _EMPTY_ |
 | Mitigation_Version | string  | YES  | NULL       | _EMPTY_ | 
 #### Notes
-Both Matrix and Mitigation version are filled from the current MITRE site. MItigation IDs are teh same as in MITRE.
+Both Matrix and Mitigation version are filled from the current MITRE site. Mitigation IDs are teh same as in MITRE.
 
 ### tMitreState
 #### Used for
@@ -113,17 +113,17 @@ This tag represents a pair of tactic/technique (or tactic/subtechnique) which ca
 |-----------|---------|------|---------|---------|
 | state_id  | string  | NO   | _EMPTY_ | _EMPTY_ |
 #### Note
-These tMitreState pairs not necessarily exist for all combinations of tactic/technique (subtechnique). The state ID has the following format "TA0001|T1133" (Tactic|Technique or subtechnique repectfully).
+These tMitreState pairs not necessarily exist for all combinations of tactic/technique (subtechnique). The state ID has the following format "TA0001|T1133" (Tactic|Technique or subtechnique respectfully).
 
 ### tMitreTactic
 #### Used for
 Represents Mitre tactic
 #### Tag properties
-| Field               | Type    | Null | Default | Comment             |
-|---------------------|---------|------|---------|---------------------|
-| Tactic_ID           | string  | NO   | _EMPTY_ | Tactic ID           |
-| Tactic_Name         | string  | NO   | _EMPTY_ | Tactic Name         |
-| Mitre_Attack_Version| string  | YES  | _EMPTY_ | Mitre ATTACK version|
+| Field                | Type   | Null | Default | Comment              |
+|----------------------|--------|------|---------|----------------------|
+| Tactic_ID            | string | NO   | _EMPTY_ | Tactic ID            |
+| Tactic_Name          | string | NO   | _EMPTY_ | Tactic Name          |
+| Mitre_Attack_Version | string | YES  | _EMPTY_ | Mitre ATTACK version |
 #### Note
 Tactic ID is the same as in Mitre.
 
@@ -158,19 +158,19 @@ This is a relationship between tMitreMitigation and Asset tags. (tMitreMitigatio
 | Maturity  | int16   | YES  | 100     | 0-100, higher better     |
 | Active    | bool    | YES  | true    | If inactive/deprecated   |
 #### Note
-Version is a field for a version of an IT Infreastructure, where different versions of relationships indicate the different sets of mitigations applied to a host (IT Infreastructure asset). Later versions will have 
+Version is a field for a version of an IT Infrastructure, where different versions of relationships indicate the different sets of mitigations applied to a host (IT Infrastructure asset). Later versions will have 
 
 
 ### belongs_to
 #### Used for
 This relationship is used to indicate to which network segment an asset belongs to. (Asset --belongs_to--> NetworkSegment)
 #### Edge properties
-| Field         | Type    | Null | Default | Comment                          |
-|---------------|---------|------|---------|----------------------------------|
-| interface_name| string  | YES  | _EMPTY_ | Physical/logical (eth0, ilo)     |
-| role          | string  | YES  | _EMPTY_ | primary, gateway, management     |
-| ip_address    | string  | YES  | _EMPTY_ | IP on interface                  |
-| vlan_id       | int16   | YES  | _EMPTY_ | VLAN ID if applicable            |
+| Field          | Type   | Null | Default | Comment                      |
+|----------------|--------|------|---------|------------------------------|
+| interface_name | string | YES  | _EMPTY_ | Physical/logical (eth0, ilo) |
+| role           | string | YES  | _EMPTY_ | primary, gateway, management |
+| ip_address     | string | YES  | _EMPTY_ | IP on interface              |
+| vlan_id        | int16  | YES  | _EMPTY_ | VLAN ID if applicable        |
 #### Note
 None of the fields are used so far.
 
@@ -187,10 +187,10 @@ No properties.
 No properties (pure relationship edges)
 
 ### connects_to
-| Field              | Type    | Null | Default | Comment                          |
-|--------------------|---------|------|---------|----------------------------------|
-| Connection_Protocol| string | YES  | TCP     | ip, tcp, udp, icmp                |
-| Connection_Port    | string | YES  | 0-65536 | Port/range: 443, 80;443           | [page:40]
+| Field               | Type   | Null | Default | Comment                 |
+|---------------------|--------|------|---------|-------------------------|
+| Connection_Protocol | string | YES  | TCP     | ip, tcp, udp, icmp      |
+| Connection_Port     | string | YES  | 0-65536 | Port/range: 443, 80;443 | [page:40]
 
 ### has_type
 | Field         | Type     | Null | Default     | Comment |
@@ -198,12 +198,12 @@ No properties (pure relationship edges)
 | assigned_date | datetime | YES  | datetime()  | _EMPTY_ | [page:40]
 
 ### implements
-| Field      | Type    | Null | Default | Comment                                    |
-|------------|---------|------|---------|--------------------------------------------|
-| function   | string  | YES  | _EMPTY_ | Device: firewall, switch, router, wireless_ap, vpn_gateway |
-| vlan_id    | int16   | YES  | _EMPTY_ | VLAN ID if applicable                      |
-| role       | string  | YES  | _EMPTY_ | primary, backup, load_balanced             |
-| is_active  | bool    | YES  | true    | Currently active/operational               | [page:40]
+| Field     | Type   | Null | Default | Comment                                                    |
+|-----------|--------|------|---------|------------------------------------------------------------|
+| function  | string | YES  | _EMPTY_ | Device: firewall, switch, router, wireless_ap, vpn_gateway |
+| vlan_id   | int16  | YES  | _EMPTY_ | VLAN ID if applicable                                      |
+| role      | string | YES  | _EMPTY_ | primary, backup, load_balanced                             |
+| is_active | bool   | YES  | true    | Currently active/operational                               | [page:40]
 
 ### mitigates
 | Field            | Type    | Null | Default    | Comment |
@@ -227,11 +227,11 @@ No properties (pure relationship edge) [page:40]
 | state_id_index       | tMitreState        | ["state_id"]                     | [page:40]
 
 ### Edge Indexes (3)
-| Index Name     | On Edge             | Columns |
-|----------------|---------------------|---------|
-| ConnectsToIndex| connects_to         | []      |
-| PartOfIndex    | part_of             | []      |
-| SubtechIndex   | has_subtechnique    | []      | [page:40]
+| Index Name      | On Edge          | Columns |
+|-----------------|------------------|---------|
+| ConnectsToIndex | connects_to      | []      |
+| PartOfIndex     | part_of          | []      |
+| SubtechIndex    | has_subtechnique | []      | [page:40]
 
 ## Design Rationale & Usage Notes
 - **Model Focus:** MITRE ATT&CK integrated with cyber assets for threat simulation/vuln mgmt. Assets have risk flags (priority, vuln, TTB).
