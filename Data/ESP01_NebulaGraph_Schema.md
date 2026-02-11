@@ -1,5 +1,5 @@
 # ESP01 NebulaGraph 3.8 Schema - Complete Documentation
-**Generated:** February 10, 2026 3:16 PM MSK  
+**Created:** February 10, 2026  
 **Space:** ESP01 (IT Infrastructure / MITRE ATT&CK Model)  
 **Source:** Full NebulaGraph Studio console, author's comments
 
