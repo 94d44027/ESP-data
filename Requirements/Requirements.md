@@ -131,13 +131,17 @@ All paths are for developers workstation and have a base of `~/projects/ESP-data
 #### 3.1.1 User Authentication and Authorization
 
 **REQ-001:** No user authentication is required to access VIS layer
+
 **REQ-002:** Host, port, username, password, space for connection to Nebula Graph Database must be read from OS environment variables of NEBULA_HOST, NEBULA_PORT, NEBULA_USER, NEBULA_PASS, NEBULA_SPACE respectfully
 
 #### 3.1.2 Visualisation
 
 **REQ-010:** Cytoscape should be used for visualisation
+
 **REQ-011:** Contrast colours must be used for visualisation
+
 **REQ-012:** Connection directions should be indicated by an arrowhead
+
 **REQ-013:** Asset ID must fit into the node (tag)
 
 #### 3.1.3 Data analysis
