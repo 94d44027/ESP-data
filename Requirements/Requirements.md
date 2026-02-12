@@ -80,7 +80,7 @@ The system is a prototype intended for future updates.
 - **CNST005:** APP layer shall be built in Go programming language for better performance
 - **VNST006:** VIS layer can be built using any framework optimised for graph visualisation
 
-### 2.5 Proposed architecture
+### 2.5 Proposed functional architecture
 
 The proposed architecture is given at the picture below
 
@@ -108,6 +108,20 @@ The proposed architecture is given at the picture below
 - static HTML page
 - uses Cytoscape
 - located at /opt/asset-viz/static/
+
+### 2.6 Proposed software module architecture
+
+All paths are for developers workstation and have a base of `~/projects/ESP-data/`
+
+| Path             | Module     | Module purpose                            |
+|------------------|------------|-------------------------------------------|
+| cmd/asset-viz/   | main.go    | entry point, where HTTP serevr starts     |
+| internal/nebula/ | client.go  | SessionPool setup, query execution        |
+| internal/graph/  | model.go   | CyNode, CyEdge, CyGraph structs + builder |
+| api/             | handler.go | HTTP handler for /api/graph               |
+| static/          | index.html | Cytoscape.js front-end (single file)      |
+| config/          | config.go  | Nebula host, port, user, password, space  |
+
 ---
 
 ## 3. Specific Requirements
@@ -120,19 +134,24 @@ No requirements.
 
 #### 3.1.2 Visualisation
 
-**REQ-010:** 
+**REQ-010:** Cytoscape should be used for visualisation
+**REQ-011:** Contrast colours must be used for visualisation
+**REQ-012:** Connection directions should be indicated by an arrowhead
+**REQ-013:** Asset ID must fit into the node (tag)
 
 #### 3.1.3 Data analysis
 
-**REQ-020:** 
+**REQ-020:** data must be retrieved from the database using the following query:
 
+`MATCH (a:Asset)-[e:connects_to]->(b:Asset)
+RETURN a.Asset.Asset_ID AS src_asset_id,
+b.Asset.Asset_ID AS dst_asset_id
+LIMIT 300;`
 
 
 #### 3.1.5 User Account Management
 
 None so far
-
-
 
 ### 3.2 External Interface Requirements
 
@@ -140,21 +159,16 @@ None so far
 
 **REQ-100:** The user interface shall be responsive and functional on devices with minimum screen resolution of 1920x1080 pixels (desktop).
 
-**REQ-101:** The interface shall use contrast colors.
-
-**REQ-102:** The interface shall use clear visual indicators for asset types: firewall, desktop, server, router, wifi device, IoT device.
-
+**REQ-101:** The interface shall use contrast coluors.
 
 
 #### 3.2.3 Software Interfaces
-
-**REQ-120:** The APP layer shall connect to the legacy MySQL catalog database (version 5.7+) using read/write access for string temporary results (if using graph database is deemed to be inefficient).
 
 **REQ-121:** The APP layer shall connect to the GrDB using Vesoft's Go client libraries.
 
 **REQ-122:** The APP layer shall publish the results intended for future visualisation as JSON.
 
-**REQ-123:** The system shall expose RESTful API endpoints for VIS layer Integration.
+**REQ-123:** The VIS layer should be implemented as a single html page (index.html) using Cytosacape.
 
 #### 3.2.4 Communications Interfaces
 
@@ -169,7 +183,7 @@ None so far
 
 **REQ-200:** The system shall use max 2 concurrent user connections. Concurrency is not important at this stage.
 
-**REQ-201:** Page load time for any screen shall not exceed 3 seconds on standard broadband connection (10 Mbps).
+**REQ-201:** Page load time for any screen shall not exceed 3 seconds on standard broadband connection (1 Mbps).
 
 **REQ-202:** Search queries shall return results within 2 seconds for result sets up to 1,000 items.
 
@@ -192,9 +206,7 @@ None so far.
 
 #### 3.3.5 Portability
 
-**REQ-240:** All components (the system) shall be deployable on Ubuntu 22.04 LTS Server or newer.
-
-**REQ-241:** In case of using mySQL the system shall use standard SQL queries compatible with both MySQL and PostgreSQL.
+**REQ-240:** All components (the system) shall be deployable on Ubuntu 24 LTS Server or newer.
 
 **REQ-242:** Configuration settings shall be externalized in environment files, enabling deployment across development, staging, and production environments without code changes.
 
@@ -262,9 +274,9 @@ Each requirement shall be considered complete when:
 
 ## Document Change History
 
-| Version | Date         | Author   | Changes         |
-|---------|--------------|----------|-----------------|
-| 1.0     | Feb 11, 2026 | KSmirnov | Initial release |
+| Version | Date         | Author   | Changes        |
+|---------|--------------|----------|----------------|
+| 1.1     | Feb 12, 2026 | KSmirnov | Second release |
 
 ---
 
