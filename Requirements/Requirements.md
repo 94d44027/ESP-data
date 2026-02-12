@@ -70,7 +70,7 @@ The system is a prototype intended for future updates.
 - **Client side:** Modern web browsers (Chrome 100+, Firefox 98+, Safari 15+, Edge 100+)
 - **Server side:** Linux (Ubuntu 22.04 LTS), Apache/Nginx web server
 - **Database:** Nebula Graph 3.8.0, newest versions of mySQL (if needed to store table data)
-- **Network:** Minimum 10 Mbps internet connection
+- **Network:** Minimum 1 Mbps internet connection
 
 ### 2.4 Design and Implementation Constraints
 - **CNST001:** No data protection regulations, data is not confidential
@@ -80,8 +80,14 @@ The system is a prototype intended for future updates.
 - **CNST005:** APP layer shall be built in Go programming language for better performance
 - **VNST006:** VIS layer can be built using any framework optimised for graph visualisation
 
-### 2.5 Assumptions and Dependencies
-- None so far
+### 2.5 Proposed architecture
+
+The proposed architecture is given at the picture below
+
+![architecture](<ESP-data_architecture_v1.png> "propsed architecture")
+
+#### 2.5.1 GrDB
+- host name: nebbie.m82
 
 ---
 
