@@ -68,7 +68,7 @@ The system is a prototype intended for future updates.
 
 ### 2.3 Operating Environment
 - **Client side:** Modern web browsers (Chrome 100+, Firefox 98+, Safari 15+, Edge 100+)
-- **Server side:** Linux (Ubuntu 22.04 LTS), Apache/Nginx web server
+- **Server side:** Linux (Ubuntu Server 24 LTS)
 - **Database:** Nebula Graph 3.8.0, newest versions of mySQL (if needed to store table data)
 - **Network:** Minimum 1 Mbps internet connection
 
@@ -88,7 +88,26 @@ The proposed architecture is given at the picture below
 
 #### 2.5.1 GrDB
 - host name: nebbie.m82
+- OS: Ubuntu server 24 LTS
+- port: 9669
+- user: root
+- password: nebula
+- space: ESP01
 
+#### 2.5.3 APP Layer
+- same host
+- same OS
+- Written in Go
+- located at /opt/asset-viz/
+- Compiled at developer workstation (MacOS Tahoe 26.2 on Apple M4) for Ubuntu Server 24 on Intel (VMWare machine)
+- Deployed manually or by means of GoLand
+
+#### 2.5.3 VIS Layer
+- same host
+- same OS
+- static HTML page
+- uses Cytoscape
+- located at /opt/asset-viz/static/
 ---
 
 ## 3. Specific Requirements
