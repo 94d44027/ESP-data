@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Asset Connectivity</title>
+    <script src="https://unpkg.com/cytoscape@3/dist/cytoscape.min.js"></script>
+    <style>
+        body { margin: 0; font-family: sans-serif; }
+        #cy   { width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+<div id="cy"></div>
+<script>
+    fetch('/api/graph')
+        .then(r => r.json())
+        .then(graph => {
+            // convert to Cytoscape elements format
+            const elements = [
+                ...graph.nodes.map(n => ({ group: 'nodes', data: n.data })),
+                ...graph.edges.map(e => ({ group: 'edges', data: e.data }))
+            ];
+
+            cytoscape({
+                container: document.getElementById('cy'),
+                elements: elements,
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'label':            'data(label)',   // shows Asset_ID
+                            'background-color': '#0074D9',
+                            'color':            '#fff',
+                            'text-valign':      'center',
+                            'text-halign':      'center',
+                            'font-size':        '10px',
+                            'width':  40,
+                            'height': 40
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width':              2,
+                            'line-color':         '#aaa',
+                            'target-arrow-color': '#aaa',
+                            'target-arrow-shape': 'triangle',
+                            'curve-style':        'bezier'
+                        }
+                    }
+                ],
+                layout: { name: 'cose', animate: true }
+            });
+        });
+</script>
+</body>
+</html>
