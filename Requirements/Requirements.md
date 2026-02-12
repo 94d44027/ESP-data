@@ -1,8 +1,8 @@
 # Software Requirements Specification (SRS)
 ## ESP Prof Of Concept system
 
-**Version:** 1.0  
-**Date:** February 11, 2026  
+**Version:** 1.1  
+**Date:** February 12, 2026  
 **Prepared by:** Konstantin Smirnov  
 **Project:** ESP PoC for Nebula Graph
 
