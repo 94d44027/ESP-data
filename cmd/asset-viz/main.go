@@ -14,7 +14,8 @@ func main() {
 	pool := nebula.NewPool(cfg)
 	defer pool.Close()
 
-	http.HandleFunc("/api/graph", api.GraphHandler(pool))
+	// Updated: pass both pool and cfg to GraphHandler
+	http.HandleFunc("/api/graph", api.GraphHandler(pool, cfg))
 	http.Handle("/", http.FileServer(http.Dir("static")))
 
 	log.Printf("listening on :%d", cfg.AppPort)
