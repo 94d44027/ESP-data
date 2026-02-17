@@ -1,7 +1,7 @@
 # UI Requirements Specification
 ## ESP PoC - Visual Layer
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** February 17, 2026  
 **Prepared by:** Based on visual reference analysis  
 **Project:** ESP PoC for Nebula Graph  
@@ -15,7 +15,7 @@ This document specifies the user interface requirements for the ESP PoC Visual L
 
 ### 1.1 Document Scope
 
-This specification supersedes **REQ-123** from the main Requirements.md and provides detailed UI/UX requirements that may span multiple HTML files or a more complex single-page application architecture as needed for functionality.
+This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.3) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
 
 ### 1.2 Design Philosophy
 
@@ -196,8 +196,10 @@ The main graph canvas SHALL:
 - Optional: Subtle dot grid pattern background (per reference UI "Show Background" setting)
 
 **Graph Data Source:**
-- Fetch from `/api/graph` endpoint on load (per existing `index.html`)
+- Fetch from `/api/graph` endpoint on load (per REQ-020, which returns asset properties and types)
 - Expected format: `{ nodes: [...], edges: [...] }` (Cytoscape elements format)
+- Each node SHALL include at minimum: `id`, `label`, `asset_id`, `asset_name`, `asset_type`, `is_entrance`, `is_target`, `priority`, `has_vulnerability`
+- Each edge SHALL include at minimum: `id`, `source`, `target`, `label`
 
 ### UI-REQ-201: Node Visualization
 
@@ -346,26 +348,31 @@ The application SHALL support multiple layout algorithms:
    - Close button (X icon)
 
 2. **Primary Attributes** (Key-value pairs)
+   - Data source: `GET /api/asset/{id}` endpoint (REQ-022)
    - Properties displayed:
      - `Asset_ID`: (value)
      - `Asset_Name`: (value)
      - `Asset_Description`: (value)
-     - `Asset_Type`: derived from "has_type" relationship to Asset_Type, "Type_Name" field of Asset_Type
-     - `is_entrance`: (value)
-     - `is_target`: (value)
-     - `priority`: (value)
-     - `has_vulnerability`: (value)
-     - `TTB`: (value)
-   - Display as table
+     - `Asset_Note`: (value, if present)
+     - `Asset_Type`: derived from `has_type` relationship to Asset_Type, `Type_Name` field of Asset_Type (REQ-022)
+     - `Segment_Name`: derived from `belongs_to` relationship to Network_Segment (REQ-022)
+     - `is_entrance`: boolean badge (green/gray)
+     - `is_target`: boolean badge (red/gray)
+     - `priority`: numeric (1–4, with color indicator)
+     - `has_vulnerability`: boolean badge (red/gray)
+     - `TTB`: numeric (Time To Bypass, in minutes)
+   - Display as key-value table
    - Truncate long values with expand button
 
 3. **Connections Summary**
+   - Data source: `GET /api/neighbors/{id}` endpoint (REQ-023)
    - "N neighbor(s)" (clickable to expand list)
    - "Inbound: M" / "Outbound: K"
 
 4. **Neighbor List** (Collapsible)
+   - Data source: same as Connections Summary (REQ-023)
    - Shows immediate neighbors
-   - Each item: Icon + Asset_ID + edge label
+   - Each item: Icon + Asset_ID + direction badge (inbound/outbound) + edge label
    - Click neighbor to navigate to that node
 
 5.**Actions** (future)
@@ -474,7 +481,7 @@ When a node is selected, the detail panel MAY show a **radial mini-graph** (per 
 
 ### UI-REQ-241: Path Analysis Dialog (Future - Out of Scope for v1.0)
 
-When user selects "Calculate Path" (future feature per REQ-020 scope):
+When user selects "Calculate Path" (future feature, see Requirements.md "Out of Scope"):
 
 **Structure:**
 - Modal dialog, ~500px width
@@ -762,7 +769,7 @@ Per existing project structure:
 - **Icons:** Lucide Icons, Heroicons, or similar lightweight icon set
 - **Fonts:** System fonts (`-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`)
 
-### UI-REQ-401: File Structure (Revised from REQ-123)
+### UI-REQ-401: File Structure
 
 Given the complexity identified, the VIS layer MAY be structured as:
 
@@ -788,35 +795,64 @@ All files still served from `/opt/asset-viz/static/` as currently configured.
 
 ### UI-REQ-402: API Endpoints Required
 
-Based on UI requirements, the following endpoints are needed:
+The following API endpoints are defined in Requirements.md (SRS v1.3) sections REQ-020 through REQ-024. See also Appendix C of Requirements.md for the full endpoint summary.
 
-**Existing:**
-- `GET /api/graph` - Returns all nodes and edges (current implementation)
+| Endpoint              | SRS Req  | Purpose                                  | Used by UI-REQ              |
+|-----------------------|----------|------------------------------------------|-----------------------------|
+| `GET /api/graph`      | REQ-020  | Graph nodes + edges with properties/types | UI-REQ-200, 201, 202       |
+| `GET /api/assets`     | REQ-021  | Asset list for sidebar (with filtering)  | UI-REQ-120, 121, 122       |
+| `GET /api/asset/{id}` | REQ-022  | Single asset detail for inspector panel  | UI-REQ-210                  |
+| `GET /api/neighbors/{id}` | REQ-023 | Immediate neighbors of an asset        | UI-REQ-210 §3–4            |
+| `GET /api/asset-types`| REQ-024  | Distinct asset types for filter checkboxes | UI-REQ-122                |
+| `GET /api/paths`      | Future   | Attack path calculation                  | UI-REQ-241 (out of scope v1.0) |
 
-**New endpoints needed for full functionality:**
-- `GET /api/assets` - Returns list of assets for sidebar (with filtering)
-  - Query params: `?type=domain&search=dev`
-- `GET /api/asset/{id}` - Returns detailed info for single asset
-- `GET /api/paths?from={id}&to={id}` - Calculate attack paths (future)
-  - Returns: `{ paths: [[node1, node2, ...]], path_data: {...} }`
-- `GET /api/neighbors/{id}` - Returns immediate neighbors of a node
+**`/api/graph` node data format (per REQ-020):**
+```json
+{
+  "nodes": [
+    {
+      "data": {
+        "id": "A00001",
+        "label": "CRM-SRV-01",
+        "asset_id": "A00001",
+        "asset_name": "CRM-SRV-01",
+        "asset_type": "Server",
+        "is_entrance": false,
+        "is_target": true,
+        "priority": 1,
+        "has_vulnerability": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "data": {
+        "id": "e0",
+        "source": "A00001",
+        "target": "A00002",
+        "label": "connects_to"
+      }
+    }
+  ]
+}
+```
 
-**Data Format Example (for sidebar):**
+**`/api/assets` response format (per REQ-021):**
 ```json
 {
   "assets": [
     {
-      "id": "db-dev-very-vulnerable.mistery-domain.org",
-      "type": "domain",
-      "display_name": "db-dev-very-vulnerable...",
-      "properties": {
-        "ip": "192.168.1.50",
-        "created_at": "2025-12-10T10:26:49Z"
-      }
+      "asset_id": "A00001",
+      "asset_name": "CRM-SRV-01",
+      "asset_type": "Server",
+      "is_entrance": false,
+      "is_target": true,
+      "priority": 1,
+      "has_vulnerability": true
     }
   ],
   "total": 63,
-  "filtered": 3
+  "filtered": 63
 }
 ```
 
@@ -881,7 +917,7 @@ The UI implementation SHALL be considered complete when:
 
 ## 20. References
 
-- **Main Requirements:** `Requirements/Requirements.md` (ESP PoC SRS v1.1)
+- **Main Requirements:** `Requirements/Requirements.md` (ESP PoC SRS v1.3)
 - **Reference UI:** Screenshots provided (demo3.mp4 frames)
 - **Existing Implementation:** `static/index.html` (ESP-data repo)
 - **Cytoscape.js Documentation:** https://js.cytoscape.org/
@@ -919,16 +955,20 @@ The UI implementation SHALL be considered complete when:
 
 ## Appendix B: Mapping to Existing Requirements
 
-| New UI Req           | Original Req     | Notes                               |
-|----------------------|------------------|-------------------------------------|
-| UI-REQ-200, 201, 202 | REQ-010          | Cytoscape.js usage confirmed        |
-| UI-REQ-300, 301      | REQ-011, REQ-101 | Contrast colors specified           |
-| UI-REQ-202           | REQ-012          | Arrowhead on edges                  |
-| UI-REQ-201           | REQ-013          | Asset ID fits in/near node          |
-| UI-REQ-200           | REQ-020          | Data from nGQL query result         |
-| UI-REQ-310           | REQ-100          | 1920x1080 minimum resolution        |
-| UI-REQ-400           | REQ-121, REQ-122 | Go backend, JSON API                |
-| UI-REQ-401           | REQ-123          | **Revised** - multi-file acceptable |
+| New UI Req           | Original Req     | Notes                                              |
+|----------------------|------------------|----------------------------------------------------|
+| UI-REQ-200, 201, 202 | REQ-010          | Cytoscape.js usage confirmed                       |
+| UI-REQ-300, 301      | REQ-011, REQ-101 | Contrast colors specified                          |
+| UI-REQ-202           | REQ-012          | Arrowhead on edges                                 |
+| UI-REQ-201           | REQ-013          | Asset ID fits in/near node                         |
+| UI-REQ-200           | REQ-020          | Graph data with asset properties and types         |
+| UI-REQ-120, 121, 122 | REQ-021          | Asset list endpoint for sidebar                    |
+| UI-REQ-210           | REQ-022          | Single asset detail for inspector panel            |
+| UI-REQ-210 §3–4      | REQ-023          | Neighbor list and connection summary               |
+| UI-REQ-122           | REQ-024          | Asset types list for filter checkboxes             |
+| UI-REQ-310           | REQ-100          | 1920x1080 minimum resolution                      |
+| UI-REQ-400           | REQ-121, REQ-122 | Go backend, JSON API                               |
+| UI-REQ-401           | REQ-123          | Multi-file VIS layer (per SRS v1.3)               |
 
 ---
 
@@ -941,4 +981,5 @@ The UI implementation SHALL be considered complete when:
 | Version | Date       | Changes                                                  | Author          |
 |---------|------------|----------------------------------------------------------|-----------------|
 | 1.0     | 2026-02-16 | Initial specification based on visual reference analysis | AI + K. Smirnov |
+| 1.1     | 2026-02-17 | Aligned with SRS v1.3: updated API endpoint specs (UI-REQ-402) with concrete JSON formats per REQ-020–024; added data source references to UI-REQ-200, UI-REQ-210; added Segment_Name to inspector panel; updated Appendix B mapping | AI + K. Smirnov |
 
