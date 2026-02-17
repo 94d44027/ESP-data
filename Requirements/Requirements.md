@@ -1,8 +1,8 @@
 # Software Requirements Specification (SRS)
 ## ESP Prof Of Concept system
 
-**Version:** 1.1  
-**Date:** February 12, 2026  
+**Version:** 1.2  
+**Date:** February 17, 2026  
 **Prepared by:** Konstantin Smirnov  
 **Project:** ESP PoC for Nebula Graph
 
@@ -84,7 +84,7 @@ The system is a prototype intended for future updates.
 
 The proposed architecture is given at the picture below
 
-![architecture](<ESP-data_architecture_v1.png> "propsed architecture")
+![architecture](<ESP-data_architecture_v1.png> "proposed architecture")
 
 #### 2.5.1 GrDB
 - host name: nebbie.m82
@@ -173,7 +173,7 @@ None so far
 
 **REQ-122:** The APP layer shall publish the results intended for future visualisation as JSON.
 
-**REQ-123:** The VIS layer should be implemented as a single html page (index.html) using Cytosacape.
+**REQ-123:** The VIS should be implemented using Cytosacape. Multiple html pages are allowed.
 
 #### 3.2.4 Communications Interfaces
 
