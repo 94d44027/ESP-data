@@ -1,57 +1,1176 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <title>Asset Connectivity</title>
-    <script src="https://unpkg.com/cytoscape@3/dist/cytoscape.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP PoC - Attack Path Visualization</title>
+    
+    <!-- Cytoscape.js library from CDN (REQ-122, REQ-300) -->
+    <!-- Note: For production, download and host locally for better reliability -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    
     <style>
-        body { margin: 0; font-family: sans-serif; }
-        #cy   { width: 100vw; height: 100vh; }
+        /* ============================================
+           GLOBAL RESET & BASE STYLES
+           UI-REQ-100: Dark theme, high contrast
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Dark Theme Color Palette (UI-REQ-100) */
+            --color-bg-primary: #0a0e1a;      /* Deep dark blue-black */
+            --color-bg-secondary: #141824;    /* Slightly lighter panels */
+            --color-bg-elevated: #1a1f2e;     /* Cards, elevated surfaces */
+            --color-border: #2a3142;          /* Subtle borders */
+            --color-border-strong: #3d4556;   /* Stronger dividers */
+            
+            /* Text Colors (High Contrast - REQ-011) */
+            --color-text-primary: #e8eaed;    /* Main text - AAA contrast */
+            --color-text-secondary: #9aa0a6;  /* Secondary text */
+            --color-text-muted: #6b7280;      /* Muted/disabled text */
+            
+            /* Accent Colors */
+            --color-accent-primary: #4a9eff;  /* Blue - primary actions */
+            --color-accent-hover: #6eb0ff;    /* Lighter blue - hover */
+            --color-success: #22c55e;         /* Green - success states */
+            --color-warning: #f59e0b;         /* Orange - warnings */
+            --color-danger: #ef4444;          /* Red - errors/critical */
+            
+            /* Node Type Colors (UI-REQ-203) */
+            --color-node-server: #8b5cf6;     /* Purple */
+            --color-node-workstation: #3b82f6; /* Blue */
+            --color-node-network: #06b6d4;    /* Cyan */
+            --color-node-application: #10b981; /* Green */
+            --color-node-database: #f59e0b;   /* Orange */
+            --color-node-default: #6b7280;    /* Gray */
+            
+            /* Priority Colors (UI-REQ-204) */
+            --color-priority-1: #ef4444;      /* Critical - Red */
+            --color-priority-2: #f59e0b;      /* High - Orange */
+            --color-priority-3: #eab308;      /* Medium - Yellow */
+            --color-priority-4: #3b82f6;      /* Low - Blue */
+            
+            /* Layout Dimensions (UI-REQ-100) */
+            --topbar-height: 56px;
+            --sidebar-width: 300px;
+            --inspector-width: 380px;
+            
+            /* Typography */
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 
+                           Roboto, 'Helvetica Neue', Arial, sans-serif;
+            --font-size-xs: 11px;
+            --font-size-sm: 13px;
+            --font-size-base: 14px;
+            --font-size-lg: 16px;
+            --font-size-xl: 18px;
+            
+            /* Spacing */
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 12px;
+            --spacing-lg: 16px;
+            --spacing-xl: 24px;
+            
+            /* Transitions */
+            --transition-fast: 150ms ease;
+            --transition-normal: 250ms ease;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: var(--font-size-base);
+            color: var(--color-text-primary);
+            background-color: var(--color-bg-primary);
+            overflow: hidden;
+            line-height: 1.5;
+        }
+
+        /* ============================================
+           LAYOUT STRUCTURE (UI-REQ-100)
+           Fixed-position zones with proper stacking
+           ============================================ */
+        
+        /* Top Bar - Full width, fixed height */
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--topbar-height);
+            background-color: var(--color-bg-secondary);
+            border-bottom: 1px solid var(--color-border-strong);
+            display: flex;
+            align-items: center;
+            padding: 0 var(--spacing-lg);
+            z-index: 100;
+        }
+
+        .topbar-title {
+            font-size: var(--font-size-xl);
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-right: auto;
+        }
+
+        .topbar-actions {
+            display: flex;
+            gap: var(--spacing-md);
+            align-items: center;
+        }
+
+        /* Left Sidebar - Entity Browser (UI-REQ-110) */
+        .sidebar {
+            position: fixed;
+            top: var(--topbar-height);
+            left: 0;
+            width: var(--sidebar-width);
+            bottom: 0;
+            background-color: var(--color-bg-secondary);
+            border-right: 1px solid var(--color-border-strong);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 50;
+            transition: transform var(--transition-normal);
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(calc(-1 * var(--sidebar-width)));
+        }
+
+        .sidebar-header {
+            padding: var(--spacing-lg);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .sidebar-title {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        /* Search Box (UI-REQ-111) */
+        .search-box {
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: var(--spacing-sm) var(--spacing-md);
+            padding-left: 32px;
+            background-color: var(--color-bg-elevated);
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            color: var(--color-text-primary);
+            font-size: var(--font-size-sm);
+            outline: none;
+            transition: border-color var(--transition-fast);
+        }
+
+        .search-input:focus {
+            border-color: var(--color-accent-primary);
+        }
+
+        .search-input::placeholder {
+            color: var(--color-text-muted);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: var(--spacing-sm);
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--color-text-muted);
+            font-size: var(--font-size-sm);
+        }
+
+        /* Filter Section (UI-REQ-122) */
+        .filter-section {
+            padding: var(--spacing-lg);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .filter-title {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            margin-bottom: var(--spacing-md);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--color-text-secondary);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+
+        .filter-checkbox {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-xs);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color var(--transition-fast);
+        }
+
+        .filter-checkbox:hover {
+            background-color: var(--color-bg-elevated);
+        }
+
+        .filter-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .filter-checkbox label {
+            flex: 1;
+            cursor: pointer;
+            font-size: var(--font-size-sm);
+        }
+
+        .filter-count {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-muted);
+            background-color: var(--color-bg-elevated);
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+
+        /* Asset List (UI-REQ-120) */
+        .asset-list-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--spacing-md);
+        }
+
+        .asset-item {
+            padding: var(--spacing-md);
+            background-color: var(--color-bg-elevated);
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            margin-bottom: var(--spacing-sm);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .asset-item:hover {
+            background-color: var(--color-bg-primary);
+            border-color: var(--color-accent-primary);
+        }
+
+        .asset-item.selected {
+            background-color: var(--color-bg-primary);
+            border-color: var(--color-accent-primary);
+            box-shadow: 0 0 0 1px var(--color-accent-primary);
+        }
+
+        .asset-item-header {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .asset-item-id {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+
+        .asset-item-name {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-secondary);
+        }
+
+        .asset-item-badges {
+            display: flex;
+            gap: var(--spacing-xs);
+            margin-top: var(--spacing-xs);
+            flex-wrap: wrap;
+        }
+
+        /* Main Canvas - Graph Visualization (UI-REQ-200) */
+        .main-canvas {
+            position: fixed;
+            top: var(--topbar-height);
+            left: var(--sidebar-width);
+            right: var(--inspector-width);
+            bottom: 0;
+            background-color: var(--color-bg-primary);
+            transition: left var(--transition-normal), right var(--transition-normal);
+        }
+
+        .main-canvas.sidebar-collapsed {
+            left: 0;
+        }
+
+        .main-canvas.inspector-collapsed {
+            right: 0;
+        }
+
+        #cy {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Right Inspector Panel (UI-REQ-210) */
+        .inspector {
+            position: fixed;
+            top: var(--topbar-height);
+            right: 0;
+            width: var(--inspector-width);
+            bottom: 0;
+            background-color: var(--color-bg-secondary);
+            border-left: 1px solid var(--color-border-strong);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 50;
+            transition: transform var(--transition-normal);
+        }
+
+        .inspector.collapsed {
+            transform: translateX(var(--inspector-width));
+        }
+
+        .inspector-header {
+            padding: var(--spacing-lg);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .inspector-title {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+        }
+
+        .inspector-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--spacing-lg);
+        }
+
+        .inspector-empty {
+            text-align: center;
+            color: var(--color-text-muted);
+            padding: var(--spacing-xl);
+            font-size: var(--font-size-sm);
+        }
+
+        /* Property List (UI-REQ-211) */
+        .property-section {
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .property-section-title {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .property-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .property-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+        }
+
+        .property-label {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .property-value {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-primary);
+            word-break: break-word;
+        }
+
+        /* Connection List (UI-REQ-212) */
+        .connection-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+
+        .connection-item {
+            padding: var(--spacing-md);
+            background-color: var(--color-bg-elevated);
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .connection-item:hover {
+            background-color: var(--color-bg-primary);
+            border-color: var(--color-accent-primary);
+        }
+
+        .connection-direction {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-muted);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .connection-target {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+
+        /* ============================================
+           COMMON UI COMPONENTS
+           ============================================ */
+        
+        /* Buttons */
+        .btn {
+            padding: var(--spacing-sm) var(--spacing-lg);
+            background-color: var(--color-bg-elevated);
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            color: var(--color-text-primary);
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            outline: none;
+        }
+
+        .btn:hover {
+            background-color: var(--color-bg-primary);
+            border-color: var(--color-accent-primary);
+        }
+
+        .btn-primary {
+            background-color: var(--color-accent-primary);
+            border-color: var(--color-accent-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--color-accent-hover);
+            border-color: var(--color-accent-hover);
+        }
+
+        .btn-icon {
+            padding: var(--spacing-sm);
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Badges - Applied dynamically via JavaScript template literals */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .badge-entrance {
+            background-color: rgba(34, 197, 94, 0.2);
+            color: var(--color-success);
+            border: 1px solid var(--color-success);
+        }
+
+        .badge-target {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: var(--color-danger);
+            border: 1px solid var(--color-danger);
+        }
+
+        .badge-vuln {
+            background-color: rgba(245, 158, 11, 0.2);
+            color: var(--color-warning);
+            border: 1px solid var(--color-warning);
+        }
+
+        /* Priority badge styles - Dynamically generated classes */
+        .badge-priority-1 { background-color: rgba(239, 68, 68, 0.2); color: var(--color-priority-1); }
+        .badge-priority-2 { background-color: rgba(245, 158, 11, 0.2); color: var(--color-priority-2); }
+        .badge-priority-3 { background-color: rgba(234, 179, 8, 0.2); color: var(--color-priority-3); }
+        .badge-priority-4 { background-color: rgba(59, 130, 246, 0.2); color: var(--color-priority-4); }
+
+        /* Scrollbar Styling (Dark Theme) */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--color-bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-border-strong);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--color-text-muted);
+        }
+
+        /* Loading Spinner */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--color-border);
+            border-top-color: var(--color-accent-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Stats Counter */
+        .stats {
+            display: flex;
+            gap: var(--spacing-lg);
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
     </style>
 </head>
 <body>
-<div id="cy"></div>
-<script>
-    fetch('/api/graph')
-        .then(r => r.json())
-        .then(graph => {
-            // convert to Cytoscape elements format
-            const elements = [
-                ...graph.nodes.map(n => ({ group: 'nodes', data: n.data })),
-                ...graph.edges.map(e => ({ group: 'edges', data: e.data }))
-            ];
+    <!-- Top Bar (UI-REQ-100) -->
+    <div class="topbar">
+        <div class="topbar-title">ESP PoC - Attack Path Visualization</div>
+        <div class="topbar-actions">
+            <div class="stats">
+                <div class="stat-item">
+                    <span>Nodes:</span>
+                    <span class="stat-value" id="stat-nodes">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Edges:</span>
+                    <span class="stat-value" id="stat-edges">0</span>
+                </div>
+            </div>
+            <button class="btn btn-icon" id="btn-toggle-sidebar" title="Toggle Sidebar">☰</button>
+            <button class="btn btn-icon" id="btn-toggle-inspector" title="Toggle Inspector">⋮</button>
+            <button class="btn btn-primary" id="btn-refresh">Refresh</button>
+        </div>
+    </div>
 
-            cytoscape({
+    <!-- Left Sidebar - Entity Browser (UI-REQ-110) -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">Assets</div>
+            <!-- Search Box (UI-REQ-111) -->
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" id="search-input" placeholder="Search assets...">
+            </div>
+        </div>
+
+        <!-- Asset Type Filters (UI-REQ-122) -->
+        <div class="filter-section">
+            <div class="filter-title">Asset Types</div>
+            <div class="filter-group" id="filter-types">
+                <!-- Populated dynamically via JavaScript -->
+            </div>
+        </div>
+
+        <!-- Asset List (UI-REQ-120) -->
+        <div class="asset-list-container">
+            <div id="asset-list">
+                <!-- Populated dynamically via JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Canvas - Graph Visualization (UI-REQ-200) -->
+    <div class="main-canvas" id="main-canvas">
+        <div id="cy"></div>
+    </div>
+
+    <!-- Right Inspector Panel (UI-REQ-210) -->
+    <div class="inspector" id="inspector">
+        <div class="inspector-header">
+            <div class="inspector-title">Inspector</div>
+        </div>
+        <div class="inspector-content" id="inspector-content">
+            <div class="inspector-empty">
+                Select a node to view details
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // GLOBAL STATE MANAGEMENT
+        // ============================================
+        const AppState = {
+            cy: null,                    // Cytoscape instance
+            selectedAssetId: null,       // Currently selected asset
+            assetTypes: [],              // Available asset types
+            activeFilters: new Set(),    // Active type filters
+            searchTerm: '',              // Search filter
+            allAssets: [],               // All assets from API
+        };
+
+        // ============================================
+        // API CLIENT (REQ-020 through REQ-024)
+        // ============================================
+        const API = {
+            // REQ-020: Fetch graph data for visualization
+            async fetchGraph() {
+                const response = await fetch('/api/graph');
+                if (!response.ok) throw new Error('Failed to fetch graph data');
+                return await response.json();
+            },
+
+            // REQ-021: Fetch asset list for sidebar
+            async fetchAssets(type = '', search = '') {
+                const params = new URLSearchParams();
+                if (type) params.append('type', type);
+                if (search) params.append('search', search);
+                
+                const url = `/api/assets${params.toString() ? '?' + params.toString() : ''}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Failed to fetch assets');
+                return await response.json();
+            },
+
+            // REQ-022: Fetch single asset detail
+            async fetchAssetDetail(assetId) {
+                const response = await fetch(`/api/asset/${assetId}`);
+                if (!response.ok) throw new Error('Failed to fetch asset detail');
+                return await response.json();
+            },
+
+            // REQ-023: Fetch neighbors for connections list
+            async fetchNeighbors(assetId) {
+                const response = await fetch(`/api/neighbors/${assetId}`);
+                if (!response.ok) throw new Error('Failed to fetch neighbors');
+                return await response.json();
+            },
+
+            // REQ-024: Fetch asset types for filters
+            async fetchAssetTypes() {
+                const response = await fetch('/api/asset-types');
+                if (!response.ok) throw new Error('Failed to fetch asset types');
+                return await response.json();
+            }
+        };
+
+        // ============================================
+        // CYTOSCAPE GRAPH INITIALIZATION (UI-REQ-200)
+        // ============================================
+        function initCytoscape(graphData) {
+            // Destroy existing instance if present
+            if (AppState.cy) {
+                AppState.cy.destroy();
+            }
+
+            // Initialize Cytoscape with graph data (REQ-300)
+            AppState.cy = cytoscape({
                 container: document.getElementById('cy'),
-                elements: elements,
+                elements: [...graphData.nodes, ...graphData.edges],
+                
+                // Graph Layout (UI-REQ-201)
+                layout: {
+                    name: 'cose',  // Force-directed layout
+                    animate: true,
+                    animationDuration: 500,
+                    nodeRepulsion: 8000,
+                    idealEdgeLength: 100,
+                    edgeElasticity: 100,
+                    nestingFactor: 1.2,
+                    gravity: 1,
+                    numIter: 1000,
+                    randomize: false
+                },
+
+                // Visual Styling (UI-REQ-203, UI-REQ-204)
                 style: [
+                    // Node base styles
                     {
                         selector: 'node',
                         style: {
-                            'label':            'data(label)',   // shows Asset_ID
-                            'background-color': '#0074D9',
-                            'color':            '#fff',
-                            'text-valign':      'center',
-                            'text-halign':      'center',
-                            'font-size':        '10px',
-                            'width':  40,
-                            'height': 40
+                            'label': 'data(label)',
+                            'text-valign': 'center',
+                            'text-halign': 'center',
+                            'font-size': '12px',
+                            'color': '#e8eaed',
+                            'text-outline-width': 2,
+                            'text-outline-color': '#0a0e1a',
+                            'width': 40,
+                            'height': 40,
+                            'border-width': 2,
+                            'border-color': '#3d4556'
                         }
                     },
+                    
+                    // Node colors by type (UI-REQ-203)
+                    {
+                        selector: 'node[asset_type="Server"]',
+                        style: { 'background-color': '#8b5cf6' }
+                    },
+                    {
+                        selector: 'node[asset_type="Workstation"]',
+                        style: { 'background-color': '#3b82f6' }
+                    },
+                    {
+                        selector: 'node[asset_type="Network Device"]',
+                        style: { 'background-color': '#06b6d4' }
+                    },
+                    {
+                        selector: 'node[asset_type="Application"]',
+                        style: { 'background-color': '#10b981' }
+                    },
+                    {
+                        selector: 'node[asset_type="Database"]',
+                        style: { 'background-color': '#f59e0b' }
+                    },
+                    
+                    // Priority border colors (UI-REQ-204)
+                    {
+                        selector: 'node[priority=1]',
+                        style: { 'border-color': '#ef4444', 'border-width': 3 }
+                    },
+                    {
+                        selector: 'node[priority=2]',
+                        style: { 'border-color': '#f59e0b', 'border-width': 3 }
+                    },
+                    {
+                        selector: 'node[priority=3]',
+                        style: { 'border-color': '#eab308', 'border-width': 2 }
+                    },
+                    {
+                        selector: 'node[priority=4]',
+                        style: { 'border-color': '#3b82f6', 'border-width': 2 }
+                    },
+                    
+                    // Special markers (UI-REQ-205)
+                    {
+                        selector: 'node[is_entrance=true]',
+                        style: { 'shape': 'triangle' }
+                    },
+                    {
+                        selector: 'node[is_target=true]',
+                        style: { 'shape': 'star' }
+                    },
+                    {
+                        selector: 'node[has_vulnerability=true]',
+                        style: { 'border-style': 'dashed' }
+                    },
+                    
+                    // Selected node highlight
+                    {
+                        selector: 'node:selected',
+                        style: {
+                            'border-color': '#4a9eff',
+                            'border-width': 4,
+                            'overlay-color': '#4a9eff',
+                            'overlay-opacity': 0.2,
+                            'overlay-padding': 8
+                        }
+                    },
+                    
+                    // Edge styles (REQ-012: directed with arrowheads)
                     {
                         selector: 'edge',
                         style: {
-                            'width':              2,
-                            'line-color':         '#aaa',
-                            'target-arrow-color': '#aaa',
+                            'width': 2,
+                            'line-color': '#3d4556',
+                            'target-arrow-color': '#3d4556',
                             'target-arrow-shape': 'triangle',
-                            'curve-style':        'bezier'
+                            'curve-style': 'bezier',
+                            'arrow-scale': 1.2
+                        }
+                    },
+                    
+                    // Selected edge highlight
+                    {
+                        selector: 'edge:selected',
+                        style: {
+                            'line-color': '#4a9eff',
+                            'target-arrow-color': '#4a9eff',
+                            'width': 3
+                        }
+                    },
+                    
+                    // Hover effects
+                    {
+                        selector: 'node:active',
+                        style: {
+                            'overlay-color': '#4a9eff',
+                            'overlay-opacity': 0.3
                         }
                     }
                 ],
-                layout: { name: 'cose', animate: true }
+
+                // Interaction settings
+                minZoom: 0.3,
+                maxZoom: 3,
+                wheelSensitivity: 0.2,
+                userZoomingEnabled: true,
+                userPanningEnabled: true,
+                boxSelectionEnabled: false
             });
+
+            // Node click event - show inspector (UI-REQ-210)
+            AppState.cy.on('tap', 'node', function(evt) {
+                const node = evt.target;
+                const assetId = node.data('asset_id');
+                selectAsset(assetId);
+            });
+
+            // Click on background - deselect
+            AppState.cy.on('tap', function(evt) {
+                if (evt.target === AppState.cy) {
+                    deselectAsset();
+                }
+            });
+
+            // Update stats
+            updateStats();
+        }
+
+        // ============================================
+        // ASSET LIST RENDERING (UI-REQ-120)
+        // ============================================
+        function renderAssetList(assets) {
+            const listContainer = document.getElementById('asset-list');
+            
+            if (assets.length === 0) {
+                listContainer.innerHTML = '<div class="inspector-empty">No assets found</div>';
+                return;
+            }
+
+            listContainer.innerHTML = assets.map(asset => `
+                <div class="asset-item ${asset.asset_id === AppState.selectedAssetId ? 'selected' : ''}" 
+                     data-asset-id="${asset.asset_id}"
+                     onclick="selectAsset('${asset.asset_id}')">
+                    <div class="asset-item-header">
+                        <span class="asset-item-id">${asset.asset_id}</span>
+                    </div>
+                    <div class="asset-item-name">${asset.asset_name}</div>
+                    <div class="asset-item-badges">
+                        ${asset.is_entrance ? '<span class="badge badge-entrance">Entrance</span>' : ''}
+                        ${asset.is_target ? '<span class="badge badge-target">Target</span>' : ''}
+                        ${asset.has_vulnerability ? '<span class="badge badge-vuln">Vuln</span>' : ''}
+                        ${asset.priority ? `<span class="badge badge-priority-${asset.priority}">P${asset.priority}</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ============================================
+        // ASSET TYPE FILTERS (UI-REQ-122)
+        // ============================================
+        function renderAssetTypeFilters(assetTypes) {
+            const filterContainer = document.getElementById('filter-types');
+            
+            filterContainer.innerHTML = assetTypes.map(type => `
+                <div class="filter-checkbox">
+                    <input type="checkbox" 
+                           id="filter-${type.type_name.replace(/\s+/g, '-')}" 
+                           value="${type.type_name}"
+                           onchange="toggleTypeFilter('${type.type_name}')">
+                    <label for="filter-${type.type_name.replace(/\s+/g, '-')}">${type.type_name}</label>
+                    <span class="filter-count">${type.count}</span>
+                </div>
+            `).join('');
+        }
+
+        function toggleTypeFilter(typeName) {
+            if (AppState.activeFilters.has(typeName)) {
+                AppState.activeFilters.delete(typeName);
+            } else {
+                AppState.activeFilters.add(typeName);
+            }
+            
+            applyFilters();
+        }
+
+        // ============================================
+        // SEARCH FUNCTIONALITY (UI-REQ-111)
+        // ============================================
+        function applyFilters() {
+            let filtered = AppState.allAssets;
+
+            // Apply type filters
+            if (AppState.activeFilters.size > 0) {
+                filtered = filtered.filter(asset => 
+                    AppState.activeFilters.has(asset.asset_type)
+                );
+            }
+
+            // Apply search filter
+            if (AppState.searchTerm) {
+                const term = AppState.searchTerm.toLowerCase();
+                filtered = filtered.filter(asset =>
+                    asset.asset_id.toLowerCase().includes(term) ||
+                    asset.asset_name.toLowerCase().includes(term)
+                );
+            }
+
+            renderAssetList(filtered);
+        }
+
+        // ============================================
+        // INSPECTOR PANEL (UI-REQ-210)
+        // ============================================
+        async function selectAsset(assetId) {
+            AppState.selectedAssetId = assetId;
+            
+            // Highlight node in graph
+            if (AppState.cy) {
+                AppState.cy.nodes().unselect();
+                const node = AppState.cy.nodes(`[asset_id="${assetId}"]`);
+                if (node.length > 0) {
+                    node.select();
+                    // Center on selected node
+                    AppState.cy.animate({
+                        center: { eles: node },
+                        zoom: 1.5
+                    }, {
+                        duration: 300
+                    });
+                }
+            }
+
+            // Update asset list selection
+            document.querySelectorAll('.asset-item').forEach(item => {
+                item.classList.toggle('selected', item.dataset.assetId === assetId);
+            });
+
+            // Show inspector with loading state
+            const inspectorContent = document.getElementById('inspector-content');
+            inspectorContent.innerHTML = '<div class="loading"></div>';
+
+            try {
+                // Fetch asset details and neighbors in parallel
+                const [detail, neighborsData] = await Promise.all([
+                    API.fetchAssetDetail(assetId),
+                    API.fetchNeighbors(assetId)
+                ]);
+
+                renderInspector(detail, neighborsData.neighbors);
+            } catch (error) {
+                console.error('Failed to load asset details:', error);
+                inspectorContent.innerHTML = `
+                    <div class="inspector-empty" style="color: var(--color-danger);">
+                        Failed to load asset details
+                    </div>
+                `;
+            }
+        }
+
+        function deselectAsset() {
+            AppState.selectedAssetId = null;
+            
+            if (AppState.cy) {
+                AppState.cy.nodes().unselect();
+            }
+
+            document.querySelectorAll('.asset-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+
+            document.getElementById('inspector-content').innerHTML = `
+                <div class="inspector-empty">Select a node to view details</div>
+            `;
+        }
+
+        function renderInspector(detail, neighbors) {
+            const inspectorContent = document.getElementById('inspector-content');
+            inspectorContent.innerHTML = `
+                <!-- Basic Info (UI-REQ-211) -->
+                <div class="property-section">
+                    <div class="property-section-title">Basic Information</div>
+                    <div class="property-list">
+                        <div class="property-item">
+                            <div class="property-label">Asset ID</div>
+                            <div class="property-value">${detail.asset_id}</div>
+                        </div>
+                        <div class="property-item">
+                            <div class="property-label">Name</div>
+                            <div class="property-value">${detail.asset_name}</div>
+                        </div>
+                        <div class="property-item">
+                            <div class="property-label">Type</div>
+                            <div class="property-value">${detail.asset_type || 'Unknown'}</div>
+                        </div>
+                        <div class="property-item">
+                            <div class="property-label">Priority</div>
+                            <div class="property-value">
+                                <span class="badge badge-priority-${detail.priority}">
+                                    Priority ${detail.priority}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Flags Section -->
+                <div class="property-section">
+                    <div class="property-section-title">Security Flags</div>
+                    <div class="property-list">
+                        <div class="property-item">
+                            <div class="property-label">Entrance Point</div>
+                            <div class="property-value">
+                                ${detail.is_entrance ? 
+                                    '<span class="badge badge-entrance">Yes</span>' : 
+                                    '<span style="color: var(--color-text-muted);">No</span>'}
+                            </div>
+                        </div>
+                        <div class="property-item">
+                            <div class="property-label">Target Asset</div>
+                            <div class="property-value">
+                                ${detail.is_target ? 
+                                    '<span class="badge badge-target">Yes</span>' : 
+                                    '<span style="color: var(--color-text-muted);">No</span>'}
+                            </div>
+                        </div>
+                        <div class="property-item">
+                            <div class="property-label">Has Vulnerability</div>
+                            <div class="property-value">
+                                ${detail.has_vulnerability ? 
+                                    '<span class="badge badge-vuln">Yes</span>' : 
+                                    '<span style="color: var(--color-text-muted);">No</span>'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connections (UI-REQ-212) -->
+                <div class="property-section">
+                    <div class="property-section-title">
+                        Connections (${neighbors.length})
+                    </div>
+                    <div class="connection-list">
+                        ${neighbors.length === 0 ? 
+                            '<div class="inspector-empty">No connections</div>' :
+                            neighbors.map(neighbor => `
+                                <div class="connection-item" onclick="selectAsset('${neighbor.neighbor_id}')">
+                                    <div class="connection-direction">
+                                        ${neighbor.direction === 'outgoing' ? '→ Outgoing' : '← Incoming'}
+                                    </div>
+                                    <div class="connection-target">
+                                        ${neighbor.neighbor_id}: ${neighbor.neighbor_name}
+                                    </div>
+                                </div>
+                            `).join('')
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        // ============================================
+        // UI CONTROLS
+        // ============================================
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const canvas = document.getElementById('main-canvas');
+            
+            sidebar.classList.toggle('collapsed');
+            canvas.classList.toggle('sidebar-collapsed');
+        }
+
+        function toggleInspector() {
+            const inspector = document.getElementById('inspector');
+            const canvas = document.getElementById('main-canvas');
+            
+            inspector.classList.toggle('collapsed');
+            canvas.classList.toggle('inspector-collapsed');
+        }
+
+        function updateStats() {
+            if (AppState.cy) {
+                document.getElementById('stat-nodes').textContent = AppState.cy.nodes().length;
+                document.getElementById('stat-edges').textContent = AppState.cy.edges().length;
+            }
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        async function initialize() {
+            try {
+                console.log('ESP PoC: Initializing application...');
+
+                // Load graph data and asset types in parallel
+                const [graphData, assetTypesData, assetsData] = await Promise.all([
+                    API.fetchGraph(),
+                    API.fetchAssetTypes(),
+                    API.fetchAssets()
+                ]);
+
+                console.log('Loaded:', graphData.nodes.length, 'nodes,', graphData.edges.length, 'edges');
+
+                // Initialize Cytoscape graph
+                initCytoscape(graphData);
+
+                // Store asset types and all assets
+                AppState.assetTypes = assetTypesData.asset_types;
+                AppState.allAssets = assetsData.assets;
+
+                // Render UI components
+                renderAssetTypeFilters(AppState.assetTypes);
+                renderAssetList(AppState.allAssets);
+
+                console.log('ESP PoC: Initialization complete');
+            } catch (error) {
+                console.error('Initialization failed:', error);
+                alert('Failed to load application data. Please check the console for details.');
+            }
+        }
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        document.getElementById('btn-toggle-sidebar').addEventListener('click', toggleSidebar);
+        document.getElementById('btn-toggle-inspector').addEventListener('click', toggleInspector);
+        document.getElementById('btn-refresh').addEventListener('click', initialize);
+
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            AppState.searchTerm = e.target.value;
+            applyFilters();
         });
-</script>
+
+        // Start application when page loads
+        window.addEventListener('DOMContentLoaded', initialize);
+    </script>
 </body>
 </html>
