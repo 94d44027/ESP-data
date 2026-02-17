@@ -1,7 +1,7 @@
 # Software Requirements Specification (SRS)
-## ESP Prof Of Concept system
+## ESP Proof Of Concept system
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Date:** February 17, 2026  
 **Prepared by:** Konstantin Smirnov  
 **Project:** ESP PoC for Nebula Graph
@@ -105,7 +105,7 @@ The proposed architecture is given at the picture below
 #### 2.5.3 VIS Layer
 - same host
 - same OS
-- static HTML page
+- static HTML page, or multiple pages
 - uses Cytoscape
 - located at /opt/asset-viz/static/
 
@@ -113,14 +113,14 @@ The proposed architecture is given at the picture below
 
 All paths are for developers workstation and have a base of `~/projects/ESP-data/`
 
-| Path             | Module     | Module purpose                            |
-|------------------|------------|-------------------------------------------|
-| cmd/asset-viz/   | main.go    | entry point, where HTTP serevr starts     |
-| internal/nebula/ | client.go  | SessionPool setup, query execution        |
-| internal/graph/  | model.go   | CyNode, CyEdge, CyGraph structs + builder |
-| api/             | handler.go | HTTP handler for /api/graph               |
-| static/          | index.html | Cytoscape.js front-end (single file)      |
-| config/          | config.go  | Nebula host, port, user, password, space  |
+| Path             | Module     | Module purpose                                                                  |
+|------------------|------------|---------------------------------------------------------------------------------|
+| cmd/asset-viz/   | main.go    | entry point, where HTTP server starts                                           |
+| internal/nebula/ | client.go  | SessionPool setup, query execution                                              |
+| internal/graph/  | model.go   | CyNode, CyEdge, CyGraph structs + builder                                       |
+| api/             | handler.go | HTTP handlers for /api/graph and other API endpoints                            |
+| static/          | index.html | Cytoscape.js front-end (entry point; see UI-Requirements.MD for full structure) |
+| config/          | config.go  | Nebula host, port, user, password, space                                        |
 
 ---
 
@@ -144,15 +144,92 @@ All paths are for developers workstation and have a base of `~/projects/ESP-data
 
 **REQ-013:** Asset ID must fit into the node (tag)
 
-#### 3.1.3 Data analysis
+#### 3.1.3 Data Retrieval and API
 
-**REQ-020:** data must be retrieved from the database using the following query:
+**REQ-020:** The graph connectivity data, including asset properties and asset types, SHALL be retrieved from the database using the following query. This query serves the `/api/graph` endpoint and provides the data needed for graph visualisation (node colouring, labels) and the sidebar entity list (type badges, filtering). Justification for using MATCH syntax: OPTIONAL MATCH with multi-hop property retrieval is significantly cleaner than chained GO statements; this is an acceptable use per REQ-244.
 
-`MATCH (a:Asset)-[e:connects_to]->(b:Asset)
-RETURN a.Asset.Asset_ID AS src_asset_id,
-b.Asset.Asset_ID AS dst_asset_id
-LIMIT 300;`
+```
+MATCH (a:Asset)-[e:connects_to]->(b:Asset)
+OPTIONAL MATCH (a)-[:has_type]->(at:Asset_Type)
+OPTIONAL MATCH (b)-[:has_type]->(bt:Asset_Type)
+RETURN
+  a.Asset.Asset_ID AS src_asset_id,
+  a.Asset.Asset_Name AS src_asset_name,
+  a.Asset.is_entrance AS src_is_entrance,
+  a.Asset.is_target AS src_is_target,
+  a.Asset.priority AS src_priority,
+  a.Asset.has_vulnerability AS src_has_vulnerability,
+  at.Asset_Type.Type_Name AS src_asset_type,
+  b.Asset.Asset_ID AS dst_asset_id,
+  b.Asset.Asset_Name AS dst_asset_name,
+  b.Asset.is_entrance AS dst_is_entrance,
+  b.Asset.is_target AS dst_is_target,
+  b.Asset.priority AS dst_priority,
+  b.Asset.has_vulnerability AS dst_has_vulnerability,
+  bt.Asset_Type.Type_Name AS dst_asset_type
+LIMIT 300;
+```
 
+**REQ-021:** The APP layer SHALL provide an API endpoint (`GET /api/assets`) that returns a list of all assets with their associated type names, to populate the sidebar entity browser (UI-REQ-120) and support filtering by asset type (UI-REQ-122). The underlying query:
+
+```
+MATCH (a:Asset)
+OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
+RETURN
+  a.Asset.Asset_ID AS asset_id,
+  a.Asset.Asset_Name AS asset_name,
+  a.Asset.is_entrance AS is_entrance,
+  a.Asset.is_target AS is_target,
+  a.Asset.priority AS priority,
+  a.Asset.has_vulnerability AS has_vulnerability,
+  t.Asset_Type.Type_Name AS asset_type;
+```
+
+Optional query parameters: `?type=Server&search=CRM` for server-side filtering.
+
+**REQ-022:** The APP layer SHALL provide an API endpoint (`GET /api/asset/{id}`) that returns all properties of a single asset together with its related type and network segment, for the detail inspector panel (UI-REQ-210). The underlying query:
+
+```
+MATCH (a:Asset) WHERE a.Asset.Asset_ID == $assetId
+OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
+OPTIONAL MATCH (a)-[:belongs_to]->(s:Network_Segment)
+RETURN
+  a.Asset.Asset_ID AS asset_id,
+  a.Asset.Asset_Name AS asset_name,
+  a.Asset.Asset_Description AS asset_description,
+  a.Asset.Asset_Note AS asset_note,
+  a.Asset.is_entrance AS is_entrance,
+  a.Asset.is_target AS is_target,
+  a.Asset.priority AS priority,
+  a.Asset.has_vulnerability AS has_vulnerability,
+  a.Asset.TTB AS ttb,
+  t.Asset_Type.Type_Name AS asset_type,
+  s.Network_Segment.Segment_Name AS segment_name;
+```
+
+Note: The `$assetId` parameter SHALL be validated against the expected format (e.g. `^A\d{4,5}$`) before query execution to prevent injection.
+
+**REQ-023:** The APP layer SHALL provide an API endpoint (`GET /api/neighbors/{id}`) that returns the immediate neighbors of a given asset with edge direction, for the inspector connections summary and neighbor list (UI-REQ-210 §3–4). The underlying nGQL query (pure nGQL per REQ-243):
+
+```
+GO FROM $assetId OVER connects_to
+YIELD connects_to._dst AS neighbor_id, "outbound" AS direction
+UNION
+GO FROM $assetId OVER connects_to REVERSELY
+YIELD connects_to._dst AS neighbor_id, "inbound" AS direction;
+```
+
+**REQ-024:** The APP layer SHALL provide an API endpoint (`GET /api/asset-types`) that returns all distinct asset types, for populating the filter checkboxes in the sidebar (UI-REQ-122). The underlying nGQL query (pure nGQL per REQ-243):
+
+```
+LOOKUP ON Asset_Type
+YIELD Asset_Type.Type_ID AS type_id,
+      Asset_Type.Type_Name AS type_name;
+```
+
+#### 3.1.4 Data Validation
+
+**REQ-025:** All asset ID parameters received from API requests SHALL be validated against their expected format before being used in database queries. Invalid parameters SHALL result in an HTTP 400 response with a descriptive error message.
 
 #### 3.1.5 User Account Management
 
@@ -164,16 +241,16 @@ None so far
 
 **REQ-100:** The user interface shall be responsive and functional on devices with minimum screen resolution of 1920x1080 pixels (desktop).
 
-**REQ-101:** The interface shall use contrast coluors.
+**REQ-101:** The interface shall use contrast colours.
 
 
 #### 3.2.3 Software Interfaces
 
 **REQ-121:** The APP layer shall connect to the GrDB using Vesoft's Go client libraries.
 
-**REQ-122:** The APP layer shall publish the results intended for future visualisation as JSON.
+**REQ-122:** The APP layer shall publish the results intended for future visualisation as JSON. All API endpoints defined in REQ-020 through REQ-024 SHALL return JSON responses.
 
-**REQ-123:** The VIS should be implemented using Cytosacape. Multiple html pages are allowed.
+**REQ-123:** The VIS layer SHALL be implemented as described in UI-Requirements.MD (Version 1.1). Cytoscape.js is the graph rendering library. The implementation may use multiple HTML files or a single-page application architecture as needed for functionality.
 
 #### 3.2.4 Communications Interfaces
 
@@ -206,7 +283,7 @@ None so far.
 
 **REQ-231:** All functions and classes shall include inline documentation describing purpose, parameters, and return values.
 
-**REQ-232:** The system (architecture shall use modular design with clear separation of concerns (MVC or similar pattern).
+**REQ-232:** The system architecture shall use modular design with clear separation of concerns (MVC or similar pattern).
 
 
 #### 3.3.5 Portability
@@ -215,9 +292,9 @@ None so far.
 
 **REQ-242:** Configuration settings shall be externalized in environment files, enabling deployment across development, staging, and production environments without code changes.
 
-**REQ-243:** For the GrDB queries the APP Layer should preferably use nGQL language, rather than Cypher
+**REQ-243:** For the GrDB queries the APP Layer should preferably use nGQL language, rather than Cypher.
 
-**REQ-244:** For the GrDB queries the use of Cypher is deemed to be used only when absolutely necessary, i.e. when nGQL query becomes overly complex, or is perceived as inefficient and/or slow.
+**REQ-244:** For the GrDB queries the use of Cypher (MATCH syntax) is deemed to be used only when absolutely necessary, i.e. when nGQL query becomes overly complex, or is perceived as inefficient and/or slow. Each use of MATCH syntax SHALL include a justification comment in the source code.
 
 ---
 
@@ -266,6 +343,17 @@ All dates are given from the beginning, W stands for a calendar week.
 ### Appendix B: Database Schema Reference
 https://github.com/94d44027/ESP-data/blob/main/Data/ESP01_NebulaGraph_Schema.md
 
+### Appendix C: API Endpoint Summary
+
+| Endpoint               | Method | Implements | Purpose                                 | Response format                  |
+|------------------------|--------|------------|-----------------------------------------|----------------------------------|
+| `/api/graph`           | GET    | REQ-020    | Graph nodes + edges for Cytoscape.js    | `{ nodes, edges }`               |
+| `/api/assets`          | GET    | REQ-021    | Asset list for sidebar entity browser   | `{ assets, total, filtered }`    |
+| `/api/asset/{id}`      | GET    | REQ-022    | Single asset detail for inspector panel | `{ asset_id, ... }`              |
+| `/api/neighbors/{id}`  | GET    | REQ-023    | Immediate neighbors of an asset         | `[ { neighbor_id, direction } ]` |
+| `/api/asset-types`     | GET    | REQ-024    | Distinct asset types for filter UI      | `[ { type_id, type_name } ]`     |
+| `/api/paths?from=&to=` | GET    | Future     | Attack path calculation                 | `{ paths, path_data }`           |
+
 ### Appendix D: nGQL Specification
 https://docs.nebula-graph.io/3.8.0/
 
@@ -279,9 +367,11 @@ Each requirement shall be considered complete when:
 
 ## Document Change History
 
-| Version | Date         | Author   | Changes        |
-|---------|--------------|----------|----------------|
-| 1.1     | Feb 12, 2026 | KSmirnov | Second release |
+| Version | Date         | Author   | Changes                                                                                                                                                                                            |
+|---------|--------------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1.1     | Feb 12, 2026 | KSmirnov | Second release                                                                                                                                                                                     |
+| 1.2     | Feb 17, 2026 | KSmirnov | REQ-123 updated                                                                                                                                                                                    |
+| 1.3     | Feb 17, 2026 | KSmirnov | REQ-020 revised (asset properties + type); REQ-021–025 added (asset list, detail, neighbors, asset types, input validation); REQ-122/REQ-123 revised; Appendix C added; section 3.1.3 restructured |
 
 ---
 
