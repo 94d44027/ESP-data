@@ -10,14 +10,46 @@ import (
 )
 
 func main() {
+	// Load configuration from environment variables (REQ-002)
 	cfg := config.Load()
+
+	// Initialize Nebula connection pool (REQ-121)
 	pool := nebula.NewPool(cfg)
 	defer pool.Close()
 
-	// Updated: pass both pool and cfg to GraphHandler
+	// Register API endpoints
+
+	// REQ-020: Enriched graph data for Cytoscape visualization
 	http.HandleFunc("/api/graph", api.GraphHandler(pool, cfg))
+
+	// REQ-021: Asset list for sidebar entity browser
+	http.HandleFunc("/api/assets", api.AssetsListHandler(pool, cfg))
+
+	// REQ-022: Single asset detail for inspector panel
+	// Note: Using prefix match to capture /api/asset/{id}
+	http.HandleFunc("/api/asset/", api.AssetDetailHandler(pool, cfg))
+
+	// REQ-023: Neighbor list for inspector connections summary
+	// Note: Using prefix match to capture /api/neighbors/{id}
+	http.HandleFunc("/api/neighbors/", api.NeighborsHandler(pool, cfg))
+
+	// REQ-024: Asset types for filter checkboxes
+	http.HandleFunc("/api/asset-types", api.AssetTypesHandler(pool, cfg))
+
+	// Serve static files (HTML, CSS, JS) from /static directory
+	// This serves the VIS layer (REQ-123, UI-Requirements.MD)
 	http.Handle("/", http.FileServer(http.Dir("static")))
 
-	log.Printf("listening on :%d", cfg.AppPort)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	// Start HTTP server (REQ-130)
+	addr := ":8080"
+	log.Printf("ESP PoC starting on %s", addr)
+	log.Printf("Configured Nebula: %s:%d, Space: %s", cfg.NebulaHost, cfg.NebulaPort, cfg.Space)
+	log.Printf("API endpoints available:")
+	log.Printf("  GET /api/graph         - Graph nodes and edges (REQ-020)")
+	log.Printf("  GET /api/assets        - Asset list (REQ-021)")
+	log.Printf("  GET /api/asset/{id}    - Asset detail (REQ-022)")
+	log.Printf("  GET /api/neighbors/{id} - Neighbor list (REQ-023)")
+	log.Printf("  GET /api/asset-types   - Asset types (REQ-024)")
+	log.Printf("Static files served from ./static/")
+	log.Fatal(http.ListenAndServe(addr, nil))
 }
