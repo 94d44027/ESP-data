@@ -2,8 +2,10 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -13,6 +15,10 @@ import (
 
 	nebulago "github.com/vesoft-inc/nebula-go/v3"
 )
+
+// validAssetID matches the Asset ID format defined in the schema (e.g. "A00012").
+// Used by REQ-025 to reject malformed or injected input before it reaches nGQL.
+var validAssetID = regexp.MustCompile(`^A\d{4,5}$`)
 
 // GraphHandler returns an http.HandlerFunc that queries Nebula and writes CyGraph JSON.
 // This satisfies REQ-122 (JSON output) and REQ-131 (JSON format for API responses).
@@ -83,24 +89,15 @@ func AssetDetailHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestStart := time.Now()
 
-		// Extract asset ID from URL path: /api/asset/{id}
-		parts := strings.Split(r.URL.Path, "/")
-		log.Printf("[%s] api: URL path: %s, parts: %v, len: %d", requestStart.Format("15:04:05.000"), r.URL.Path, parts, len(parts))
-
-		if len(parts) < 4 {
-			http.Error(w, "Invalid asset ID", http.StatusBadRequest)
-			return
-		}
-		assetID := parts[3]
-
-		// Validate asset ID is not empty
-		if assetID == "" {
-			log.Printf("[%s] api: ERROR - empty assetID extracted from path", requestStart.Format("15:04:05.000"))
-			http.Error(w, "Asset ID cannot be empty", http.StatusBadRequest)
+		// Extract and validate asset ID from URL path: /api/asset/{id}
+		assetID, err := extractAssetID(r.URL.Path, 3)
+		if err != nil {
+			log.Printf("[%s] api: /api/asset/ bad request: %v", requestStart.Format("15:04:05.000"), err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		log.Printf("[%s] api: /api/asset/%s request (extracted assetID: '%s')", requestStart.Format("15:04:05.000"), assetID, assetID)
+		log.Printf("[%s] api: /api/asset/%s request", requestStart.Format("15:04:05.000"), assetID)
 
 		detail, err := nebula.QueryAssetDetail(pool, cfg, assetID)
 		if err != nil {
@@ -126,24 +123,15 @@ func NeighborsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Ha
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestStart := time.Now()
 
-		// Extract asset ID from URL path: /api/neighbors/{id}
-		parts := strings.Split(r.URL.Path, "/")
-		log.Printf("[%s] api: URL path: %s, parts: %v, len: %d", requestStart.Format("15:04:05.000"), r.URL.Path, parts, len(parts))
-
-		if len(parts) < 4 {
-			http.Error(w, "Invalid asset ID", http.StatusBadRequest)
-			return
-		}
-		assetID := parts[3]
-
-		// Validate asset ID is not empty
-		if assetID == "" {
-			log.Printf("[%s] api: ERROR - empty assetID extracted from path", requestStart.Format("15:04:05.000"))
-			http.Error(w, "Asset ID cannot be empty", http.StatusBadRequest)
+		// Extract and validate asset ID from URL path: /api/neighbors/{id}
+		assetID, err := extractAssetID(r.URL.Path, 3)
+		if err != nil {
+			log.Printf("[%s] api: /api/neighbors/ bad request: %v", requestStart.Format("15:04:05.000"), err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		log.Printf("[%s] api: /api/neighbors/%s request (extracted assetID: '%s')", requestStart.Format("15:04:05.000"), assetID, assetID)
+		log.Printf("[%s] api: /api/neighbors/%s request", requestStart.Format("15:04:05.000"), assetID)
 
 		neighbors, err := nebula.QueryNeighbors(pool, cfg, assetID)
 		if err != nil {
@@ -187,4 +175,25 @@ func AssetTypesHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.H
 		requestDuration := time.Since(requestStart)
 		log.Printf("[%s] api: returned %d asset types in %.3f seconds", time.Now().Format("15:04:05.000"), len(types), requestDuration.Seconds())
 	}
+}
+
+// extractAssetID pulls the asset ID from the given URL path segment,
+// validates it against the expected format (REQ-025), and returns
+// it or a descriptive error for an HTTP 400 response.
+func extractAssetID(urlPath string, segmentIndex int) (string, error) {
+	parts := strings.Split(urlPath, "/")
+	if len(parts) <= segmentIndex {
+		return "", fmt.Errorf("missing asset ID in path")
+	}
+
+	assetID := parts[segmentIndex]
+	if assetID == "" {
+		return "", fmt.Errorf("asset ID cannot be empty")
+	}
+
+	if !validAssetID.MatchString(assetID) {
+		return "", fmt.Errorf("invalid asset ID format: %q (expected pattern like A00012)", assetID)
+	}
+
+	return assetID, nil
 }

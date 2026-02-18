@@ -735,7 +735,8 @@
                             'width': 40,
                             'height': 40,
                             'border-width': 2,
-                            'border-color': '#3d4556'
+                            'border-color': '#3d4556',
+                            'shape': 'ellipse',
                         }
                     },
                     
@@ -781,15 +782,15 @@
                     
                     // Special markers (UI-REQ-205)
                     {
-                        selector: 'node[is_entrance=true]',
+                        selector: 'node[?is_entrance]',
                         style: { 'shape': 'triangle' }
                     },
                     {
-                        selector: 'node[is_target=true]',
+                        selector: 'node[?is_target]',
                         style: { 'shape': 'star' }
                     },
                     {
-                        selector: 'node[has_vulnerability=true]',
+                        selector: 'node[?has_vulnerability]',
                         style: { 'border-style': 'dashed' }
                     },
                     
@@ -883,7 +884,7 @@
                     <div class="asset-item-header">
                         <span class="asset-item-id">${asset.asset_id}</span>
                     </div>
-                    <div class="asset-item-name">${asset.asset_name}</div>
+                    <div class="asset-item-name">${asset.asset_name || ''}</div>
                     <div class="asset-item-badges">
                         ${asset.is_entrance ? '<span class="badge badge-entrance">Entrance</span>' : ''}
                         ${asset.is_target ? '<span class="badge badge-target">Target</span>' : ''}
@@ -899,7 +900,14 @@
         // ============================================
         function renderAssetTypeFilters(assetTypes) {
             const filterContainer = document.getElementById('filter-types');
-            
+
+            // Compute per-type counts from the already-loaded asset list
+            const counts = {};
+            (AppState.allAssets || []).forEach(a => {
+                const t = a.asset_type || 'Unknown';
+                counts[t] = (counts[t] || 0) + 1;
+            });
+
             filterContainer.innerHTML = assetTypes.map(type => `
                 <div class="filter-checkbox">
                     <input type="checkbox" 
@@ -907,7 +915,7 @@
                            value="${type.type_name}"
                            onchange="toggleTypeFilter('${type.type_name}')">
                     <label for="filter-${type.type_name.replace(/\s+/g, '-')}">${type.type_name}</label>
-                    <span class="filter-count">${type.count}</span>
+                    <span class="filter-count">${counts[type.type_name] || 0}</span>
                 </div>
             `).join('');
         }
@@ -940,7 +948,7 @@
                 const term = AppState.searchTerm.toLowerCase();
                 filtered = filtered.filter(asset =>
                     asset.asset_id.toLowerCase().includes(term) ||
-                    asset.asset_name.toLowerCase().includes(term)
+                    (asset.asset_name || '').toLowerCase().includes(term)
                 );
             }
 
@@ -956,7 +964,7 @@
             // Highlight node in graph
             if (AppState.cy) {
                 AppState.cy.nodes().unselect();
-                const node = AppState.cy.nodes(`[asset_id="${assetId}"]`);
+                const node = AppState.cy.nodes(`#${assetId}`);
                 if (node.length > 0) {
                     node.select();
                     // Center on selected node
@@ -1084,10 +1092,10 @@
                             neighbors.map(neighbor => `
                                 <div class="connection-item" onclick="selectAsset('${neighbor.neighbor_id}')">
                                     <div class="connection-direction">
-                                        ${neighbor.direction === 'outgoing' ? '→ Outgoing' : '← Incoming'}
+                                        ${neighbor.direction === 'outbound' ? '→ Outbound' : '← Inbound'}
                                     </div>
                                     <div class="connection-target">
-                                        ${neighbor.neighbor_id}: ${neighbor.neighbor_name}
+                                        ${neighbor.neighbor_id}
                                     </div>
                                 </div>
                             `).join('')
