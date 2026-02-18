@@ -1,12 +1,14 @@
 package api
 
 import (
-	"ESP-data/config"
-	"ESP-data/internal/graph"
-	"ESP-data/internal/nebula"
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
+
+	"ESP-data/config"
+	"ESP-data/internal/graph"
+	"ESP-data/internal/nebula"
 
 	nebulago "github.com/vesoft-inc/nebula-go/v3"
 )
@@ -48,87 +50,95 @@ func GraphHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 	}
 }
 
-// AssetsHandler serves the asset list for the sidebar (REQ-021).
+// AssetsHandler returns asset list with details for sidebar (REQ-021).
 func AssetsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("api: assets list request %s %s", r.Method, r.URL.Path)
+		log.Printf("api: /api/assets request")
 
-		items, err := nebula.QueryAssetsWithDetails(pool, cfg)
+		assets, err := nebula.QueryAssetsWithDetails(pool, cfg)
 		if err != nil {
 			log.Printf("api: QueryAssetsWithDetails failed: %v", err)
 			http.Error(w, "Failed to query assets", http.StatusInternalServerError)
 			return
 		}
 
-		resp := graph.BuildAssetsList(items, len(items))
+		response := graph.BuildAssetsList(assets, len(assets))
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			log.Printf("api: assets list JSON encode failed: %v", err)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("api: JSON encode failed: %v", err)
 		}
+
+		log.Printf("api: returned %d assets", len(assets))
 	}
 }
 
-// AssetDetailHandler serves a single asset detail (REQ-022).
+// AssetDetailHandler returns detail for single asset (REQ-022).
 func AssetDetailHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("api: asset detail request %s %s", r.Method, r.URL.Path)
-
-		// URL is /api/asset/{id}
-		id := r.URL.Path[len("/api/asset/"):]
-		if id == "" {
-			http.Error(w, "missing asset id", http.StatusBadRequest)
+		// Extract asset ID from URL path: /api/asset/{id}
+		parts := strings.Split(r.URL.Path, "/")
+		if len(parts) < 4 {
+			http.Error(w, "Invalid asset ID", http.StatusBadRequest)
 			return
 		}
+		assetID := parts[3]
 
-		detail, err := nebula.QueryAssetDetail(pool, cfg, id)
+		log.Printf("api: /api/asset/%s request", assetID)
+
+		detail, err := nebula.QueryAssetDetail(pool, cfg, assetID)
 		if err != nil {
 			log.Printf("api: QueryAssetDetail failed: %v", err)
-			http.Error(w, "Failed to query asset detail", http.StatusInternalServerError)
+			http.Error(w, "Asset not found", http.StatusNotFound)
 			return
 		}
 
-		resp := graph.BuildAssetDetailResponse(detail)
+		response := graph.BuildAssetDetailResponse(detail)
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			log.Printf("api: asset detail JSON encode failed: %v", err)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("api: JSON encode failed: %v", err)
 		}
+
+		log.Printf("api: returned detail for %s", assetID)
 	}
 }
 
-// NeighborsHandler serves neighbors for an asset (REQ-023).
+// NeighborsHandler returns neighbors for inspector panel (REQ-023).
 func NeighborsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("api: neighbors request %s %s", r.Method, r.URL.Path)
-
-		// URL is /api/neighbors/{id}
-		id := r.URL.Path[len("/api/neighbors/"):]
-		if id == "" {
-			http.Error(w, "missing asset id", http.StatusBadRequest)
+		// Extract asset ID from URL path: /api/neighbors/{id}
+		parts := strings.Split(r.URL.Path, "/")
+		if len(parts) < 4 {
+			http.Error(w, "Invalid asset ID", http.StatusBadRequest)
 			return
 		}
+		assetID := parts[3]
 
-		neighbors, err := nebula.QueryNeighbors(pool, cfg, id)
+		log.Printf("api: /api/neighbors/%s request", assetID)
+
+		neighbors, err := nebula.QueryNeighbors(pool, cfg, assetID)
 		if err != nil {
 			log.Printf("api: QueryNeighbors failed: %v", err)
 			http.Error(w, "Failed to query neighbors", http.StatusInternalServerError)
 			return
 		}
 
-		resp := graph.BuildNeighborsList(neighbors)
+		response := graph.BuildNeighborsList(neighbors)
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			log.Printf("api: neighbors JSON encode failed: %v", err)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("api: JSON encode failed: %v", err)
 		}
+
+		log.Printf("api: returned %d neighbors for %s", len(neighbors), assetID)
 	}
 }
 
-// AssetTypesHandler serves asset types with counts (REQ-024).
+// AssetTypesHandler returns asset types for filter dropdown (REQ-024).
 func AssetTypesHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("api: asset types request %s %s", r.Method, r.URL.Path)
+		log.Printf("api: /api/asset-types request")
 
 		types, err := nebula.QueryAssetTypes(pool, cfg)
 		if err != nil {
@@ -137,11 +147,13 @@ func AssetTypesHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.H
 			return
 		}
 
-		resp := graph.BuildAssetTypesList(types)
+		response := graph.BuildAssetTypesList(types)
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			log.Printf("api: asset types JSON encode failed: %v", err)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("api: JSON encode failed: %v", err)
 		}
+
+		log.Printf("api: returned %d asset types", len(types))
 	}
 }
