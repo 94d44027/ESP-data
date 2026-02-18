@@ -1,7 +1,7 @@
 # Software Requirements Specification (SRS)
 ## ESP Proof Of Concept system
 
-**Version:** 1.3  
+**Version:** 1.4  
 **Date:** February 17, 2026  
 **Prepared by:** Konstantin Smirnov  
 **Project:** ESP PoC for Nebula Graph
@@ -142,7 +142,7 @@ All paths are for developers workstation and have a base of `~/projects/ESP-data
 
 **REQ-012:** Connection directions should be indicated by an arrowhead
 
-**REQ-013:** Asset ID must fit into the node (tag)
+**REQ-013:** Asset identification must be visible on or near the node. The node label SHALL display Asset_Name when available, with Asset_ID as fallback. Asset_ID is always accessible via the inspector panel.
 
 #### 3.1.3 Data Retrieval and API
 
@@ -187,6 +187,8 @@ RETURN
 
 Optional query parameters: `?type=Server&search=CRM` for server-side filtering.
 
+_Note “In the current version, filtering is performed client-side from the full asset list. Server-side filtering via query parameters is deferred (till we hit the larder models). 
+
 **REQ-022:** The APP layer SHALL provide an API endpoint (`GET /api/asset/{id}`) that returns all properties of a single asset together with its related type and network segment, for the detail inspector panel (UI-REQ-210). The underlying query:
 
 ```
@@ -213,10 +215,10 @@ Note: The `$assetId` parameter SHALL be validated against the expected format (e
 
 ```
 GO FROM $assetId OVER connects_to
-YIELD connects_to._dst AS neighbor_id, "outbound" AS direction
+YIELD dst(edge) AS neighbor_id, "outbound" AS direction
 UNION
 GO FROM $assetId OVER connects_to REVERSELY
-YIELD connects_to._dst AS neighbor_id, "inbound" AS direction;
+YIELD src(edge) AS neighbor_id, "inbound" AS direction;
 ```
 
 **REQ-024:** The APP layer SHALL provide an API endpoint (`GET /api/asset-types`) that returns all distinct asset types, for populating the filter checkboxes in the sidebar (UI-REQ-122). The underlying nGQL query (pure nGQL per REQ-243):
