@@ -23,14 +23,12 @@ func main() {
 	http.HandleFunc("/api/graph", api.GraphHandler(pool, cfg))
 
 	// REQ-021: Asset list for sidebar entity browser
-	http.HandleFunc("/api/assets", api.AssetsListHandler(pool, cfg))
+	http.HandleFunc("/api/assets", api.AssetsHandler(pool, cfg))
 
 	// REQ-022: Single asset detail for inspector panel
-	// Note: Using prefix match to capture /api/asset/{id}
 	http.HandleFunc("/api/asset/", api.AssetDetailHandler(pool, cfg))
 
 	// REQ-023: Neighbor list for inspector connections summary
-	// Note: Using prefix match to capture /api/neighbors/{id}
 	http.HandleFunc("/api/neighbors/", api.NeighborsHandler(pool, cfg))
 
 	// REQ-024: Asset types for filter checkboxes
