@@ -3,6 +3,7 @@ package nebula
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"ESP-data/config"
 
@@ -39,44 +40,38 @@ func NewPool(cfg *config.Config) *nebula.ConnectionPool {
 // QueryAssets executes the connectivity query specified in REQ-020.
 // Returns rows with source and destination Asset_IDs.
 func QueryAssets(pool *nebula.ConnectionPool, cfg *config.Config) ([]AssetRow, error) {
-	// Get a session from the pool
 	session, err := pool.GetSession(cfg.NebulaUser, cfg.NebulaPwd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
-
 	defer session.Release()
 
-	// Switch to the target space
 	useStmt := fmt.Sprintf("USE %s;", cfg.Space)
 	useResult, err := session.Execute(useStmt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to USE space: %w", err)
 	}
-
 	if !useResult.IsSucceed() {
 		return nil, fmt.Errorf("USE space failed: %s", useResult.GetErrorMsg())
 	}
 
-	// Execute the query from REQ-020
-	// Note: This uses Cypher (MATCH) as explicitly specified in requirements
-	query := `MATCH (a:Asset)-[e:connects_to]->(b:Asset)
-RETURN a.Asset.Asset_ID AS src_asset_id,
-       b.Asset.Asset_ID AS dst_asset_id
-LIMIT 300;`
+	// Native nGQL: LOOKUP all Assets and pipe to GO for connectivity (tested in console)
+	query := `LOOKUP ON Asset YIELD id(vertex) AS vid | GO FROM $-.vid OVER connects_to YIELD $^.Asset.Asset_ID AS src_asset_id, $$.Asset.Asset_ID AS dst_asset_id;`
 
-	log.Printf("nebula: QueryAssets executing: %s", query)
+	queryStart := time.Now()
+	log.Printf("[%s] nebula: QueryAssets executing query: %s", queryStart.Format("15:04:05.000"), query)
 
 	resultSet, err := session.Execute(query)
+	queryDuration := time.Since(queryStart)
+	log.Printf("[%s] nebula: QueryAssets execution completed in %.3f seconds", time.Now().Format("15:04:05.000"), queryDuration.Seconds())
+
 	if err != nil {
 		return nil, fmt.Errorf("query execution failed: %w", err)
 	}
-
 	if !resultSet.IsSucceed() {
 		return nil, fmt.Errorf("query failed: %s", resultSet.GetErrorMsg())
 	}
 
-	// Parse the result rows
 	rows := make([]AssetRow, 0, resultSet.GetRowSize())
 	for i := 0; i < resultSet.GetRowSize(); i++ {
 		record, err := resultSet.GetRowValuesByIndex(i)
@@ -85,8 +80,6 @@ LIMIT 300;`
 			continue
 		}
 
-		// Extract src_asset_id and dst_asset_id
-		// Columns are: [0]=src_asset_id, [1]=dst_asset_id
 		srcVal, err := record.GetValueByIndex(0)
 		if err != nil {
 			log.Printf("nebula: row %d src error: %v", i, err)
@@ -99,7 +92,6 @@ LIMIT 300;`
 			continue
 		}
 
-		// Convert ValueWrapper to string
 		srcStr, err := srcVal.AsString()
 		if err != nil {
 			log.Printf("nebula: row %d src not string: %v", i, err)
@@ -118,7 +110,7 @@ LIMIT 300;`
 		})
 	}
 
-	log.Printf("nebula: query returned %d asset connectivity rows", len(rows))
+	log.Printf("nebula: QueryAssets returned %d asset connectivity rows", len(rows))
 	return rows, nil
 }
 
@@ -135,18 +127,19 @@ func QueryAssetsWithDetails(pool *nebula.ConnectionPool, cfg *config.Config) ([]
 		return nil, fmt.Errorf("failed to USE space: %w", err)
 	}
 
-	query := `MATCH (a:Asset)-[:has_type]->(t:Asset_Type)
-RETURN a.Asset.Asset_ID AS asset_id,
-       t.Asset_Type.Type_Name AS type_name,
-       count(*) AS count;`
+	// Native nGQL: LOOKUP all Assets and pipe to GO for type details (tested in console)
+	query := `LOOKUP ON Asset YIELD id(vertex) AS vid | GO FROM $-.vid OVER has_type YIELD $^.Asset.Asset_ID AS asset_id, $$.Asset_Type.Type_Name AS type_name;`
 
-	log.Printf("nebula: QueryAssetsWithDetails executing: %s", query)
+	queryStart := time.Now()
+	log.Printf("[%s] nebula: QueryAssetsWithDetails executing query: %s", queryStart.Format("15:04:05.000"), query)
 
 	resultSet, err := session.Execute(query)
+	queryDuration := time.Since(queryStart)
+	log.Printf("[%s] nebula: QueryAssetsWithDetails execution completed in %.3f seconds", time.Now().Format("15:04:05.000"), queryDuration.Seconds())
+
 	if err != nil {
 		return nil, fmt.Errorf("query execution failed: %w", err)
 	}
-
 	if !resultSet.IsSucceed() {
 		return nil, fmt.Errorf("query failed: %s", resultSet.GetErrorMsg())
 	}
@@ -188,18 +181,19 @@ func QueryAssetDetail(pool *nebula.ConnectionPool, cfg *config.Config, assetID s
 		return nil, fmt.Errorf("failed to USE space: %w", err)
 	}
 
-	query := fmt.Sprintf(`MATCH (a:Asset)-[:has_type]->(t:Asset_Type)
-WHERE a.Asset.Asset_ID == "%s"
-RETURN a.Asset.Asset_ID AS asset_id,
-       t.Asset_Type.Type_Name AS type_name;`, assetID)
+	// Native nGQL: GO from specific VID (equals Asset_ID) to type vertex
+	query := fmt.Sprintf(`GO FROM "%s" OVER has_type YIELD $^.Asset.Asset_ID AS asset_id, $^.Asset.Asset_Name AS asset_name, $^.Asset.priority AS asset_priority, $^.Asset.is_entrance AS is_entrance, $^.Asset.is_target AS is_target, $^.Asset.has_vulnerability AS has_vulnerability, $$.Asset_Type.Type_Name AS type_name;`, assetID)
 
-	log.Printf("nebula: QueryAssetDetail executing: %s", query)
+	queryStart := time.Now()
+	log.Printf("[%s] nebula: QueryAssetDetail executing query for asset %s: %s", queryStart.Format("15:04:05.000"), assetID, query)
 
 	resultSet, err := session.Execute(query)
+	queryDuration := time.Since(queryStart)
+	log.Printf("[%s] nebula: QueryAssetDetail execution completed in %.3f seconds", time.Now().Format("15:04:05.000"), queryDuration.Seconds())
+
 	if err != nil {
 		return nil, fmt.Errorf("query execution failed: %w", err)
 	}
-
 	if !resultSet.IsSucceed() {
 		return nil, fmt.Errorf("query failed: %s", resultSet.GetErrorMsg())
 	}
@@ -214,14 +208,29 @@ RETURN a.Asset.Asset_ID AS asset_id,
 	}
 
 	assetIDVal, _ := record.GetValueByIndex(0)
-	typeNameVal, _ := record.GetValueByIndex(1)
+	assetNameVal, _ := record.GetValueByIndex(1)
+	priorityVal, _ := record.GetValueByIndex(2)
+	isEntranceVal, _ := record.GetValueByIndex(3)
+	isTargetVal, _ := record.GetValueByIndex(4)
+	hasVulnVal, _ := record.GetValueByIndex(5)
+	typeNameVal, _ := record.GetValueByIndex(6)
 
 	assetIDStr, _ := assetIDVal.AsString()
+	assetNameStr, _ := assetNameVal.AsString()
+	priorityInt64, _ := priorityVal.AsInt()
+	isEntranceBool, _ := isEntranceVal.AsBool()
+	isTargetBool, _ := isTargetVal.AsBool()
+	hasVulnBool, _ := hasVulnVal.AsBool()
 	typeNameStr, _ := typeNameVal.AsString()
 
 	detail := map[string]interface{}{
-		"asset_id":  assetIDStr,
-		"type_name": typeNameStr,
+		"asset_id":          assetIDStr,
+		"asset_name":        assetNameStr,
+		"asset_priority":    int(priorityInt64),
+		"is_entrance":       isEntranceBool,
+		"is_target":         isTargetBool,
+		"has_vulnerability": hasVulnBool,
+		"type_name":         typeNameStr,
 	}
 
 	log.Printf("nebula: QueryAssetDetail returned detail for %s", assetID)
@@ -241,17 +250,19 @@ func QueryNeighbors(pool *nebula.ConnectionPool, cfg *config.Config, assetID str
 		return nil, fmt.Errorf("failed to USE space: %w", err)
 	}
 
-	query := fmt.Sprintf(`MATCH (a:Asset)-[:connects_to]->(b:Asset)
-WHERE a.Asset.Asset_ID == "%s"
-RETURN b.Asset.Asset_ID AS neighbor_id;`, assetID)
+	// Native nGQL: GO from specific VID (equals Asset_ID) over edge to neighbors
+	query := fmt.Sprintf(`GO FROM "%s" OVER connects_to YIELD $$.Asset.Asset_ID AS neighbor_id;`, assetID)
 
-	log.Printf("nebula: QueryNeighbors executing: %s", query)
+	queryStart := time.Now()
+	log.Printf("[%s] nebula: QueryNeighbors executing query for asset %s: %s", queryStart.Format("15:04:05.000"), assetID, query)
 
 	resultSet, err := session.Execute(query)
+	queryDuration := time.Since(queryStart)
+	log.Printf("[%s] nebula: QueryNeighbors execution completed in %.3f seconds", time.Now().Format("15:04:05.000"), queryDuration.Seconds())
+
 	if err != nil {
 		return nil, fmt.Errorf("query execution failed: %w", err)
 	}
-
 	if !resultSet.IsSucceed() {
 		return nil, fmt.Errorf("query failed: %s", resultSet.GetErrorMsg())
 	}
@@ -289,17 +300,19 @@ func QueryAssetTypes(pool *nebula.ConnectionPool, cfg *config.Config) ([]map[str
 		return nil, fmt.Errorf("failed to USE space: %w", err)
 	}
 
-	query := `MATCH (a:Asset)-[:has_type]->(t:Asset_Type)
-RETURN t.Asset_Type.Type_Name AS type_name,
-       count(a) AS count;`
+	// Native nGQL: LOOKUP all Assets, GO to types, GROUP BY for counts (tested in console)
+	query := `LOOKUP ON Asset YIELD id(vertex) AS vid | GO FROM $-.vid OVER has_type YIELD $$.Asset_Type.Type_Name AS type_name | GROUP BY $-.type_name YIELD $-.type_name AS type_name, COUNT(*) AS count;`
 
-	log.Printf("nebula: QueryAssetTypes executing: %s", query)
+	queryStart := time.Now()
+	log.Printf("[%s] nebula: QueryAssetTypes executing query: %s", queryStart.Format("15:04:05.000"), query)
 
 	resultSet, err := session.Execute(query)
+	queryDuration := time.Since(queryStart)
+	log.Printf("[%s] nebula: QueryAssetTypes execution completed in %.3f seconds", time.Now().Format("15:04:05.000"), queryDuration.Seconds())
+
 	if err != nil {
 		return nil, fmt.Errorf("query execution failed: %w", err)
 	}
-
 	if !resultSet.IsSucceed() {
 		return nil, fmt.Errorf("query failed: %s", resultSet.GetErrorMsg())
 	}
@@ -316,7 +329,10 @@ RETURN t.Asset_Type.Type_Name AS type_name,
 		count, _ := record.GetValueByIndex(1)
 
 		typeNameStr, _ := typeName.AsString()
-		countInt, _ := count.AsInt()
+		countInt64, _ := count.AsInt()
+
+		// CRITICAL FIX: Convert int64 to int for JSON compatibility
+		countInt := int(countInt64)
 
 		types = append(types, map[string]interface{}{
 			"type_name": typeNameStr,

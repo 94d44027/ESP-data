@@ -850,7 +850,7 @@
             // Node click event - show inspector (UI-REQ-210)
             AppState.cy.on('tap', 'node', function(evt) {
                 const node = evt.target;
-                const assetId = node.data('asset_id');
+                const assetId = node.id();
                 selectAsset(assetId);
             });
 

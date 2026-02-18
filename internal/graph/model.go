@@ -1,54 +1,37 @@
 package graph
 
-import (
-	"fmt"
+import "ESP-data/internal/nebula"
 
-	"ESP-data/internal/nebula"
-)
-
-// CyNode represents a node in Cytoscape.js format
-type CyNode struct {
-	Data map[string]string `json:"data"`
-}
-
-// CyEdge represents an edge in Cytoscape.js format
-type CyEdge struct {
-	Data map[string]string `json:"data"`
-}
-
-// CyGraph represents the complete graph for Cytoscape.js
+// CyGraph represents Cytoscape.js compatible JSON format.
+// This satisfies REQ-122 (Cytoscape.js JSON format).
 type CyGraph struct {
 	Nodes []CyNode `json:"nodes"`
 	Edges []CyEdge `json:"edges"`
 }
 
-// AssetsListResponse wraps asset list for JSON response (REQ-021)
-type AssetsListResponse struct {
-	Assets   []nebula.AssetWithDetails `json:"assets"`
-	Total    int                       `json:"total"`
-	Filtered int                       `json:"filtered"`
+// CyNode is a single node in Cytoscape format.
+type CyNode struct {
+	Data CyNodeData `json:"data"`
 }
 
-// AssetDetailResponse wraps AssetDetail for JSON response (REQ-022)
-type AssetDetailResponse struct {
-	Detail nebula.AssetDetail `json:"detail"`
+// CyNodeData holds the node's attributes.
+type CyNodeData struct {
+	ID string `json:"id"`
 }
 
-// NeighborsResponse wraps neighbors list for JSON response (REQ-023)
-type NeighborsResponse struct {
-	Neighbors []nebula.Neighbor `json:"neighbors"`
-	Total     int               `json:"total"`
+// CyEdge is a single edge in Cytoscape format.
+type CyEdge struct {
+	Data CyEdgeData `json:"data"`
 }
 
-// AssetTypesResponse wraps asset types for JSON response (REQ-024)
-type AssetTypesResponse struct {
-	AssetTypes []nebula.AssetTypeCount `json:"asset_types"`
-	Total      int                     `json:"total"`
+// CyEdgeData holds the edge's attributes.
+type CyEdgeData struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
 }
 
 // BuildGraph converts Nebula query results into Cytoscape.js graph format.
-// This satisfies REQ-122 (JSON output), REQ-013 (Asset_ID in node),
-// and REQ-012 (directed edges for arrowheads).
+// This satisfies REQ-013 (Asset_ID in node), REQ-012 (directed edges for arrowheads).
 func BuildGraph(rows []nebula.AssetRow) CyGraph {
 	// Step 1: Collect unique node IDs
 	nodeSet := make(map[string]bool)
@@ -57,65 +40,130 @@ func BuildGraph(rows []nebula.AssetRow) CyGraph {
 		nodeSet[row.DstAssetID] = true
 	}
 
-	// Step 2: Build CyNode array
+	// Step 2: Build node list
 	nodes := make([]CyNode, 0, len(nodeSet))
-	for assetID := range nodeSet {
+	for id := range nodeSet {
 		nodes = append(nodes, CyNode{
-			Data: map[string]string{
-				"id":    assetID, // Cytoscape element ID
-				"label": assetID, // Display label (REQ-013: Asset ID fits in node)
-			},
+			Data: CyNodeData{ID: id},
 		})
 	}
 
-	// Step 3: Build CyEdge array
+	// Step 3: Build edge list
 	edges := make([]CyEdge, 0, len(rows))
-	for i, row := range rows {
+	for _, row := range rows {
 		edges = append(edges, CyEdge{
-			Data: map[string]string{
-				"id":     fmt.Sprintf("e%d", i), // Unique edge ID
-				"source": row.SrcAssetID,        // Direction: src -> dst
-				"target": row.DstAssetID,        // (REQ-012: arrowhead direction)
+			Data: CyEdgeData{
+				Source: row.SrcAssetID,
+				Target: row.DstAssetID,
 			},
 		})
 	}
 
-	// Step 4: Return complete graph ready for JSON marshaling
 	return CyGraph{
 		Nodes: nodes,
 		Edges: edges,
 	}
 }
 
+// AssetsListResponse wraps asset list for JSON response (REQ-021).
+type AssetsListResponse struct {
+	Assets   []AssetWithDetails `json:"assets"`
+	Total    int                `json:"total"`
+	Filtered int                `json:"filtered"`
+}
+
+// AssetWithDetails represents an asset with its type for the asset list.
+type AssetWithDetails struct {
+	AssetID  string `json:"asset_id"`
+	TypeName string `json:"type_name"`
+}
+
 // BuildAssetsList creates the asset list response with count.
-func BuildAssetsList(items []nebula.AssetWithDetails, totalCount int) AssetsListResponse {
+func BuildAssetsList(items []map[string]interface{}, totalCount int) AssetsListResponse {
+	assets := make([]AssetWithDetails, 0, len(items))
+	for _, item := range items {
+		assets = append(assets, AssetWithDetails{
+			AssetID:  item["asset_id"].(string),
+			TypeName: item["type_name"].(string),
+		})
+	}
 	return AssetsListResponse{
-		Assets:   items,
+		Assets:   assets,
 		Total:    totalCount,
 		Filtered: len(items),
 	}
 }
 
-// BuildAssetDetailResponse wraps AssetDetail for JSON response (REQ-022).
+// AssetDetailResponse wraps AssetDetail for JSON response (REQ-022).
 // Just returns the AssetDetail as-is, structure already matches UI spec.
-func BuildAssetDetailResponse(detail *nebula.AssetDetail) AssetDetailResponse {
+type AssetDetailResponse struct {
+	Detail AssetDetail `json:"detail"`
+}
+
+// AssetDetail represents detailed information for a single asset.
+type AssetDetail struct {
+	AssetID  string `json:"asset_id"`
+	TypeName string `json:"type_name"`
+}
+
+// BuildAssetDetailResponse maps AssetDetail for JSON response (REQ-022).
+func BuildAssetDetailResponse(detail map[string]interface{}) AssetDetailResponse {
 	return AssetDetailResponse{
-		Detail: *detail,
+		Detail: AssetDetail{
+			AssetID:  detail["asset_id"].(string),
+			TypeName: detail["type_name"].(string),
+		},
 	}
 }
 
+// NeighborsResponse wraps neighbors list for JSON response (REQ-023).
+type NeighborsResponse struct {
+	Neighbors []Neighbor `json:"neighbors"`
+	Total     int        `json:"total"`
+}
+
+// Neighbor represents a neighbor asset.
+type Neighbor struct {
+	NeighborID string `json:"neighbor_id"`
+}
+
 // BuildNeighborsList wraps neighbors list for JSON response (REQ-023).
-func BuildNeighborsList(neighbors []nebula.Neighbor) NeighborsResponse {
+func BuildNeighborsList(neighbors []map[string]interface{}) NeighborsResponse {
+	neighborList := make([]Neighbor, 0, len(neighbors))
+	for _, n := range neighbors {
+		neighborList = append(neighborList, Neighbor{
+			NeighborID: n["neighbor_id"].(string),
+		})
+	}
 	return NeighborsResponse{
-		Neighbors: neighbors,
+		Neighbors: neighborList,
 		Total:     len(neighbors),
 	}
 }
 
+// AssetTypesResponse wraps asset types list for JSON response (REQ-024).
+type AssetTypesResponse struct {
+	AssetTypes []AssetTypeCount `json:"asset_types"`
+	Total      int              `json:"total"`
+}
+
+// AssetTypeCount represents an asset type with count.
+type AssetTypeCount struct {
+	TypeName string `json:"type_name"`
+	Count    int    `json:"count"`
+}
+
 // BuildAssetTypesList creates the asset types response with count.
-func BuildAssetTypesList(types []nebula.AssetTypeCount) AssetTypesResponse {
+func BuildAssetTypesList(types []map[string]interface{}) AssetTypesResponse {
+	assetTypes := make([]AssetTypeCount, 0, len(types))
+	for _, t := range types {
+		assetTypes = append(assetTypes, AssetTypeCount{
+			TypeName: t["type_name"].(string),
+			Count:    t["count"].(int),
+		})
+	}
 	return AssetTypesResponse{
-		AssetTypes: types,
+		AssetTypes: assetTypes,
 		Total:      len(types),
 	}
 }
