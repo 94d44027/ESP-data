@@ -2,7 +2,7 @@
 ## ESP Proof Of Concept system
 
 **Version:** 1.4  
-**Date:** February 17, 2026  
+**Date:** February 18, 2026  
 **Prepared by:** Konstantin Smirnov  
 **Project:** ESP PoC for Nebula Graph
 
