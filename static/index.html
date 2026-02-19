@@ -41,9 +41,9 @@
             --color-danger: #ef4444;          /* Red - errors/critical */
             
             /* Node Type Colors (UI-REQ-203) */
-            --color-node-server: #8b5cf6;     /* Purple */
-            --color-node-workstation: #3b82f6; /* Blue */
-            --color-node-network: #06b6d4;    /* Cyan */
+            --color-node-server: #5a9d5a;     /* Green */
+            --color-node-workstation: #4a9d9c; /* Teal */
+            --color-node-network: #5a7fbf;    /* Blue */
             --color-node-application: #10b981; /* Green */
             --color-node-database: #f59e0b;   /* Orange */
             --color-node-default: #6b7280;    /* Gray */
@@ -743,15 +743,15 @@
                     // Node colors by type (UI-REQ-203)
                     {
                         selector: 'node[asset_type="Server"]',
-                        style: { 'background-color': '#8b5cf6' }
+                        style: { 'background-color': '#5a9d5a' }
                     },
                     {
                         selector: 'node[asset_type="Workstation"]',
-                        style: { 'background-color': '#3b82f6' }
+                        style: { 'background-color': '#4a9d9c' }
                     },
                     {
                         selector: 'node[asset_type="Network Device"]',
-                        style: { 'background-color': '#06b6d4' }
+                        style: { 'background-color': '#5a7fbf' }
                     },
                     {
                         selector: 'node[asset_type="Application"]',
@@ -760,6 +760,14 @@
                     {
                         selector: 'node[asset_type="Database"]',
                         style: { 'background-color': '#f59e0b' }
+                    },
+                    {
+                        selector: 'node[asset_type="Mobile Device"]',
+                        style: { 'background-color': '#9437FF' }
+                    },
+                    {
+                        selector: 'node[asset_type="IoT Device"]',
+                        style: { 'background-color': '#BE5014' }
                     },
                     
                     // Priority border colors (UI-REQ-204)
