@@ -177,6 +177,65 @@ func AssetTypesHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.H
 	}
 }
 
+// EdgesHandler returns all connects_to edge properties between two assets
+// for the edge inspector panel (REQ-026, UI-REQ-212).
+func EdgesHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		requestStart := time.Now()
+
+		// Extract and validate both asset IDs from URL path: /api/edges/{sourceId}/{targetId}
+		// REQ-025: validate before query execution
+		sourceID, err := extractAssetID(r.URL.Path, 3)
+		if err != nil {
+			log.Printf("[%s] api: /api/edges/ bad source: %v", requestStart.Format("15:04:05.000"), err)
+			http.Error(w, "Invalid source asset ID: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		targetID, err := extractAssetID(r.URL.Path, 4)
+		if err != nil {
+			log.Printf("[%s] api: /api/edges/ bad target: %v", requestStart.Format("15:04:05.000"), err)
+			http.Error(w, "Invalid target asset ID: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		log.Printf("[%s] api: /api/edges/%s/%s request", requestStart.Format("15:04:05.000"), sourceID, targetID)
+
+		// Fetch edge connections and both asset details in parallel concept,
+		// but sequential here for simplicity — three fast queries.
+		connections, err := nebula.QueryEdgeConnections(pool, cfg, sourceID, targetID)
+		if err != nil {
+			log.Printf("[%s] api: QueryEdgeConnections failed: %v", time.Now().Format("15:04:05.000"), err)
+			http.Error(w, "Failed to query edge connections", http.StatusInternalServerError)
+			return
+		}
+
+		srcDetail, err := nebula.QueryAssetDetail(pool, cfg, sourceID)
+		if err != nil {
+			log.Printf("[%s] api: QueryAssetDetail(source) failed: %v", time.Now().Format("15:04:05.000"), err)
+			http.Error(w, "Source asset not found", http.StatusNotFound)
+			return
+		}
+
+		dstDetail, err := nebula.QueryAssetDetail(pool, cfg, targetID)
+		if err != nil {
+			log.Printf("[%s] api: QueryAssetDetail(target) failed: %v", time.Now().Format("15:04:05.000"), err)
+			http.Error(w, "Target asset not found", http.StatusNotFound)
+			return
+		}
+
+		response := graph.BuildEdgeDetailResponse(srcDetail, dstDetail, connections)
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
+		}
+
+		requestDuration := time.Since(requestStart)
+		log.Printf("[%s] api: returned %d connections for %s -> %s in %.3f seconds",
+			time.Now().Format("15:04:05.000"), len(connections), sourceID, targetID, requestDuration.Seconds())
+	}
+}
+
 // extractAssetID pulls the asset ID from the given URL path segment,
 // validates it against the expected format (REQ-025), and returns
 // it or a descriptive error for an HTTP 400 response.

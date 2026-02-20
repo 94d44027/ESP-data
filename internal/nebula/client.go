@@ -411,3 +411,52 @@ YIELD Asset_Type.Type_ID   AS type_id,
 	log.Printf("nebula: QueryAssetTypes returned %d asset types", len(types))
 	return types, nil
 }
+
+// QueryEdgeConnections fetches all connects_to edge properties between two
+// specific assets, for the edge inspector panel (REQ-026).
+// Uses pure nGQL GO statement per REQ-243.
+func QueryEdgeConnections(pool *nebula.ConnectionPool, cfg *config.Config, sourceID, targetID string) ([]map[string]interface{}, error) {
+	session, err := openSession(pool, cfg)
+	if err != nil {
+		return nil, err
+	}
+	defer session.Release()
+
+	// REQ-026 query — pure nGQL per REQ-243
+	query := fmt.Sprintf(`GO FROM "%s" OVER connects_to
+WHERE dst(edge) == "%s"
+YIELD
+  connects_to.Connection_Protocol AS connection_protocol,
+  connects_to.Connection_Port     AS connection_port;`, sourceID, targetID)
+
+	queryStart := time.Now()
+	log.Printf("[%s] nebula: QueryEdgeConnections executing query for %s -> %s", queryStart.Format("15:04:05.000"), sourceID, targetID)
+
+	resultSet, err := session.Execute(query)
+	queryDuration := time.Since(queryStart)
+	log.Printf("[%s] nebula: QueryEdgeConnections completed in %.3f seconds", time.Now().Format("15:04:05.000"), queryDuration.Seconds())
+
+	if err != nil {
+		return nil, fmt.Errorf("query execution failed: %w", err)
+	}
+	if !resultSet.IsSucceed() {
+		return nil, fmt.Errorf("query failed: %s", resultSet.GetErrorMsg())
+	}
+
+	connections := make([]map[string]interface{}, 0, resultSet.GetRowSize())
+	for i := 0; i < resultSet.GetRowSize(); i++ {
+		record, err := resultSet.GetRowValuesByIndex(i)
+		if err != nil {
+			log.Printf("nebula: skipping row %d: %v", i, err)
+			continue
+		}
+
+		connections = append(connections, map[string]interface{}{
+			"connection_protocol": safeString(record, 0),
+			"connection_port":     safeString(record, 1),
+		})
+	}
+
+	log.Printf("nebula: QueryEdgeConnections returned %d connections for %s -> %s", len(connections), sourceID, targetID)
+	return connections, nil
+}

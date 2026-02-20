@@ -99,9 +99,17 @@ func BuildGraph(rows []nebula.AssetRow) CyGraph {
 		})
 	}
 
-	// Build edge list
+	// Build edge list — de-duplicated per REQ-027.
+	// At most one visual edge per (source, target) pair, regardless of
+	// how many connects_to edges exist in the database.
+	edgeSeen := make(map[string]bool, len(rows))
 	edges := make([]CyEdge, 0, len(rows))
 	for _, row := range rows {
+		key := row.SrcAssetID + "|" + row.DstAssetID
+		if edgeSeen[key] {
+			continue
+		}
+		edgeSeen[key] = true
 		edges = append(edges, CyEdge{
 			Data: CyEdgeData{
 				Source: row.SrcAssetID,
@@ -263,6 +271,59 @@ func BuildAssetTypesList(types []map[string]interface{}) AssetTypesResponse {
 }
 
 // ============================================================
+// ============================================================
+// Edge detail response (REQ-026 — edge inspector panel)
+// ============================================================
+
+// EdgeAssetSummary carries the subset of asset fields shown in the
+// edge inspector's Source/Target blocks (UI-REQ-212).
+type EdgeAssetSummary struct {
+	AssetID          string `json:"asset_id"`
+	AssetName        string `json:"asset_name"`
+	AssetDescription string `json:"asset_description"`
+}
+
+// EdgeConnection represents one connects_to edge between two assets.
+type EdgeConnection struct {
+	ConnectionProtocol string `json:"connection_protocol"`
+	ConnectionPort     string `json:"connection_port"`
+}
+
+// EdgeDetailResponse is the combined response for GET /api/edges/{src}/{dst}.
+type EdgeDetailResponse struct {
+	Source      EdgeAssetSummary `json:"source"`
+	Target      EdgeAssetSummary `json:"target"`
+	Connections []EdgeConnection `json:"connections"`
+	Total       int              `json:"total"`
+}
+
+// BuildEdgeDetailResponse assembles the edge inspector response from
+// the source/target asset details (REQ-022 reuse) and the edge
+// connection rows (REQ-026).
+func BuildEdgeDetailResponse(srcDetail, dstDetail map[string]interface{}, connections []map[string]interface{}) EdgeDetailResponse {
+	conns := make([]EdgeConnection, 0, len(connections))
+	for _, c := range connections {
+		conns = append(conns, EdgeConnection{
+			ConnectionProtocol: mapStr(c, "connection_protocol"),
+			ConnectionPort:     mapStr(c, "connection_port"),
+		})
+	}
+	return EdgeDetailResponse{
+		Source: EdgeAssetSummary{
+			AssetID:          mapStr(srcDetail, "asset_id"),
+			AssetName:        mapStr(srcDetail, "asset_name"),
+			AssetDescription: mapStr(srcDetail, "asset_description"),
+		},
+		Target: EdgeAssetSummary{
+			AssetID:          mapStr(dstDetail, "asset_id"),
+			AssetName:        mapStr(dstDetail, "asset_name"),
+			AssetDescription: mapStr(dstDetail, "asset_description"),
+		},
+		Connections: conns,
+		Total:       len(conns),
+	}
+}
+
 // Safe map accessors — prevent panics on missing/wrong-typed keys
 // ============================================================
 

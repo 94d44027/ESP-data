@@ -34,6 +34,9 @@ func main() {
 	// REQ-024: Asset types for filter checkboxes
 	http.HandleFunc("/api/asset-types", api.AssetTypesHandler(pool, cfg))
 
+	// REQ-026: Edge connections for edge inspector panel
+	http.HandleFunc("/api/edges/", api.EdgesHandler(pool, cfg))
+
 	// Serve static files (HTML, CSS, JS) from /static directory
 	// This serves the VIS layer (REQ-123, UI-Requirements.MD)
 	http.Handle("/", http.FileServer(http.Dir("static")))
@@ -48,6 +51,7 @@ func main() {
 	log.Printf("  GET /api/asset/{id}    - Asset detail (REQ-022)")
 	log.Printf("  GET /api/neighbors/{id} - Neighbor list (REQ-023)")
 	log.Printf("  GET /api/asset-types   - Asset types (REQ-024)")
+	log.Printf("  GET /api/edges/{src}/{dst} - Edge connections (REQ-026)")
 	log.Printf("Static files served from ./static/")
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

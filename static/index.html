@@ -435,6 +435,57 @@
             color: var(--color-text-primary);
         }
 
+        /* Edge Inspector styles (UI-REQ-212) */
+        .edge-asset-block {
+            padding: var(--spacing-md);
+        }
+        .edge-asset-label {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: var(--spacing-xs);
+        }
+        .edge-asset-name {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: var(--color-text-primary);
+            cursor: pointer;
+        }
+        .edge-asset-name:hover {
+            color: var(--color-accent-primary);
+        }
+        .edge-asset-id {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+        }
+        .edge-asset-desc {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            margin-top: var(--spacing-xs);
+        }
+        .edge-connections-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--font-size-sm);
+        }
+        .edge-connections-table th {
+            text-align: left;
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--color-bg-primary);
+            color: var(--color-text-secondary);
+            font-weight: 600;
+            border-bottom: 1px solid var(--color-border-strong);
+        }
+        .edge-connections-table td {
+            padding: var(--spacing-sm) var(--spacing-md);
+            color: var(--color-text-primary);
+            border-bottom: 1px solid var(--color-border);
+        }
+        .edge-connections-table tr:last-child td {
+            border-bottom: none;
+        }
+
         /* ============================================
            COMMON UI COMPONENTS
            ============================================ */
@@ -683,6 +734,13 @@
                 return await response.json();
             },
 
+            // REQ-026: Fetch edge connections for edge inspector
+            async fetchEdges(sourceId, targetId) {
+                const response = await fetch(`/api/edges/${sourceId}/${targetId}`);
+                if (!response.ok) throw new Error('Failed to fetch edge connections');
+                return await response.json();
+            },
+
             // REQ-024: Fetch asset types for filters
             async fetchAssetTypes() {
                 const response = await fetch('/api/asset-types');
@@ -863,6 +921,14 @@
                 selectAsset(assetId);
             });
 
+            // Edge click event - show edge inspector (UI-REQ-212, UI-REQ-330)
+            AppState.cy.on('tap', 'edge', function(evt) {
+                const edge = evt.target;
+                const sourceId = edge.data('source');
+                const targetId = edge.data('target');
+                selectEdge(sourceId, targetId);
+            });
+
             // Click on background - deselect
             AppState.cy.on('tap', function(evt) {
                 if (evt.target === AppState.cy) {
@@ -1025,6 +1091,91 @@
 
             document.getElementById('inspector-content').innerHTML = `
                 <div class="inspector-empty">Select a node to view details</div>
+            `;
+        }
+
+        // ============================================
+        // EDGE INSPECTOR (UI-REQ-212, UI-REQ-330)
+        // ============================================
+        async function selectEdge(sourceId, targetId) {
+            AppState.selectedAssetId = null;
+
+            // Deselect nodes, keep edge selected
+            if (AppState.cy) {
+                AppState.cy.nodes().unselect();
+            }
+            document.querySelectorAll('.asset-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+
+            // Show inspector with loading state
+            const inspectorContent = document.getElementById('inspector-content');
+            inspectorContent.innerHTML = '<div class="loading"></div>';
+
+            try {
+                const edgeData = await API.fetchEdges(sourceId, targetId);
+                renderEdgeInspector(edgeData);
+            } catch (error) {
+                console.error('Failed to load edge details:', error);
+                inspectorContent.innerHTML = `
+                    <div class="inspector-empty" style="color: var(--color-danger);">
+                        Failed to load edge details
+                    </div>
+                `;
+            }
+        }
+
+        function renderEdgeInspector(edgeData) {
+            const inspectorContent = document.getElementById('inspector-content');
+            inspectorContent.innerHTML = `
+                <!-- Source Asset Block (UI-REQ-212 \u00a71) -->
+                <div class="property-section">
+                    <div class="edge-asset-block">
+                        <div class="edge-asset-label">Source</div>
+                        <div class="edge-asset-name" onclick="selectAsset('${edgeData.source.asset_id}')">
+                            ${edgeData.source.asset_name || edgeData.source.asset_id}
+                        </div>
+                        <div class="edge-asset-id">(${edgeData.source.asset_id})</div>
+                        ${edgeData.source.asset_description ?
+                            `<div class="edge-asset-desc">${edgeData.source.asset_description}</div>` : ''}
+                    </div>
+                </div>
+
+                <!-- Target Asset Block (UI-REQ-212 \u00a72) -->
+                <div class="property-section">
+                    <div class="edge-asset-block">
+                        <div class="edge-asset-label">Target</div>
+                        <div class="edge-asset-name" onclick="selectAsset('${edgeData.target.asset_id}')">
+                            ${edgeData.target.asset_name || edgeData.target.asset_id}
+                        </div>
+                        <div class="edge-asset-id">(${edgeData.target.asset_id})</div>
+                        ${edgeData.target.asset_description ?
+                            `<div class="edge-asset-desc">${edgeData.target.asset_description}</div>` : ''}
+                    </div>
+                </div>
+
+                <!-- Connections Table (UI-REQ-212 \u00a73) -->
+                <div class="property-section">
+                    <div class="property-section-title">
+                        Connections (${edgeData.total})
+                    </div>
+                    <table class="edge-connections-table">
+                        <thead>
+                            <tr><th>Protocol</th><th>Port</th></tr>
+                        </thead>
+                        <tbody>
+                            ${edgeData.connections.length === 0 ?
+                                '<tr><td>\u2014</td><td>\u2014</td></tr>' :
+                                edgeData.connections.map(c => `
+                                    <tr>
+                                        <td>${c.connection_protocol || '\u2014'}</td>
+                                        <td>${c.connection_port || '\u2014'}</td>
+                                    </tr>
+                                `).join('')
+                            }
+                        </tbody>
+                    </table>
+                </div>
             `;
         }
 
