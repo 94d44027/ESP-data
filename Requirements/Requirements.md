@@ -2,7 +2,7 @@
 ## ESP Proof Of Concept system
 
 **Version:** 1.4  
-**Date:** February 18, 2026  
+**Date:** February 20, 2026  
 **Prepared by:** Konstantin Smirnov  
 **Project:** ESP PoC for Nebula Graph
 
@@ -229,6 +229,44 @@ YIELD Asset_Type.Type_ID AS type_id,
       Asset_Type.Type_Name AS type_name;
 ```
 
+**REQ-026:** The APP layer SHALL provide an API endpoint (`GET /api/edges/{sourceId}/{targetId}`) that returns all `connects_to` edge properties between two given assets, for the edge inspector panel (UI-REQ-212). Both `sourceId` and `targetId` SHALL be validated per REQ-025 before query execution. The underlying nGQL query (pure nGQL per REQ-243):
+
+```
+GO FROM "{sourceId}" OVER connects_to
+WHERE dst(edge) == "{targetId}"
+YIELD
+  connects_to.Connection_Protocol AS connection_protocol,
+  connects_to.Connection_Port     AS connection_port;
+```
+
+The response SHALL also include the source and target asset summary (Asset_Name, Asset_ID, Asset_Description) so the edge inspector can render both endpoints without a separate API call. To obtain asset properties, the APP layer SHALL issue two additional lookups using the existing `QueryAssetDetail` function (REQ-022) for both the source and the target asset. The combined response format:
+
+```json
+{
+  "source": {
+    "asset_id": "A00002",
+    "asset_name": "FW1",
+    "asset_description": "Main DC Firewall"
+  },
+  "target": {
+    "asset_id": "A00003",
+    "asset_name": "WS1",
+    "asset_description": "Workstation"
+  },
+  "connections": [
+    { "connection_protocol": "TCP", "connection_port": "389" },
+    { "connection_protocol": "TCP", "connection_port": "443" },
+    { "connection_protocol": "UDP", "connection_port": "1149" },
+    { "connection_protocol": "TCP/IP", "connection_port": "8000-8080" }
+  ],
+  "total": 4
+}
+```
+
+**REQ-027:** When building the graph response for the `/api/graph` endpoint (REQ-020), the APP layer SHALL de-duplicate edges so that at most **one edge per unique (source, target) pair** is included in the response. This ensures the VIS layer renders a single visual connection between any two assets, regardless of how many `connects_to` edges exist in the database. De-duplication SHALL be performed in the APP layer (Go code) rather than by modifying the nGQL query.
+
+Note: a candidate for future change - a separate query that will deduplicate endpoints on teh database level. I.e. that it is not the APP layer that makes the deduplication, but the database itself, in a new API point.
+
 #### 3.1.4 Data Validation
 
 **REQ-025:** All asset ID parameters received from API requests SHALL be validated against their expected format before being used in database queries. Invalid parameters SHALL result in an HTTP 400 response with a descriptive error message.
@@ -250,7 +288,7 @@ None so far
 
 **REQ-121:** The APP layer shall connect to the GrDB using Vesoft's Go client libraries.
 
-**REQ-122:** The APP layer shall publish the results intended for future visualisation as JSON. All API endpoints defined in REQ-020 through REQ-024 SHALL return JSON responses.
+**REQ-122:** The APP layer shall publish the results intended for future visualisation as JSON. All API endpoints defined in REQ-020 through REQ-026 SHALL return JSON responses.
 
 **REQ-123:** The VIS layer SHALL be implemented as described in UI-Requirements.MD (Version 1.1). Cytoscape.js is the graph rendering library. The implementation may use multiple HTML files or a single-page application architecture as needed for functionality.
 
@@ -347,14 +385,15 @@ https://github.com/94d44027/ESP-data/blob/main/Data/ESP01_NebulaGraph_Schema.md
 
 ### Appendix C: API Endpoint Summary
 
-| Endpoint               | Method | Implements | Purpose                                 | Response format                  |
-|------------------------|--------|------------|-----------------------------------------|----------------------------------|
-| `/api/graph`           | GET    | REQ-020    | Graph nodes + edges for Cytoscape.js    | `{ nodes, edges }`               |
-| `/api/assets`          | GET    | REQ-021    | Asset list for sidebar entity browser   | `{ assets, total, filtered }`    |
-| `/api/asset/{id}`      | GET    | REQ-022    | Single asset detail for inspector panel | `{ asset_id, ... }`              |
-| `/api/neighbors/{id}`  | GET    | REQ-023    | Immediate neighbors of an asset         | `[ { neighbor_id, direction } ]` |
-| `/api/asset-types`     | GET    | REQ-024    | Distinct asset types for filter UI      | `[ { type_id, type_name } ]`     |
-| `/api/paths?from=&to=` | GET    | Future     | Attack path calculation                 | `{ paths, path_data }`           |
+| Endpoint                           | Method | Implements | Purpose                                               | Response format                          |
+|------------------------------------|--------|------------|-------------------------------------------------------|------------------------------------------|
+| `/api/graph`                       | GET    | REQ-020    | Graph nodes + edges for Cytoscape.js                  | `{ nodes, edges }`                       |
+| `/api/assets`                      | GET    | REQ-021    | Asset list for sidebar entity browser                 | `{ assets, total, filtered }`            |
+| `/api/asset/{id}`                  | GET    | REQ-022    | Single asset detail for inspector panel               | `{ asset_id, ... }`                      |
+| `/api/neighbors/{id}`              | GET    | REQ-023    | Immediate neighbors of an asset                       | `[ { neighbor_id, direction } ]`         |
+| `/api/asset-types`                 | GET    | REQ-024    | Distinct asset types for filter UI                    | `[ { type_id, type_name } ]`             |
+| `/api/paths?from=&to=`             | GET    | Future     | Attack path calculation                               | `{ paths, path_data }`                   |
+| `/api/edges/{sourceId}/{targetId}` | GET    | REQ-026    | All connections between two assets for edge inspector | `{ source, target, connections, total }` |
 
 ### Appendix D: nGQL Specification
 https://docs.nebula-graph.io/3.8.0/
@@ -374,6 +413,7 @@ Each requirement shall be considered complete when:
 | 1.1     | Feb 12, 2026 | KSmirnov | Second release                                                                                                                                                                                     |
 | 1.2     | Feb 17, 2026 | KSmirnov | REQ-123 updated                                                                                                                                                                                    |
 | 1.3     | Feb 17, 2026 | KSmirnov | REQ-020 revised (asset properties + type); REQ-021–025 added (asset list, detail, neighbors, asset types, input validation); REQ-122/REQ-123 revised; Appendix C added; section 3.1.3 restructured |
+| 1.4     | Feb 20, 2026 | KSmirnov | REQ-026 added (edge detail endpoint); REQ-027 added (edge de-duplication); REQ-122 range updated; Appendix C updated                                                                               |
 
 ---
 
