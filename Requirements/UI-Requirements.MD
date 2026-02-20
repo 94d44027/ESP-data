@@ -17,6 +17,7 @@ This document specifies the user interface requirements for the ESP PoC Visual L
 
 This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.4) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
 
+
 ### 1.2 Design Philosophy
 
 - **Dark theme** as primary color scheme (matching reference UI)
@@ -1064,22 +1065,22 @@ The UI implementation SHALL be considered complete when:
 
 ## Appendix B: Mapping to Existing Requirements
 
-| New UI Req           | Original Req     | Notes                                         |
-|----------------------|------------------|-----------------------------------------------|
-| UI-REQ-200, 201, 202 | REQ-010          | Cytoscape.js usage confirmed                  |
-| UI-REQ-300, 301      | REQ-011, REQ-101 | Contrast colors specified                     |
-| UI-REQ-202           | REQ-012          | Arrowhead on edges                            |
-| UI-REQ-201           | REQ-013          | Asset ID fits in/near node                    |
-| UI-REQ-200           | REQ-020          | Graph data with asset properties and types    |
-| UI-REQ-120, 121, 122 | REQ-021          | Asset list endpoint for sidebar               |
-| UI-REQ-210           | REQ-022          | Single asset detail for inspector panel       |
-| UI-REQ-210 §3–4      | REQ-023          | Neighbor list and connection summary          |
-| UI-REQ-122           | REQ-024          | Asset types list for filter checkboxes        |
-| UI-REQ-310           | REQ-100          | 1920x1080 minimum resolution                  |
-| UI-REQ-400           | REQ-121, REQ-122 | Go backend, JSON API                          |
-| UI-REQ-401           | REQ-123          | Multi-file VIS layer (per SRS v1.3)           |
-| UI-REQ-212           | REQ-026          | Edge inspector panel, edge detail endpoint    |
-| UI-REQ-202           | REQ-027          | Edge consolidation (de-duplication)           |
+| New UI Req           | Original Req     | Notes                                      |
+|----------------------|------------------|--------------------------------------------|
+| UI-REQ-200, 201, 202 | REQ-010          | Cytoscape.js usage confirmed               |
+| UI-REQ-300, 301      | REQ-011, REQ-101 | Contrast colors specified                  |
+| UI-REQ-202           | REQ-012          | Arrowhead on edges                         |
+| UI-REQ-201           | REQ-013          | Asset ID fits in/near node                 |
+| UI-REQ-200           | REQ-020          | Graph data with asset properties and types |
+| UI-REQ-120, 121, 122 | REQ-021          | Asset list endpoint for sidebar            |
+| UI-REQ-210           | REQ-022          | Single asset detail for inspector panel    |
+| UI-REQ-210 §3–4      | REQ-023          | Neighbor list and connection summary       |
+| UI-REQ-122           | REQ-024          | Asset types list for filter checkboxes     |
+| UI-REQ-310           | REQ-100          | 1920x1080 minimum resolution               |
+| UI-REQ-400           | REQ-121, REQ-122 | Go backend, JSON API                       |
+| UI-REQ-401           | REQ-123          | Multi-file VIS layer (per SRS v1.4)        |
+| UI-REQ-212           | REQ-026          | Edge inspector panel, edge detail endpoint |
+| UI-REQ-202           | REQ-027          | Edge consolidation (de-duplication)        |
 
 ---
 
