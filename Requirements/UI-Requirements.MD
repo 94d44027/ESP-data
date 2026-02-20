@@ -872,7 +872,7 @@ All files still served from `/opt/asset-viz/static/` as currently configured.
 
 ### UI-REQ-402: API Endpoints Required
 
-The following API endpoints are defined in Requirements.md (SRS v1.3) sections REQ-020 through REQ-024. See also Appendix C of Requirements.md for the full endpoint summary.
+The following API endpoints are defined in Requirements.md (SRS v1.4) sections REQ-020 through REQ-026. See also Appendix C of Requirements.md for the full endpoint summary.
 
 | Endpoint                               | SRS Req | Purpose                                               | Used by UI-REQ                 |
 |----------------------------------------|---------|-------------------------------------------------------|--------------------------------|
@@ -1026,7 +1026,7 @@ The UI implementation SHALL be considered complete when:
 
 ## 20. References
 
-- **Main Requirements:** `Requirements/Requirements.md` (ESP PoC SRS v1.3)
+- **Main Requirements:** `Requirements/Requirements.md` (ESP PoC SRS v1.4)
 - **Reference UI:** Screenshots provided (demo3.mp4 frames)
 - **Existing Implementation:** `static/index.html` (ESP-data repo)
 - **Cytoscape.js Documentation:** https://js.cytoscape.org/
