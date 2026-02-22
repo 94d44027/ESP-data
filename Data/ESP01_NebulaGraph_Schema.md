@@ -215,7 +215,7 @@ This edge indicates that one host can connect to another - through which combina
 #### Notes
 > This is future changes candidate Number 1 (i.e. which model describes the connectivity best).
 >
-> #### Edge Uniqueness and Rank
+#### Edge Uniqueness and Rank
 > In NebulaGraph, an edge is uniquely identified by the four-tuple: `(source_vid, edge_type, rank, destination_vid)`. If two `connects_to` edges share the same source, destination, **and rank**, the second INSERT **overwrites** the first.
 >
 > To store multiple connections between the same pair of assets (e.g., TCP/443 and UDP/1194 from the same source to the same target), each edge MUST have a **unique rank value** assigned via the `@rank` syntax:
