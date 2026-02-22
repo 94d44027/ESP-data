@@ -170,7 +170,7 @@ RETURN
 LIMIT 300;
 ```
 
-> **Note:** The MATCH query returns one row per `connects_to` edge, including edges with different rank values. For a pair of assets with N connections (N ranked edges), the query produces N rows. The APP layer de-duplicates these into a single visual edge per REQ-027.
+> **Note:** The MATCH query returns one row per `connects_to` edge, including edges with different rank values. For a pair of assets with N connections (N ranked edges), the query produces N rows. The APP layer de-duplicates these into a single visual edge per REQ-027. The `LIMIT 300` will be uplifted at teh later versions, candidate for future change.
 
 **REQ-021:** The APP layer SHALL provide an API endpoint (`GET /api/assets`) that returns a list of all assets with their associated type names, to populate the sidebar entity browser (UI-REQ-120) and support filtering by asset type (UI-REQ-122). The underlying query:
 
