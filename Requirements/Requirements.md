@@ -1,8 +1,8 @@
 # Software Requirements Specification (SRS)
 ## ESP Proof Of Concept system
 
-**Version:** 1.4  
-**Date:** February 20, 2026  
+**Version:** 1.5  
+**Date:** February 22, 2026  
 **Prepared by:** Konstantin Smirnov  
 **Project:** ESP PoC for Nebula Graph
 
@@ -170,6 +170,8 @@ RETURN
 LIMIT 300;
 ```
 
+> **Note:** The MATCH query returns one row per `connects_to` edge, including edges with different rank values. For a pair of assets with N connections (N ranked edges), the query produces N rows. The APP layer de-duplicates these into a single visual edge per REQ-027.
+
 **REQ-021:** The APP layer SHALL provide an API endpoint (`GET /api/assets`) that returns a list of all assets with their associated type names, to populate the sidebar entity browser (UI-REQ-120) and support filtering by asset type (UI-REQ-122). The underlying query:
 
 ```
@@ -266,6 +268,9 @@ The response SHALL also include the source and target asset summary (Asset_Name,
 **REQ-027:** When building the graph response for the `/api/graph` endpoint (REQ-020), the APP layer SHALL de-duplicate edges so that at most **one edge per unique (source, target) pair** is included in the response. This ensures the VIS layer renders a single visual connection between any two assets, regardless of how many `connects_to` edges exist in the database. De-duplication SHALL be performed in the APP layer (Go code) rather than by modifying the nGQL query.
 
 Note: a candidate for future change - a separate query that will deduplicate endpoints on teh database level. I.e. that it is not the APP layer that makes the deduplication, but the database itself, in a new API point.
+
+**REQ-028:** When inserting `connects_to` edges into NebulaGraph, each edge between the same `(source_vid, destination_vid)` pair MUST use a unique `@rank` value (starting from 0, incrementing by 1). This ensures multiple connections between the same asset pair are stored as separate edges rather than overwriting each other. See ESP01_NebulaGraph_Schema.md, `connects_to` section, "Edge Uniqueness and Rank" for the rank assignment convention.
+
 
 #### 3.1.4 Data Validation
 
@@ -416,7 +421,7 @@ Each requirement shall be considered complete when:
 | 1.2     | Feb 17, 2026 | KSmirnov | REQ-123 updated                                                                                                                                                                                    |
 | 1.3     | Feb 17, 2026 | KSmirnov | REQ-020 revised (asset properties + type); REQ-021–025 added (asset list, detail, neighbors, asset types, input validation); REQ-122/REQ-123 revised; Appendix C added; section 3.1.3 restructured |
 | 1.4     | Feb 20, 2026 | KSmirnov | REQ-026 added (edge detail endpoint); REQ-027 added (edge de-duplication); REQ-122 range updated; Appendix C updated                                                                               |
-
+| 1.5     | Feb 22, 2026 | KSmirnov | REQ-028 added (edge rank requirement); REQ-020 clarifying note on rank rows added          |
 ---
 
 

@@ -4,7 +4,7 @@
 **Source:** Full NebulaGraph Studio console, author's comments
 
 
-## Space Configuration
+## SP01: Space Configuration
 CREATE SPACE ESP01 (
 partition_num = 10,
 replica_factor = 1,
@@ -24,7 +24,7 @@ vid_type = FIXED_STRING(64)
 | VID Type         | FIXED_STRING(64) |
 | Comment          | (empty)          |
 
-## Tags (8 Types)
+## TA: Tags (8 Types)
 MITRE ATT&CK tactics, techniques, subtechniques, mitigations
 IT Infrastructure assets, asset types, OS types
 MITRE Tactic/Technique pairs and their patterns
@@ -34,7 +34,7 @@ Every tag description follows this pattern:
 * `Tag properties` - what properties does this edge have, type, nullable or not, default value, optional comments.
 * `Notes` (optional) - any other useful information regarding the use of a tag or the nature of its properties
 
-### Asset
+### TA001: Asset
 #### Used for
 Represents an asset in IT Infrastructure
 #### Tag properties
@@ -57,7 +57,7 @@ TTB stands for time to bypass - teh calculated time the hacker needs to traverse
 Asset Version field is reserved for future use.
 has vulnerability is used to indicate that there is a vulnerability on this host.
 
-### Asset_Type
+### TA002: Asset_Type
 #### Used for
 Type of asset like Server, Workstation, etc.
 #### Tag properties
@@ -69,7 +69,7 @@ Type of asset like Server, Workstation, etc.
 #### Notes
 Asset Type IDs have the format like "DT001".
 
-### Network_Segment
+### TA003: Network_Segment
 #### Used for
 Network segment that asset belongs to, such as DMZ, DC Lan, etc.
 #### Tag properties
@@ -83,7 +83,7 @@ Network segment that asset belongs to, such as DMZ, DC Lan, etc.
 #### Notes
 Segment IDs have format like "SEG00001".
 
-### OS_Type
+### TA004: OS_Type
 #### Used for
 Type of OS that asset runs, like Windows, Linux, Cisco iOS, etc.
 #### Tag properties
@@ -96,7 +96,7 @@ Type of OS that asset runs, like Windows, Linux, Cisco iOS, etc.
 #### Notes
 OS ID have the formats like "OPS0001"
 
-### tMitreMitigation
+### TA005: tMitreMitigation
 #### Used for
 This tag is used to represent MITRE mitigation applied to a host.
 #### Tag properties
@@ -110,7 +110,7 @@ This tag is used to represent MITRE mitigation applied to a host.
 #### Notes
 Both Matrix and Mitigation version are filled from the current MITRE site. Mitigation IDs are teh same as in MITRE.
 
-### tMitreState
+### TA006: tMitreState
 #### Used for
 This tag represents a pair of tactic/technique (or tactic/subtechnique) which can pattern (transit) to another combination of tactic/technique
 #### Tag properties
@@ -120,7 +120,7 @@ This tag represents a pair of tactic/technique (or tactic/subtechnique) which ca
 #### Notes
 These tMitreState pairs not necessarily exist for all combinations of tactic/technique (subtechnique). The state ID has the following format "TA0001|T1133" (Tactic|Technique or subtechnique respectfully).
 
-### tMitreTactic
+### TA007: tMitreTactic
 #### Used for
 Represents Mitre tactic
 #### Tag properties
@@ -132,7 +132,7 @@ Represents Mitre tactic
 #### Notes
 Tactic ID is the same as in Mitre.
 
-### tMitreTechnique
+### TA008: tMitreTechnique
 #### Used for
 Represents Mitre Technique/Subtechnique
 #### Tag properties
@@ -150,7 +150,7 @@ Technique and subtechnique are represented by the same type of tag, subtechnique
 Technique ID is the same as in MITRE.
 
 
-## Edges (12 Types)
+## ED: Edges (12 Types)
 Relationships for network topology, asset types, OS, how mitigation applied to assets, and relationships between tactics, techniques, subtechniques, and mitigations.
 
 Every edge description follows this pattern:
@@ -158,7 +158,7 @@ Every edge description follows this pattern:
 * `Edge properties` - what properties does this edge have, type, nullable or not, default value, optional comments.
 * `Notes` (optional) - any other useful information regarding the use of an edge or the nature of its properties
 
-### applied_to
+### ED001: applied_to
 #### Used for
 This is a relationship between tMitreMitigation and Asset tags. (tMitreMitigation --applied_to--> Asset)
 #### Edge properties
@@ -171,7 +171,7 @@ This is a relationship between tMitreMitigation and Asset tags. (tMitreMitigatio
 Version is a field for a version of an IT Infrastructure, where different versions of relationships indicate the different sets of mitigations applied to a host (IT Infrastructure asset). Later versions will have versions of IT Infrastructure differentiated by versions (i.e. same component but with the newer version). **To Be Verified Later**
 
 
-### belongs_to
+### ED002: belongs_to
 #### Used for
 This relationship is used to indicate to which network segment an asset belongs to. (Asset --belongs_to--> NetworkSegment)
 #### Edge properties
@@ -184,23 +184,26 @@ This relationship is used to indicate to which network segment an asset belongs 
 #### Notes
 None of the fields are used so far.
 
-### can_be_executed_on
+### ED003: can_be_executed_on
 #### Used for
 So far is not used.
 #### Edge properties
 No properties.
 
-### defines_state
+### ED004: defines_state
 #### Used for 
-This relationship is used to link MITRE tactic (tMitreTactic) and MITRE technique/subtechnique (tMitreTechnique) to a state (pattern) that they both form for automating the transitions between one Tactic/Technique to another Tactic/Technique. 
+This relationship is used to link MITRE tactic (tMitreTactic) and MITRE technique/subtechnique (tMitreTechnique) to a state (pattern) that they both form for automating the transitions between one Tactic/Technique to another Tactic/Technique.
+#### Edge properties
+No properties.
 
-### has_subtechnique
+
+### ED005: has_subtechnique
 #### Used for
 This relationship between a technique and a subtechnique indicates that this technique has a subtechnique (tMitreTechnique --has_subtechnique--> tMitreTechnique). This is done, because MITRE treats techniques and subtechniques as equal, i.e. the hierarchy Tactic - Technique/Subtechnique has one level, and this type of edges provides the way to group otherwise same-level items under its parent technique. In other words, subtechniques have two relations to their parents, one to tactic and one to its parent technique. 
 #### Edge properties
 No properties (pure relationship edge)
 
-### connects_to
+### ED006: connects_to
 #### Used for
 This edge indicates that one host can connect to another - through which combination of ports and protocols.
 #### Edge properties
@@ -209,9 +212,29 @@ This edge indicates that one host can connect to another - through which combina
 | Connection_Protocol | string | YES  | TCP     | ip, tcp, udp, icmp      |
 | Connection_Port     | string | YES  | 0-65536 | Port/range: 443, 80;443 |
 #### Notes
-This is future changes candidate Number 1 (i.e. which model describes the connectivity best).
+> This is future changes candidate Number 1 (i.e. which model describes the connectivity best).
+>
+> #### Edge Uniqueness and Rank
+> In NebulaGraph, an edge is uniquely identified by the four-tuple: `(source_vid, edge_type, rank, destination_vid)`. If two `connects_to` edges share the same source, destination, **and rank**, the second INSERT **overwrites** the first.
+>
+> To store multiple connections between the same pair of assets (e.g., TCP/443 and UDP/1194 from the same source to the same target), each edge MUST have a **unique rank value** assigned via the `@rank` syntax:
+>
+> ```sql
+> -- First connection (rank 0 — default)
+> INSERT EDGE IF NOT EXISTS connects_to(Connection_Protocol, Connection_Port)
+>   VALUES "A00025"->"A00002"@0:("TCP", "443");
+>
+> -- Second connection (rank 1)
+> INSERT EDGE IF NOT EXISTS connects_to(Connection_Protocol, Connection_Port)
+>   VALUES "A00025"->"A00002"@1:("UDP", "1194");
+> ```
+>
+> **Rank assignment convention:** For each unique `(source, target)` pair, ranks start at 0 and increment by 1. When bulk-loading from a spreadsheet, sort by `(source, target)` and compute rank as: if the current row's `(source, target)` matches the previous row, `rank = previous_rank + 1`; otherwise `rank = 0`.
+>
+> **Note:** This rank requirement applies to **all edge types** in NebulaGraph where multiple edges of the same type may connect the same vertex pair. Currently, only `connects_to` requires this in practice.
 
-### has_type
+
+### ED007: has_type
 #### Used for
 This field is used to indicate device type (Asset_Type) to IT infrastructure asset (Asset) - (Asset --has_type--> AssetType).
 #### Edge properties
@@ -221,7 +244,7 @@ This field is used to indicate device type (Asset_Type) to IT infrastructure ass
 #### Notes
 Assigned date is the indirect way to indicate when teh asset was added to an asset database. More properties will be added at later stage (like IT Infrastructure version - for future use).
 
-### implements
+### ED008: implements
 #### Used for
 This relationship is to indicate which IT Infrastructure asset (Asset) implements particular network segment - (Asset --implements--> Network_Segment).
 #### Edge properties
@@ -234,7 +257,7 @@ This relationship is to indicate which IT Infrastructure asset (Asset) implement
 #### Notes
 So far, none of the properties are used, except is_active. Subject to future improvements.
 
-### mitigates
+### ED009: mitigates
 #### Used for
 This is a relationship between the mitigation and the Technique/Subtechniqu - (tMitreMitigation --mitigates--> tMitreTechnique).
 #### Edge properties
@@ -245,7 +268,7 @@ This is a relationship between the mitigation and the Technique/Subtechniqu - (t
 #### Notes
 The data on connectivity is collected from MITRE ATT&CK Enterprise matrix by an external tool (going to be a part of the project later on). So far treated as static relationship. Use_Description field is not used at the moment.
 
-### part_of
+### ED010: part_of
 #### Used for
 This is to show the relationship between technique/subtechnique and its parent tactic. (tMitreTechnique --part_of--> tMitreTactic).
 #### Edge properties
@@ -253,17 +276,17 @@ No properties (pure relationship edge)
 #### Notes
 The data on connectivity is collected from MITRE ATT&CK Enterprise matrix by an external tool (going to be a part of the project later on). So far treated as static relationship.
 
-## Indexes (10 Total)
+## IN: Indexes (10 Total)
 ### Tag Indexes (7)
-| Index Name           | On Tag             | Columns                          |
-|----------------------|--------------------|----------------------------------|
-| MTactic_Index        | tMitreTactic       | ["Tactic_ID"]                    |
-| TecniqueIndex        | tMitreTechnique    | ["Technique_ID"]                 |
-| idx_asset_any        | Asset              | ["Asset_ID", "Asset_Name"]       |
-| idx_asset_type_any   | Asset_Type         | []                               |
-| idx_os_type_any      | OS_Type            | []                               |
-| idx_segment_any      | Network_Segment    | []                               |
-| state_id_index       | tMitreState        | ["state_id"]                     |
+| Index Name         | On Tag          | Columns                    |
+|--------------------|-----------------|----------------------------|
+| MTactic_Index      | tMitreTactic    | ["Tactic_ID"]              |
+| TecniqueIndex      | tMitreTechnique | ["Technique_ID"]           |
+| idx_asset_any      | Asset           | ["Asset_ID", "Asset_Name"] |
+| idx_asset_type_any | Asset_Type      | []                         |
+| idx_os_type_any    | OS_Type         | []                         |
+| idx_segment_any    | Network_Segment | []                         |
+| state_id_index     | tMitreState     | ["state_id"]               |
 
 ### Edge Indexes (3)
 | Index Name      | On Edge          | Columns |
