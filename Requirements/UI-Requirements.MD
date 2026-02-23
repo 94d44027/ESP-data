@@ -1,11 +1,11 @@
 # UI Requirements Specification
 ## ESP PoC - Visual Layer
 
-**Version:** 1.4  
-**Date:** February 20, 2026  
-**Prepared by:** Based on visual reference analysis  
+**Version:** 1.6  
+**Date:** February 23, 2026  
+**Prepared by:** KSmirnov + AI  
 **Project:** ESP PoC for Nebula Graph  
-**Reference:** Derived from demo UI screenshots
+**Reference:** Derived from demo UI screenshots and more
 
 ---
 
@@ -68,6 +68,7 @@ The top bar SHALL contain:
 - View mode toggles (graph layout selector)
 - Settings/preferences button (gear icon)
 - Help/documentation button (question mark icon)
+- Path Inspector button (chain-link or route icon) — opens the Path Inspector panel (UI-REQ-240)
 - Refresh data button (per REQ-013 concept - reload graph)
 
 **Visual Style:**
@@ -352,6 +353,86 @@ The application SHALL support multiple layout algorithms:
 - Can be toggled on/off via settings
 
 ---
+
+## 5A. Path Inspector
+
+### UI-REQ-206: Path Inspector Activation
+
+A button SHALL be placed in the Top Bar (or Bottom Toolbar) to open the Path Inspector. Per the wireframe, this is a dedicated button (chain-link icon or similar) that opens the Path Inspector as a modal overlay or a slide-out panel on the right side of the canvas.
+- Button icon: chain-link (🔗) or route icon
+- Tooltip: "Path Inspector"
+- The button is always visible (not context-dependent)
+
+### UI-REQ-207: Path Inspector Panel Structure
+
+The Path Inspector SHALL be a modal dialog or floating panel overlaying the main canvas (right-aligned per wireframe). It is stateless — closing it discards all calculated data; reopening requires a fresh calculation.
+
+Panel title: "Path Inspector"
+
+Layout (top to bottom):
+1. Entry Point dropdown
+   - Label: "Entry point:"
+   - Populated from `GET /api/entry-points` (REQ-030)
+   - Each option displays: `Asset_Name (Asset_ID)` — e.g. "WiFi1 (A00002)"
+   - Below the dropdown: description text showing the asset's full name/description
+   
+2. Target dropdown
+   - Label: "Target:"
+   - Populated from `GET /api/targets` (REQ-031)
+   - Same display format as entry point
+   - Below the dropdown: description text
+
+3. Hops (limit) selector
+   - Label: "Hops (limit):"
+   - Input type: number input or dropdown
+   - Valid range: 2–9
+   - Default: 6
+
+4. Run button
+   - Label: "Run"
+   - Triggers the path calculation call to `GET /api/paths` (REQ-029)
+   - Disabled until both entry point and target are selected
+   - Shows loading spinner while query executes
+
+5. Results table
+   - Columns: Path | Hosts | TTA 
+   - Path column: displays the path ID (e.g. P00001)
+   - Hosts column: displays the asset chain (e.g. `A00013 -> A00018 -> A00011`). Line wraps are allowed in this column. 
+   - TTA column: integer value, right-aligned 
+   - Table is scrollable vertically if many results 
+   - Rows are clickable (see UI-REQ-208)
+   - Results sorted by TTA ascending (matching API response order)
+
+Visual style:
+- Background: matches right panel / inspector panel (#202020 – #282828)
+- Table header: bold, slightly darker background
+- Table rows: alternating subtle striping for readability
+- Selected row: highlighted with accent color background
+
+### UI-REQ-208: Path Selection and Graph Highlighting
+
+When a row in the Path Inspector results table is clicked:
+
+1. The row becomes visually selected (highlighted background)
+2. The corresponding path is highlighted on the Cytoscape graph canvas:
+   - Path nodes: bold border, increased border width (e.g. 4px), accent colour (orange #ff9933 or similar per UI-REQ-202 "Path Member" state)
+   - Path edges: colour changes to orange #ff9933, increased width (3–4px), optionally animated dashes
+   - Non-path elements: dimmed (opacity 0.3) to make the path stand out
+3. The graph viewport pans/zooms to fit the selected path
+4. Clicking a different row switches the highlighting to the new path
+5. Only one path may be highlighted at a time
+
+> Note: This requirement promotes UI-REQ-332 from "Future Feature" to implemented for the path highlighting behaviour specifically when triggered from the Path Inspector.
+
+### UI-REQ-209: Path Inspector Close Behaviour
+- Close button (X) at top-right of the panel
+- Closing the panel:
+  - Clears all calculated data (stateless — per requirement 7 in the brief)
+  - Removes any path highlighting from the graph (restores all elements to default state)
+  - Does not persist entry point / target / hops selections
+- Pressing Escape also closes the panel
+
+>Note: A candidate for future change - teh path table persistence is a planned feature.
 
 ## 6. Right Panel (Detail Inspector)
 
@@ -727,16 +808,30 @@ Per REQ-100, the interface SHALL be functional on:
 4. Filter state persists during session
 5. "Clear Filters" resets to show all
 
-### UI-REQ-332: Path Highlighting (Future Feature)
+### UI-REQ-332: Path Highlighting (via Path Inspector)
 
-When attack path is calculated:
-1. All path edges change to orange color
-2. Path edges animate (dashed line moving or glow pulse)
-3. Path nodes highlighted with orange border
-4. Non-path elements dimmed
-5. Right panel lists path steps in order
-6. Click path step → zoom to that hop
-7. "Clear Path" button returns to normal view
+When an attack path is selected from the Path Inspector results table (UI-REQ-207), the graph canvas SHALL enter a path highlighting mode with the following behaviour:
+
+1. Path visual state (implemented):
+   - All edges that belong to the selected path are rendered with selected/path styling: color orange (#ff9933), width 3–4px, and (optionally) animated dashes or glow. 
+   - All nodes that belong to the selected path are highlighted with a distinct border (e.g. white or orange), increased border width, and optional glow effect. 
+   - All non-path nodes and edges are visually dimmed (e.g. opacity ≈0.3) but remain interactive.
+
+2. Path steps presentation (implemented):
+   - The Path Inspector table itself serves as the ordered list of path steps: each row represents a path, and within a row the Hosts column shows the ordered chain of Asset_IDs (e.g. `A00013 -> A00018 -> A00011`). 
+   - Selecting a row in the table highlights the corresponding path on the graph per item 1 above.
+
+3. Viewport behaviour (implemented):
+   - When a path is selected, the graph viewport SHALL pan/zoom to fit all nodes of that path within the visible area. 
+   - Selecting a different path updates the highlighted elements and refits the viewport accordingly.
+
+4. Interaction details (partially deferred):
+   - Clicking a row in the Path Inspector selects the entire path. 
+   - Fine-grained “click a single hop in the host chain to zoom only to that hop” is deferred and not required for this version.
+
+5. Clearing highlight state (implemented):
+   - Closing the Path Inspector (UI-REQ-209) SHALL exit path highlighting mode, restoring all nodes and edges to their default visual state and clearing any selected path. 
+   - An explicit “Clear Path” button inside the Path Inspector is optional; closing the panel is sufficient to satisfy this requirement.
 
 ---
 
@@ -875,15 +970,17 @@ All files still served from `/opt/asset-viz/static/` as currently configured.
 
 The following API endpoints are defined in Requirements.md (SRS v1.4) sections REQ-020 through REQ-026. See also Appendix C of Requirements.md for the full endpoint summary.
 
-| Endpoint                               | SRS Req | Purpose                                               | Used by UI-REQ                 |
-|----------------------------------------|---------|-------------------------------------------------------|--------------------------------|
-| `GET /api/graph`                       | REQ-020 | Graph nodes + edges with properties/types             | UI-REQ-200, 201, 202           |
-| `GET /api/assets`                      | REQ-021 | Asset list for sidebar (with filtering)               | UI-REQ-120, 121, 122           |
-| `GET /api/asset/{id}`                  | REQ-022 | Single asset detail for inspector panel               | UI-REQ-210                     |
-| `GET /api/neighbors/{id}`              | REQ-023 | Immediate neighbors of an asset                       | UI-REQ-210 §3–4                |
-| `GET /api/asset-types`                 | REQ-024 | Distinct asset types for filter checkboxes            | UI-REQ-122                     |
-| `GET /api/paths`                       | Future  | Attack path calculation                               | UI-REQ-241 (out of scope v1.0) |
-| `GET /api/edges/{sourceId}/{targetId}` | REQ-026 | All connections between two assets for edge inspector | UI-REQ-212                     |
+| Endpoint                               | SRS Req | Purpose                                               | Used by UI-REQ       |
+|----------------------------------------|---------|-------------------------------------------------------|----------------------|
+| `GET /api/graph`                       | REQ-020 | Graph nodes + edges with properties/types             | UI-REQ-200, 201, 202 |
+| `GET /api/assets`                      | REQ-021 | Asset list for sidebar (with filtering)               | UI-REQ-120, 121, 122 |
+| `GET /api/asset/{id}`                  | REQ-022 | Single asset detail for inspector panel               | UI-REQ-210           |
+| `GET /api/neighbors/{id}`              | REQ-023 | Immediate neighbors of an asset                       | UI-REQ-210 §3–4      |
+| `GET /api/asset-types`                 | REQ-024 | Distinct asset types for filter checkboxes            | UI-REQ-122           |
+| `GET /api/edges/{sourceId}/{targetId}` | REQ-026 | All connections between two assets for edge inspector | UI-REQ-212           |
+| `GET /api/paths?from=&to=&hops=`       | REQ-029 | Path calculation with TTA                             | UI-REQ-241           |
+| `GET /api/entry-points`                | REQ-030 | Entry points for dropdown                             | UI-REQ-241 §1        |
+| `GET /api/targets`                     | REQ-031 | Targets for dropdown                                  | UI-REQ-241 §2        |
 
 **`/api/graph` node data format (per REQ-020):**
 ```json
@@ -1065,22 +1162,27 @@ The UI implementation SHALL be considered complete when:
 
 ## Appendix B: Mapping to Existing Requirements
 
-| New UI Req           | Original Req     | Notes                                      |
-|----------------------|------------------|--------------------------------------------|
-| UI-REQ-200, 201, 202 | REQ-010          | Cytoscape.js usage confirmed               |
-| UI-REQ-300, 301      | REQ-011, REQ-101 | Contrast colors specified                  |
-| UI-REQ-202           | REQ-012          | Arrowhead on edges                         |
-| UI-REQ-201           | REQ-013          | Asset ID fits in/near node                 |
-| UI-REQ-200           | REQ-020          | Graph data with asset properties and types |
-| UI-REQ-120, 121, 122 | REQ-021          | Asset list endpoint for sidebar            |
-| UI-REQ-210           | REQ-022          | Single asset detail for inspector panel    |
-| UI-REQ-210 §3–4      | REQ-023          | Neighbor list and connection summary       |
-| UI-REQ-122           | REQ-024          | Asset types list for filter checkboxes     |
-| UI-REQ-310           | REQ-100          | 1920x1080 minimum resolution               |
-| UI-REQ-400           | REQ-121, REQ-122 | Go backend, JSON API                       |
-| UI-REQ-401           | REQ-123          | Multi-file VIS layer (per SRS v1.4)        |
-| UI-REQ-212           | REQ-026          | Edge inspector panel, edge detail endpoint |
-| UI-REQ-202           | REQ-027          | Edge consolidation (de-duplication)        |
+| New UI Req           | Original Req              | Notes                                           |
+|----------------------|---------------------------|-------------------------------------------------|
+| UI-REQ-200, 201, 202 | REQ-010                   | Cytoscape.js usage confirmed                    |
+| UI-REQ-300, 301      | REQ-011, REQ-101          | Contrast colors specified                       |
+| UI-REQ-202           | REQ-012                   | Arrowhead on edges                              |
+| UI-REQ-201           | REQ-013                   | Asset ID fits in/near node                      |
+| UI-REQ-200           | REQ-020                   | Graph data with asset properties and types      |
+| UI-REQ-120, 121, 122 | REQ-021                   | Asset list endpoint for sidebar                 |
+| UI-REQ-210           | REQ-022                   | Single asset detail for inspector panel         |
+| UI-REQ-210 §3–4      | REQ-023                   | Neighbor list and connection summary            |
+| UI-REQ-122           | REQ-024                   | Asset types list for filter checkboxes          |
+| UI-REQ-310           | REQ-100                   | 1920x1080 minimum resolution                    |
+| UI-REQ-400           | REQ-121, REQ-122          | Go backend, JSON API                            |
+| UI-REQ-401           | REQ-123                   | Multi-file VIS layer (per SRS v1.4)             |
+| UI-REQ-212           | REQ-026                   | Edge inspector panel, edge detail endpoint      |
+| UI-REQ-202           | REQ-027                   | Edge consolidation (de-duplication)             |
+| UI-REQ-206           | REQ-029                   | Inspector activation                            |
+| UI-REQ-207           | REQ-029, REQ-030, REQ-031 | Path Inspector panel with dropdowns and results |
+| UI-REQ-208           | REQ-029                   | Path selection and graph highlighting           |
+| UI-REQ-209           | ---                       | Stateless close behaviour                       |
+
 
 ---
 
@@ -1095,3 +1197,4 @@ The UI implementation SHALL be considered complete when:
 | 1.0     | feb 16, 2026 | Initial specification based on visual reference analysis                                                                                                                                                                                 | AI + K. Smirnov |
 | 1.1     | Feb 17, 2026 | Aligned with SRS v1.3: updated API endpoint specs (UI-REQ-402) with concrete JSON formats per REQ-020–024; added data source references to UI-REQ-200, UI-REQ-210; added Segment_Name to inspector panel; updated Appendix B mapping     | AI + K. Smirnov |
 | 1.4     | Feb 20, 2026 | UI-REQ-202 amended (edge consolidation); UI-REQ-212 added (edge inspector); UI-REQ-200 amended (edge de-duplication note); UI-REQ-330 amended (edge selection flow); UI-REQ-402 updated (new endpoint + JSON format); Appendix B updated | AI + K. Smirnov |
+| 1.6     | Feb 23, 2026 | Adder UI-REQ-206 - 209, Amended UI-REQ-110, Promoted from "Future" to "Partially implemented" UI-REQ-332, updated UI-REQ-402, Appendix B                                                                                                 | AI+K.Smirnov    |
