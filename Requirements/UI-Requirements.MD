@@ -1,8 +1,8 @@
 # UI Requirements Specification
 ## ESP PoC - Visual Layer
 
-**Version:** 1.6  
-**Date:** February 23, 2026  
+**Version:** 1.7  
+**Date:** February 24, 2026  
 **Prepared by:** K. Smirnov + AI  
 **Project:** ESP PoC for Nebula Graph  
 **Reference:** Derived from demo UI screenshots and more
@@ -193,6 +193,17 @@ Note: marking "clear filter" button as deferred.
 - Button to expand: Right-pointing chevron
 - Animation: Smooth 250ms transition
 
+### UI-REQ-124: Sidebar Auto-Focus on Graph Selection:
+
+| Aspect                       | Specification                                                                                                                                                                                                                |
+|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Trigger                      | User clicks (selects) a node on the main Cytoscape graph canvas                                                                                                                                                              |
+| Behavior — sidebar open      | The asset list SHALL smooth-scroll to the corresponding asset item and apply the "selected item" highlight style (background #2a4a5a or accent color with opacity, per UI-REQ-120)                                           |
+| Behavior — sidebar collapsed | No action. The sidebar remains collapsed; no auto-expand occurs.                                                                                                                                                             |
+| Highlight persistence        | The highlight remains active for as long as the node is selected on the canvas. Clicking empty canvas or pressing Escape clears both the graph selection and the sidebar highlight.                                          |
+| Multi-select                 | When Cmd/Ctrl + Click adds nodes (per UI-REQ-330), the sidebar SHALL scroll to and highlight the most recently selected node. Previously highlighted items remain highlighted if their nodes are still in the selection set. |
+| Scroll style                 | Smooth scroll with behavior: 'smooth' (or equivalent CSS/JS), block: 'nearest' to minimise unnecessary scrolling when the item is already visible.                                                                           |
+
 ---
 
 ## 5. Main Canvas (Graph Visualization)
@@ -249,7 +260,7 @@ The main graph canvas SHALL:
 - **Highlighted:** (from search/path) Pulsing glow or distinct border color (orange `#ff9933`)
 
 **Node Behavior:**
-- Click: Select node, open detail panel, highlight in entity list
+- Click: Select node, open detail panel, highlight in entity list (see UI-REQ-124)
 - Double-click: Expand/collapse neighbors (if too dense)
 - Drag: Move node (layout should allow manual repositioning)
 - Right-click: Context menu (future)
@@ -762,13 +773,13 @@ Per REQ-100, the interface SHALL be functional on:
 
 ## 12. Interaction Patterns
 
-### UI-REQ-330: Selection Behavior
+### UI-REQ-330: Selection Behaviour
 
 **Single Node Selection:**
 1. Click node
 2. Node highlighted (border change)
 3. Right panel slides in with details
-4. Entity list scrolls to and highlights corresponding item
+4. Entity list scrolls to and highlights corresponding item (per UI-REQ-124)
 
 **Multi-Node Selection:**
 1. `Cmd/Ctrl + Click` additional nodes
@@ -1202,3 +1213,4 @@ The UI implementation SHALL be considered complete when:
 | 1.1     | Feb 17, 2026 | Aligned with SRS v1.3: updated API endpoint specs (UI-REQ-402) with concrete JSON formats per REQ-020–024; added data source references to UI-REQ-200, UI-REQ-210; added Segment_Name to inspector panel; updated Appendix B mapping     | AI + K. Smirnov |
 | 1.4     | Feb 20, 2026 | UI-REQ-202 amended (edge consolidation); UI-REQ-212 added (edge inspector); UI-REQ-200 amended (edge de-duplication note); UI-REQ-330 amended (edge selection flow); UI-REQ-402 updated (new endpoint + JSON format); Appendix B updated | AI + K. Smirnov |
 | 1.6     | Feb 23, 2026 | Added UI-REQ-206 - 209, Amended UI-REQ-110, Promoted from "Future" to "Partially implemented" UI-REQ-332, updated UI-REQ-402, Appendix B, UI-REQ-401 updated - new static UI files structure                                             | AI + K.Smirnov  |
+| 1.7     | Feb 24, 2026 | Added UI-REQ-124 (scroll to asset), enrich UI-REQ-201 and UI-REQ-330 with references to the new UI-REQ-124                                                                                                                               |                 |

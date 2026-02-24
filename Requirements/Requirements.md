@@ -363,7 +363,7 @@ None so far
 
 **REQ-122:** The APP layer shall publish the results intended for visualisation as JSON. All API endpoints defined in REQ-020 - REQ-031 SHALL return JSON responses.
 
-**REQ-123:** The VIS layer SHALL be implemented as described in UI-Requirements.MD (Version 1.6). Cytoscape.js is the graph rendering library. The implementation may use multiple HTML files or a single-page application architecture as needed for functionality.
+**REQ-123:** The VIS layer SHALL be implemented as described in UI-Requirements.MD (Version 1.7). Cytoscape.js is the graph rendering library. The implementation may use multiple HTML files or a single-page application architecture as needed for functionality.
 
 
 
