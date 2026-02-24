@@ -1,0 +1,608 @@
+/* ============================================
+   ESP PoC - Main Stylesheet
+   Extracted from monolithic index.html
+   ============================================ */
+
+/* ============================================
+   GLOBAL RESET & BASE STYLES
+   UI-REQ-100: Dark theme, high contrast
+   ============================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Dark Theme Color Palette (UI-REQ-100) */
+    --color-bg-primary: #0a0e1a;
+    --color-bg-secondary: #141824;
+    --color-bg-elevated: #1a1f2e;
+    --color-border: #2a3142;
+    --color-border-strong: #3d4556;
+
+    /* Text Colors (High Contrast - REQ-011) */
+    --color-text-primary: #e8eaed;
+    --color-text-secondary: #9aa0a6;
+    --color-text-muted: #6b7280;
+
+    /* Accent Colors */
+    --color-accent-primary: #4a9eff;
+    --color-accent-hover: #6eb0ff;
+    --color-success: #22c55e;
+    --color-warning: #f59e0b;
+    --color-danger: #ef4444;
+
+    /* Node Type Colors (UI-REQ-203) */
+    --color-node-server: #5a9d5a;
+    --color-node-workstation: #4a9d9c;
+    --color-node-network: #5a7fbf;
+    --color-node-application: #10b981;
+    --color-node-database: #f59e0b;
+    --color-node-default: #6b7280;
+
+    /* Priority Colors (UI-REQ-204) */
+    --color-priority-1: #ef4444;
+    --color-priority-2: #f59e0b;
+    --color-priority-3: #eab308;
+    --color-priority-4: #3b82f6;
+
+    /* Layout Dimensions (UI-REQ-100) */
+    --topbar-height: 56px;
+    --sidebar-width: 300px;
+    --inspector-width: 380px;
+
+    /* Typography */
+    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                   Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-size-xs: 11px;
+    --font-size-sm: 13px;
+    --font-size-base: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 18px;
+
+    /* Spacing */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --spacing-xl: 24px;
+
+    /* Transitions */
+    --transition-fast: 150ms ease;
+    --transition-normal: 250ms ease;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: var(--font-size-base);
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-primary);
+    overflow: hidden;
+    line-height: 1.5;
+}
+
+/* ============================================
+   LAYOUT STRUCTURE (UI-REQ-100)
+   ============================================ */
+
+.topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--topbar-height);
+    background-color: var(--color-bg-secondary);
+    border-bottom: 1px solid var(--color-border-strong);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--spacing-lg);
+    z-index: 100;
+}
+
+.topbar-title {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-right: auto;
+}
+
+.topbar-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    align-items: center;
+}
+
+/* Left Sidebar (UI-REQ-110) */
+.sidebar {
+    position: fixed;
+    top: var(--topbar-height);
+    left: 0;
+    width: var(--sidebar-width);
+    bottom: 0;
+    background-color: var(--color-bg-secondary);
+    border-right: 1px solid var(--color-border-strong);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 50;
+    transition: transform var(--transition-normal);
+}
+
+.sidebar.collapsed {
+    transform: translateX(calc(-1 * var(--sidebar-width)));
+}
+
+.sidebar-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.sidebar-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Search Box (UI-REQ-111) */
+.search-box {
+    position: relative;
+}
+
+.search-input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    padding-left: 32px;
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+
+.search-input:focus {
+    border-color: var(--color-accent-primary);
+}
+
+.search-input::placeholder {
+    color: var(--color-text-muted);
+}
+
+.search-icon {
+    position: absolute;
+    left: var(--spacing-sm);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+/* Filter Section (UI-REQ-122) */
+.filter-section {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.filter-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    margin-bottom: var(--spacing-md);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-text-secondary);
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.filter-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color var(--transition-fast);
+}
+
+.filter-checkbox:hover {
+    background-color: var(--color-bg-elevated);
+}
+
+.filter-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.filter-checkbox label {
+    flex: 1;
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+}
+
+.filter-count {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-elevated);
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+
+/* Asset List (UI-REQ-120) */
+.asset-list-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-md);
+}
+
+.asset-item {
+    padding: var(--spacing-md);
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    margin-bottom: var(--spacing-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.asset-item:hover {
+    background-color: var(--color-bg-primary);
+    border-color: var(--color-accent-primary);
+}
+
+.asset-item.selected {
+    background-color: var(--color-bg-primary);
+    border-color: var(--color-accent-primary);
+    box-shadow: 0 0 0 1px var(--color-accent-primary);
+}
+
+.asset-item-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+.asset-item-id {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.asset-item-name {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+.asset-item-badges {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-xs);
+    flex-wrap: wrap;
+}
+
+/* Main Canvas (UI-REQ-200) */
+.main-canvas {
+    position: fixed;
+    top: var(--topbar-height);
+    left: var(--sidebar-width);
+    right: var(--inspector-width);
+    bottom: 0;
+    background-color: var(--color-bg-primary);
+    transition: left var(--transition-normal), right var(--transition-normal);
+}
+
+.main-canvas.sidebar-collapsed {
+    left: 0;
+}
+
+.main-canvas.inspector-collapsed {
+    right: 0;
+}
+
+#cy {
+    width: 100%;
+    height: 100%;
+}
+
+/* Right Inspector Panel (UI-REQ-210) */
+.inspector {
+    position: fixed;
+    top: var(--topbar-height);
+    right: 0;
+    width: var(--inspector-width);
+    bottom: 0;
+    background-color: var(--color-bg-secondary);
+    border-left: 1px solid var(--color-border-strong);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 50;
+    transition: transform var(--transition-normal);
+}
+
+.inspector.collapsed {
+    transform: translateX(var(--inspector-width));
+}
+
+.inspector-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.inspector-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+}
+
+.inspector-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg);
+}
+
+.inspector-empty {
+    text-align: center;
+    color: var(--color-text-muted);
+    padding: var(--spacing-xl);
+    font-size: var(--font-size-sm);
+}
+
+/* Property List (UI-REQ-211) */
+.property-section {
+    margin-bottom: var(--spacing-xl);
+}
+
+.property-section-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-md);
+}
+
+.property-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.property-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.property-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.property-value {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+    word-break: break-word;
+}
+
+/* Connection List (UI-REQ-212) */
+.connection-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.connection-item {
+    padding: var(--spacing-md);
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.connection-item:hover {
+    background-color: var(--color-bg-primary);
+    border-color: var(--color-accent-primary);
+}
+
+.connection-direction {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-bottom: var(--spacing-xs);
+}
+
+.connection-target {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+/* Edge Inspector styles (UI-REQ-212) */
+.edge-asset-block {
+    padding: var(--spacing-md);
+}
+.edge-asset-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: var(--spacing-xs);
+}
+.edge-asset-name {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    cursor: pointer;
+}
+.edge-asset-name:hover {
+    color: var(--color-accent-primary);
+}
+.edge-asset-id {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+.edge-asset-desc {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-top: var(--spacing-xs);
+}
+.edge-connections-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+.edge-connections-table th {
+    text-align: left;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-bg-primary);
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    border-bottom: 1px solid var(--color-border-strong);
+}
+.edge-connections-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--color-text-primary);
+    border-bottom: 1px solid var(--color-border);
+}
+.edge-connections-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* ============================================
+   COMMON UI COMPONENTS
+   ============================================ */
+
+.btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    outline: none;
+}
+
+.btn:hover {
+    background-color: var(--color-bg-primary);
+    border-color: var(--color-accent-primary);
+}
+
+.btn-primary {
+    background-color: var(--color-accent-primary);
+    border-color: var(--color-accent-primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+}
+
+.btn-icon {
+    padding: var(--spacing-sm);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Badges */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.badge-entrance {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: var(--color-success);
+    border: 1px solid var(--color-success);
+}
+
+.badge-target {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: var(--color-danger);
+    border: 1px solid var(--color-danger);
+}
+
+.badge-vuln {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning);
+}
+
+.badge-priority-1 { background-color: rgba(239, 68, 68, 0.2); color: var(--color-priority-1); }
+.badge-priority-2 { background-color: rgba(245, 158, 11, 0.2); color: var(--color-priority-2); }
+.badge-priority-3 { background-color: rgba(234, 179, 8, 0.2); color: var(--color-priority-3); }
+.badge-priority-4 { background-color: rgba(59, 130, 246, 0.2); color: var(--color-priority-4); }
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--color-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted);
+}
+
+/* Loading Spinner */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-border);
+    border-top-color: var(--color-accent-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Stats Counter */
+.stats {
+    display: flex;
+    gap: var(--spacing-lg);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.stat-value {
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
