@@ -361,9 +361,9 @@ None so far
 
 **REQ-121:** The APP layer shall connect to the GrDB using Vesoft's Go client libraries.
 
-**REQ-122:** The APP layer shall publish the results intended for visualisation as JSON. All API endpoints defined in REQ-020 - REQ-026, REQ-029 SHALL return JSON responses.
+**REQ-122:** The APP layer shall publish the results intended for visualisation as JSON. All API endpoints defined in REQ-020 - REQ-031 SHALL return JSON responses.
 
-**REQ-123:** The VIS layer SHALL be implemented as described in UI-Requirements.MD (Version 1.4). Cytoscape.js is the graph rendering library. The implementation may use multiple HTML files or a single-page application architecture as needed for functionality.
+**REQ-123:** The VIS layer SHALL be implemented as described in UI-Requirements.MD (Version 1.6). Cytoscape.js is the graph rendering library. The implementation may use multiple HTML files or a single-page application architecture as needed for functionality.
 
 
 
@@ -468,7 +468,6 @@ https://github.com/94d44027/ESP-data/blob/main/Data/ESP01_NebulaGraph_Schema.md
 | `/api/asset/{id}`                  | GET    | REQ-022    | Single asset detail for inspector panel               | `{ asset_id, ... }`                           |
 | `/api/neighbors/{id}`              | GET    | REQ-023    | Immediate neighbors of an asset                       | `[ { neighbor_id, direction } ]`              |
 | `/api/asset-types`                 | GET    | REQ-024    | Distinct asset types for filter UI                    | `[ { type_id, type_name } ]`                  |
-| `/api/paths?from=&to=`             | GET    | Future     | Attack path calculation                               | `{ paths, path_data }`                        |
 | `/api/edges/{sourceId}/{targetId}` | GET    | REQ-026    | All connections between two assets for edge inspector | `{ source, target, connections, total }`      |
 | `/api/paths?from=&to=&hops=`       | GET    | REQ-029    | Path calculation with TTA metric                      | `{ paths, entry_point, target, hops, total }` |
 | `/api/entry-points`                | GET    | REQ-030    | Entry point assets for Path Inspector dropdown        | `[ { asset_id, asset_name } ]`                |
@@ -494,7 +493,7 @@ Each requirement shall be considered complete when:
 | 1.3     | Feb 17, 2026 | KSmirnov | REQ-020 revised (asset properties + type); REQ-021–025 added (asset list, detail, neighbors, asset types, input validation); REQ-122/REQ-123 revised; Appendix C added; section 3.1.3 restructured |
 | 1.4     | Feb 20, 2026 | KSmirnov | REQ-026 added (edge detail endpoint); REQ-027 added (edge de-duplication); REQ-122 range updated; Appendix C updated                                                                               |
 | 1.5     | Feb 22, 2026 | KSmirnov | REQ-028 added (edge rank requirement); REQ-020 clarifying note on rank rows added                                                                                                                  |
-| 1.6     | Feb 23, 2026 | KSmirnov | REQ-029, REQ-030, REQ-031, REQ-032 added, added PAth ID definition, Move /api/paths from Future → REQ-029; add two new endpoints                                                                   |
+| 1.6     | Feb 23, 2026 | KSmirnov | REQ-029, REQ-030, REQ-031, REQ-032 added, added Pфth ID definition, Move /api/paths from Future → REQ-029; add two new endpoints                                                                   |
 ---
 
 
