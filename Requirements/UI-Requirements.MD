@@ -3,7 +3,7 @@
 
 **Version:** 1.6  
 **Date:** February 23, 2026  
-**Prepared by:** KSmirnov + AI  
+**Prepared by:** K. Smirnov + AI  
 **Project:** ESP PoC for Nebula Graph  
 **Reference:** Derived from demo UI screenshots and more
 
@@ -15,12 +15,12 @@ This document specifies the user interface requirements for the ESP PoC Visual L
 
 ### 1.1 Document Scope
 
-This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.4) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
+This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.6) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
 
 
 ### 1.2 Design Philosophy
 
-- **Dark theme** as primary color scheme (matching reference UI)
+- **Dark theme** as primary colour scheme (matching reference UI)
 - **High contrast** for accessibility (per REQ-011, REQ-101)
 - **Graph-centric** layout with supporting panels
 - **Minimal cognitive load** - focus on the visualization
@@ -68,7 +68,7 @@ The top bar SHALL contain:
 - View mode toggles (graph layout selector)
 - Settings/preferences button (gear icon)
 - Help/documentation button (question mark icon)
-- Path Inspector button (chain-link or route icon) — opens the Path Inspector panel (UI-REQ-240)
+- Path Inspector button (chain-link or route icon) — opens the Path Inspector panel (UI-REQ-206)
 - Refresh data button (per REQ-013 concept - reload graph)
 
 **Visual Style:**
@@ -968,7 +968,7 @@ All files still served from `/opt/asset-viz/static/` as currently configured.
 
 ### UI-REQ-402: API Endpoints Required
 
-The following API endpoints are defined in Requirements.md (SRS v1.4) sections REQ-020 through REQ-026. See also Appendix C of Requirements.md for the full endpoint summary.
+The following API endpoints are defined in Requirements.md (SRS v1.6) sections REQ-020 through REQ-032. See also Appendix C of Requirements.md for the full endpoint summary.
 
 | Endpoint                               | SRS Req | Purpose                                               | Used by UI-REQ       |
 |----------------------------------------|---------|-------------------------------------------------------|----------------------|
@@ -978,9 +978,9 @@ The following API endpoints are defined in Requirements.md (SRS v1.4) sections R
 | `GET /api/neighbors/{id}`              | REQ-023 | Immediate neighbors of an asset                       | UI-REQ-210 §3–4      |
 | `GET /api/asset-types`                 | REQ-024 | Distinct asset types for filter checkboxes            | UI-REQ-122           |
 | `GET /api/edges/{sourceId}/{targetId}` | REQ-026 | All connections between two assets for edge inspector | UI-REQ-212           |
-| `GET /api/paths?from=&to=&hops=`       | REQ-029 | Path calculation with TTA                             | UI-REQ-241           |
-| `GET /api/entry-points`                | REQ-030 | Entry points for dropdown                             | UI-REQ-241 §1        |
-| `GET /api/targets`                     | REQ-031 | Targets for dropdown                                  | UI-REQ-241 §2        |
+| `GET /api/paths?from=&to=&hops=`       | REQ-029 | Path calculation with TTA                             | UI-REQ-207           |
+| `GET /api/entry-points`                | REQ-030 | Entry points for dropdown                             | UI-REQ-207 §1        |
+| `GET /api/targets`                     | REQ-031 | Targets for dropdown                                  | UI-REQ-207 §2        |
 
 **`/api/graph` node data format (per REQ-020):**
 ```json
@@ -1124,7 +1124,7 @@ The UI implementation SHALL be considered complete when:
 
 ## 20. References
 
-- **Main Requirements:** `Requirements/Requirements.md` (ESP PoC SRS v1.4)
+- **Main Requirements:** `Requirements/Requirements.md` (ESP PoC SRS v1.6)
 - **Reference UI:** Screenshots provided (demo3.mp4 frames)
 - **Existing Implementation:** `static/index.html` (ESP-data repo)
 - **Cytoscape.js Documentation:** https://js.cytoscape.org/
@@ -1197,4 +1197,4 @@ The UI implementation SHALL be considered complete when:
 | 1.0     | feb 16, 2026 | Initial specification based on visual reference analysis                                                                                                                                                                                 | AI + K. Smirnov |
 | 1.1     | Feb 17, 2026 | Aligned with SRS v1.3: updated API endpoint specs (UI-REQ-402) with concrete JSON formats per REQ-020–024; added data source references to UI-REQ-200, UI-REQ-210; added Segment_Name to inspector panel; updated Appendix B mapping     | AI + K. Smirnov |
 | 1.4     | Feb 20, 2026 | UI-REQ-202 amended (edge consolidation); UI-REQ-212 added (edge inspector); UI-REQ-200 amended (edge de-duplication note); UI-REQ-330 amended (edge selection flow); UI-REQ-402 updated (new endpoint + JSON format); Appendix B updated | AI + K. Smirnov |
-| 1.6     | Feb 23, 2026 | Adder UI-REQ-206 - 209, Amended UI-REQ-110, Promoted from "Future" to "Partially implemented" UI-REQ-332, updated UI-REQ-402, Appendix B                                                                                                 | AI+K.Smirnov    |
+| 1.6     | Feb 23, 2026 | Added UI-REQ-206 - 209, Amended UI-REQ-110, Promoted from "Future" to "Partially implemented" UI-REQ-332, updated UI-REQ-402, Appendix B                                                                                                 | AI + K.Smirnov  |
