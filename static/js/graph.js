@@ -17,13 +17,13 @@ function initCytoscape(graphData) {
             name: 'cose',
             animate: true,
             animationDuration: 500,
-            nodeRepulsion: 8000,
-            idealEdgeLength: 100,
+            nodeRepulsion: 400000,
+            idealEdgeLength: 160,
             edgeElasticity: 100,
             nestingFactor: 1.2,
-            gravity: 1,
-            numIter: 1000,
-            randomize: false
+            gravity: 0.5,
+            numIter: 3000,
+            randomize: true
         },
 
         // Visual Styling (UI-REQ-203, UI-REQ-204)
