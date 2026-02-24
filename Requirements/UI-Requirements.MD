@@ -1175,7 +1175,7 @@ The UI implementation SHALL be considered complete when:
 | UI-REQ-122           | REQ-024                   | Asset types list for filter checkboxes          |
 | UI-REQ-310           | REQ-100                   | 1920x1080 minimum resolution                    |
 | UI-REQ-400           | REQ-121, REQ-122          | Go backend, JSON API                            |
-| UI-REQ-401           | REQ-123                   | Multi-file VIS layer (per SRS v1.4)             |
+| UI-REQ-401           | REQ-123                   | Multi-file VIS layer (per SRS v1.6)             |
 | UI-REQ-212           | REQ-026                   | Edge inspector panel, edge detail endpoint      |
 | UI-REQ-202           | REQ-027                   | Edge consolidation (de-duplication)             |
 | UI-REQ-206           | REQ-029                   | Inspector activation                            |
