@@ -100,8 +100,38 @@ function initCytoscape(graphData) {
                     'target-arrow-color': '#ff9933',
                     'width': 3
                 }
+            },
+
+            // Path highlight styles (UI-REQ-208)
+            {
+                selector: 'node.path-highlighted',
+                style: {
+                    'background-color': '#ff9933',
+                    'border-color': '#ff9933',
+                    'border-width': 4,
+                    'overlay-color': '#ff9933',
+                    'overlay-opacity': 0.15,
+                    'overlay-padding': 6
+                }
+            },
+            {
+                selector: 'edge.path-highlighted',
+                style: {
+                    'line-color': '#ff9933',
+                    'target-arrow-color': '#ff9933',
+                    'width': 4,
+                    'z-index': 10
+                }
             }
-        ]
+        ],
+
+        // Interaction settings
+        minZoom: 0.3,
+        maxZoom: 3,
+        wheelSensitivity: 0.2,
+        userZoomingEnabled: true,
+        userPanningEnabled: true,
+        boxSelectionEnabled: false
     });
 
     // Node click handler — open asset inspector

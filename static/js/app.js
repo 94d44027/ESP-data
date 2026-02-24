@@ -39,6 +39,7 @@ document.getElementById('btn-toggle-sidebar').addEventListener('click', toggleSi
 document.getElementById('btn-toggle-inspector').addEventListener('click', toggleInspector);
 document.getElementById('btn-refresh').addEventListener('click', initialize);
 document.getElementById('btn-path-inspector').addEventListener('click', openPathInspector);
+document.getElementById('btn-path-close').addEventListener('click', closePathInspector);
 
 document.getElementById('search-input').addEventListener('input', (e) => {
     AppState.searchTerm = e.target.value;

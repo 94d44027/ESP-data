@@ -8,7 +8,7 @@
     <!-- Cytoscape.js library from CDN (REQ-010) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
 
-    <!-- Application stylesheet (UI-REQ-401) -->
+    <!-- Application stylesheets (UI-REQ-401) -->
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/components.css">
 </head>
@@ -29,7 +29,7 @@
             </div>
             <button class="btn btn-icon" id="btn-toggle-sidebar" title="Toggle Sidebar">☰</button>
             <button class="btn btn-icon" id="btn-toggle-inspector" title="Toggle Inspector">ℹ</button>
-            <button class="btn btn-icon" id="btn-path-inspector" title="Path Inspector">&#x26D3;</button>
+            <button class="btn btn-icon" id="btn-path-inspector" title="Path Inspector">⛓</button>
             <button class="btn btn-primary" id="btn-refresh">Refresh</button>
         </div>
     </div>
@@ -77,62 +77,59 @@
         </div>
     </div>
 
-
-    <!-- Path Inspector Modal (UI-REQ-206) -->
-    <div class="path-inspector-modal" id="path-inspector-modal">
-        <div class="path-inspector-panel">
-            <div class="path-inspector-header">
-                <div class="path-inspector-title">Path Inspector</div>
-                <button class="btn btn-icon" onclick="closePathInspector()" title="Close">&times;</button>
+    <!-- Path Inspector Side Panel (UI-REQ-206) -->
+    <div class="path-inspector-side" id="path-inspector-panel">
+        <div class="path-inspector-header">
+            <div class="path-inspector-title">Path Inspector</div>
+            <button class="btn btn-icon" id="btn-path-close" title="Close">&times;</button>
+        </div>
+        <div class="path-inspector-body">
+            <!-- Entry Point dropdown (UI-REQ-207 §1) -->
+            <div class="path-form-group">
+                <label class="path-form-label" for="path-from">Entry Point</label>
+                <select class="path-form-select" id="path-from">
+                    <option value="">Loading...</option>
+                </select>
             </div>
-            <div class="path-inspector-body">
-                <!-- Entry Point dropdown (UI-REQ-207 §1) -->
+
+            <!-- Target dropdown (UI-REQ-207 §2) -->
+            <div class="path-form-group">
+                <label class="path-form-label" for="path-to">Target</label>
+                <select class="path-form-select" id="path-to">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+
+            <!-- Hops + Run button row -->
+            <div class="path-form-row">
                 <div class="path-form-group">
-                    <label class="path-form-label" for="path-from">Entry Point</label>
-                    <select class="path-form-select" id="path-from">
-                        <option value="">Loading...</option>
-                    </select>
+                    <label class="path-form-label" for="path-hops">Max Hops</label>
+                    <input type="number" class="path-form-input" id="path-hops"
+                           value="6" min="2" max="9">
                 </div>
-
-                <!-- Target dropdown (UI-REQ-207 §2) -->
                 <div class="path-form-group">
-                    <label class="path-form-label" for="path-to">Target</label>
-                    <select class="path-form-select" id="path-to">
-                        <option value="">Loading...</option>
-                    </select>
+                    <button class="btn btn-primary" onclick="runPathCalculation()">
+                        Calculate Paths
+                    </button>
                 </div>
+            </div>
 
-                <!-- Hops + Run button row -->
-                <div class="path-form-row">
-                    <div class="path-form-group">
-                        <label class="path-form-label" for="path-hops">Max Hops</label>
-                        <input type="number" class="path-form-input" id="path-hops"
-                               value="6" min="2" max="9">
-                    </div>
-                    <div class="path-form-group">
-                        <button class="btn btn-primary" onclick="runPathCalculation()">
-                            Calculate Paths
-                        </button>
-                    </div>
-                </div>
+            <!-- Status message -->
+            <div class="path-status" id="path-status"></div>
 
-                <!-- Status message -->
-                <div class="path-status" id="path-status"></div>
-
-                <!-- Results table (UI-REQ-208) -->
-                <div class="path-results-section" id="path-results-section" style="display:none;">
-                    <table class="path-results-table">
-                        <thead>
-                            <tr>
-                                <th>Path ID</th>
-                                <th>Hosts</th>
-                                <th>TTA</th>
-                            </tr>
-                        </thead>
-                        <tbody id="path-results-body">
-                        </tbody>
-                    </table>
-                </div>
+            <!-- Results table (UI-REQ-208) -->
+            <div class="path-results-section" id="path-results-section" style="display:none;">
+                <table class="path-results-table">
+                    <thead>
+                        <tr>
+                            <th>Path ID</th>
+                            <th>Hosts</th>
+                            <th>TTA</th>
+                        </tr>
+                    </thead>
+                    <tbody id="path-results-body">
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

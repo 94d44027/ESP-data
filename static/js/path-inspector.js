@@ -1,11 +1,18 @@
 // ============================================
-// PATH INSPECTOR (UI-REQ-206, UI-REQ-207, UI-REQ-208, UI-REQ-209)
+// PATH INSPECTOR — Side Panel
+// (UI-REQ-206, UI-REQ-207, UI-REQ-208, UI-REQ-209)
 // ============================================
 
-// Open the Path Inspector modal and populate dropdowns (UI-REQ-206)
+// Open the Path Inspector side panel and populate dropdowns (UI-REQ-206)
 async function openPathInspector() {
-    const modal = document.getElementById('path-inspector-modal');
-    modal.classList.add('active');
+    const panel = document.getElementById('path-inspector-panel');
+    const inspector = document.getElementById('inspector');
+    const canvas = document.getElementById('main-canvas');
+
+    // Show panel and adjust layout
+    panel.classList.add('active');
+    inspector.classList.add('path-inspector-open');
+    canvas.classList.add('path-inspector-open');
 
     // Reset state
     document.getElementById('path-results-body').innerHTML = '';
@@ -37,9 +44,16 @@ async function openPathInspector() {
     }
 }
 
-// Close the Path Inspector modal and clear graph highlights (UI-REQ-209)
+// Close the Path Inspector side panel and restore layout (UI-REQ-209)
 function closePathInspector() {
-    document.getElementById('path-inspector-modal').classList.remove('active');
+    const panel = document.getElementById('path-inspector-panel');
+    const inspector = document.getElementById('inspector');
+    const canvas = document.getElementById('main-canvas');
+
+    panel.classList.remove('active');
+    inspector.classList.remove('path-inspector-open');
+    canvas.classList.remove('path-inspector-open');
+
     clearPathHighlights();
 }
 
