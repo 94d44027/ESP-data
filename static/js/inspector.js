@@ -19,10 +19,8 @@ async function selectAsset(assetId) {
         }
     }
 
-    // Update asset list selection
-    document.querySelectorAll('.asset-item').forEach(item => {
-        item.classList.toggle('selected', item.dataset.assetId === assetId);
-    });
+    // Scroll to and highlight asset in sidebar list (UI-REQ-124)
+    focusAssetInList(assetId);
 
     // Show inspector with loading state
     const inspectorContent = document.getElementById('inspector-content');

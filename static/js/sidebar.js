@@ -86,3 +86,32 @@ function applyFilters() {
 
     renderAssetList(filtered);
 }
+
+// ============================================
+// SIDEBAR AUTO-FOCUS ON GRAPH SELECTION (UI-REQ-124)
+// ============================================
+function focusAssetInList(assetId) {
+    // If sidebar is collapsed, do nothing (UI-REQ-124: closed sidebar)
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar.classList.contains('collapsed')) {
+        return;
+    }
+
+    // Remove previous selection highlight from all items
+    document.querySelectorAll('.asset-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+
+    // Find the matching asset item in the DOM
+    const targetItem = document.querySelector(`.asset-item[data-asset-id="${assetId}"]`);
+    if (!targetItem) {
+        return; // Asset not in current filtered list
+    }
+
+    // Apply selected highlight
+    targetItem.classList.add('selected');
+
+    // Smooth-scroll into view (block: 'nearest' avoids unnecessary scroll
+    // when item is already visible)
+    targetItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
