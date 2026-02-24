@@ -1,0 +1,180 @@
+/* ============================================
+   PATH INSPECTOR — Side Panel (UI-REQ-206 through UI-REQ-209)
+   ============================================ */
+
+/* Side panel — slides in from the right, same pattern as .inspector */
+.path-inspector-side {
+    position: fixed;
+    top: var(--topbar-height);
+    right: 0;
+    width: 420px;
+    bottom: 0;
+    background-color: var(--color-bg-secondary);
+    border-left: 1px solid var(--color-border-strong);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 60;
+    transform: translateX(420px);
+    transition: transform var(--transition-normal);
+}
+
+.path-inspector-side.active {
+    transform: translateX(0);
+}
+
+/* When path inspector is open, push the main inspector left */
+.inspector.path-inspector-open {
+    right: 420px;
+}
+
+/* When path inspector is open, shrink the canvas */
+.main-canvas.path-inspector-open {
+    right: calc(var(--inspector-width) + 420px);
+}
+
+/* If inspector is collapsed but path inspector is open */
+.main-canvas.inspector-collapsed.path-inspector-open {
+    right: 420px;
+}
+
+/* Panel header */
+.path-inspector-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+.path-inspector-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+/* Panel body (scrollable) */
+.path-inspector-body {
+    padding: var(--spacing-xl);
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Form controls */
+.path-form-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.path-form-label {
+    display: block;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: var(--spacing-sm);
+}
+
+.path-form-select,
+.path-form-input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+
+.path-form-select:focus,
+.path-form-input:focus {
+    border-color: var(--color-accent-primary);
+}
+
+.path-form-select option {
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+}
+
+.path-form-input[type="number"] {
+    width: 80px;
+}
+
+/* Form row (hops + run button inline) */
+.path-form-row {
+    display: flex;
+    gap: var(--spacing-lg);
+    align-items: flex-end;
+}
+
+.path-form-row .path-form-group {
+    margin-bottom: 0;
+}
+
+.path-form-row .path-form-group:first-child {
+    flex-shrink: 0;
+}
+
+/* Status message */
+.path-status {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    min-height: 20px;
+}
+
+/* Results table (UI-REQ-208) */
+.path-results-section {
+    margin-top: var(--spacing-lg);
+}
+
+.path-results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.path-results-table th {
+    text-align: left;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-bg-primary);
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    border-bottom: 1px solid var(--color-border-strong);
+    white-space: nowrap;
+}
+
+.path-results-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--color-text-primary);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.path-results-table tr:last-child td {
+    border-bottom: none;
+}
+
+.path-row {
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.path-row:hover {
+    background-color: var(--color-bg-elevated);
+}
+
+.path-hosts {
+    font-family: 'Courier New', monospace;
+    font-size: var(--font-size-xs);
+    word-break: break-word;
+}
+
+.path-tta {
+    text-align: right;
+    font-weight: 600;
+    white-space: nowrap;
+}
