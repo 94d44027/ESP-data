@@ -944,24 +944,28 @@ Per existing project structure:
 
 ### UI-REQ-401: File Structure
 
-Given the complexity identified, the VIS layer MAY be structured as:
+Given the complexity identified, the VIS layer is structured as:
 
 
 ```
 static/
-├── index.html          # Main HTML shell
+├── index.html              # HTML shell only (~80 lines)
 ├── css/
-│   ├── main.css        # Layout and global styles
-│   ├── graph.css       # Graph-specific styles
-│   └── components.css  # Sidebar, panels, modals
+│   ├── main.css            # Layout, top bar, sidebar, panels
+│   ├── graph.css           # Canvas background, node/edge overrides
+│   └── components.css      # Inspector, modals, path-inspector table
 ├── js/
-│   ├── app.js          # Main application initialization
-│   ├── graph.js        # Cytoscape instance and graph logic
-│   ├── sidebar.js      # Entity list and search
-│   ├── detail-panel.js # Right panel logic
-│   └── utils.js        # Helper functions
-└── assets/
-    └── icons/          # SVG icons if needed
+│   ├── state.js            # AppState object
+│   ├── api.js              # API client (fetch wrappers)
+│   ├── graph.js            # initCytoscape, node/edge styling
+│   ├── sidebar.js          # renderAssetList, renderAssetTypeFilters, applyFilters
+│   ├── inspector.js        # selectAsset, deselectAsset, renderInspector
+│   ├── edge-inspector.js   # selectEdge, renderEdgeInspector
+│   ├── path-inspector.js   # entire Path Inspector feature
+│   ├── ui-controls.js      # toggleSidebar, toggleInspector, updateStats
+│   └── app.js              # initialize(), event listeners, DOMContentLoaded
+├── assets/
+│   ├── icons/              # For future use - any icons to be stored here
 ```
 
 All files still served from `/opt/asset-viz/static/` as currently configured.
@@ -1197,4 +1201,4 @@ The UI implementation SHALL be considered complete when:
 | 1.0     | feb 16, 2026 | Initial specification based on visual reference analysis                                                                                                                                                                                 | AI + K. Smirnov |
 | 1.1     | Feb 17, 2026 | Aligned with SRS v1.3: updated API endpoint specs (UI-REQ-402) with concrete JSON formats per REQ-020–024; added data source references to UI-REQ-200, UI-REQ-210; added Segment_Name to inspector panel; updated Appendix B mapping     | AI + K. Smirnov |
 | 1.4     | Feb 20, 2026 | UI-REQ-202 amended (edge consolidation); UI-REQ-212 added (edge inspector); UI-REQ-200 amended (edge de-duplication note); UI-REQ-330 amended (edge selection flow); UI-REQ-402 updated (new endpoint + JSON format); Appendix B updated | AI + K. Smirnov |
-| 1.6     | Feb 23, 2026 | Added UI-REQ-206 - 209, Amended UI-REQ-110, Promoted from "Future" to "Partially implemented" UI-REQ-332, updated UI-REQ-402, Appendix B                                                                                                 | AI + K.Smirnov  |
+| 1.6     | Feb 23, 2026 | Added UI-REQ-206 - 209, Amended UI-REQ-110, Promoted from "Future" to "Partially implemented" UI-REQ-332, updated UI-REQ-402, Appendix B, UI-REQ-401 updated - new static UI files structure                                             | AI + K.Smirnov  |

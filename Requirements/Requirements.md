@@ -493,7 +493,7 @@ Each requirement shall be considered complete when:
 | 1.3     | Feb 17, 2026 | KSmirnov | REQ-020 revised (asset properties + type); REQ-021–025 added (asset list, detail, neighbors, asset types, input validation); REQ-122/REQ-123 revised; Appendix C added; section 3.1.3 restructured |
 | 1.4     | Feb 20, 2026 | KSmirnov | REQ-026 added (edge detail endpoint); REQ-027 added (edge de-duplication); REQ-122 range updated; Appendix C updated                                                                               |
 | 1.5     | Feb 22, 2026 | KSmirnov | REQ-028 added (edge rank requirement); REQ-020 clarifying note on rank rows added                                                                                                                  |
-| 1.6     | Feb 23, 2026 | KSmirnov | REQ-029, REQ-030, REQ-031, REQ-032 added, added Path ID definition, Move /api/paths from Future → REQ-029; add two new endpoints                                                                   |
+| 1.6     | Feb 23, 2026 | KSmirnov | REQ-029, REQ-030, REQ-031, REQ-032 added, added Path ID definition, Move /api/paths from Future → REQ-029; add two new endpoints; VIS layer refactored under new version of UI-REQ-401             |
 ---
 
 
