@@ -1,5 +1,5 @@
 // ============================================
-// API CLIENT (REQ-020 through REQ-026)
+// API CLIENT (REQ-020 through REQ-031)
 // ============================================
 const API = {
     // REQ-020: Fetch graph data for visualization
@@ -46,6 +46,27 @@ const API = {
     async fetchAssetTypes() {
         const response = await fetch('/api/asset-types');
         if (!response.ok) throw new Error('Failed to fetch asset types');
+        return await response.json();
+    },
+
+    // REQ-030: Fetch entry points for Path Inspector dropdown
+    async fetchEntryPoints() {
+        const response = await fetch('/api/entry-points');
+        if (!response.ok) throw new Error('Failed to fetch entry points');
+        return await response.json();
+    },
+
+    // REQ-031: Fetch targets for Path Inspector dropdown
+    async fetchTargets() {
+        const response = await fetch('/api/targets');
+        if (!response.ok) throw new Error('Failed to fetch targets');
+        return await response.json();
+    },
+
+    // REQ-029: Calculate paths between entry and target
+    async fetchPaths(fromId, toId, hops = 6) {
+        const response = await fetch(`/api/paths?from=${fromId}&to=${toId}&hops=${hops}`);
+        if (!response.ok) throw new Error('Failed to calculate paths');
         return await response.json();
     }
 };

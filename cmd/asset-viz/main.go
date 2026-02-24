@@ -37,6 +37,15 @@ func main() {
 	// REQ-026: Edge connections for edge inspector panel
 	http.HandleFunc("/api/edges/", api.EdgesHandler(pool, cfg))
 
+	// REQ-029: Path calculation for Path Inspector
+	http.HandleFunc("/api/paths", api.PathsHandler(pool, cfg))
+
+	// REQ-030: Entry points for Path Inspector dropdown
+	http.HandleFunc("/api/entry-points", api.EntryPointsHandler(pool, cfg))
+
+	// REQ-031: Targets for Path Inspector dropdown
+	http.HandleFunc("/api/targets", api.TargetsHandler(pool, cfg))
+
 	// Serve static files (HTML, CSS, JS) from /static directory
 	// This serves the VIS layer (REQ-123, UI-Requirements.MD)
 	http.Handle("/", http.FileServer(http.Dir("static")))
@@ -52,6 +61,9 @@ func main() {
 	log.Printf("  GET /api/neighbors/{id} - Neighbor list (REQ-023)")
 	log.Printf("  GET /api/asset-types   - Asset types (REQ-024)")
 	log.Printf("  GET /api/edges/{src}/{dst} - Edge connections (REQ-026)")
+	log.Printf("  GET /api/paths         - Path calculation (REQ-029)")
+	log.Printf("  GET /api/entry-points  - Entry points (REQ-030)")
+	log.Printf("  GET /api/targets       - Targets (REQ-031)")
 	log.Printf("Static files served from ./static/")
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

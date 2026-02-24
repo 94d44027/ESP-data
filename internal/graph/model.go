@@ -1,6 +1,9 @@
 package graph
 
-import "ESP-data/internal/nebula"
+import (
+	"ESP-data/internal/nebula"
+	"fmt"
+)
 
 // ============================================================
 // Cytoscape.js graph structures (REQ-020, REQ-122)
@@ -357,4 +360,112 @@ func mapInt(m map[string]interface{}, key string) int {
 		}
 	}
 	return 0
+}
+
+// ============================================================
+// Entry points response (REQ-030 — Path Inspector dropdown)
+// ============================================================
+
+// EntryPointsResponse wraps the entry points list for JSON response.
+type EntryPointsResponse struct {
+	EntryPoints []EntryPointItem `json:"entry_points"`
+	Total       int              `json:"total"`
+}
+
+// EntryPointItem represents one asset with is_entrance == true.
+type EntryPointItem struct {
+	AssetID   string `json:"asset_id"`
+	AssetName string `json:"asset_name"`
+}
+
+// BuildEntryPointsList converts the raw query maps into the typed response.
+func BuildEntryPointsList(items []map[string]interface{}) EntryPointsResponse {
+	entries := make([]EntryPointItem, 0, len(items))
+	for _, item := range items {
+		entries = append(entries, EntryPointItem{
+			AssetID:   mapStr(item, "asset_id"),
+			AssetName: mapStr(item, "asset_name"),
+		})
+	}
+	return EntryPointsResponse{
+		EntryPoints: entries,
+		Total:       len(entries),
+	}
+}
+
+// ============================================================
+// Targets response (REQ-031 — Path Inspector dropdown)
+// ============================================================
+
+// TargetsResponse wraps the targets list for JSON response.
+type TargetsResponse struct {
+	Targets []TargetItem `json:"targets"`
+	Total   int          `json:"total"`
+}
+
+// TargetItem represents one asset with is_target == true.
+type TargetItem struct {
+	AssetID   string `json:"asset_id"`
+	AssetName string `json:"asset_name"`
+}
+
+// BuildTargetsList converts the raw query maps into the typed response.
+func BuildTargetsList(items []map[string]interface{}) TargetsResponse {
+	targets := make([]TargetItem, 0, len(items))
+	for _, item := range items {
+		targets = append(targets, TargetItem{
+			AssetID:   mapStr(item, "asset_id"),
+			AssetName: mapStr(item, "asset_name"),
+		})
+	}
+	return TargetsResponse{
+		Targets: targets,
+		Total:   len(targets),
+	}
+}
+
+// ============================================================
+// Path calculation response (REQ-029 — Path Inspector results)
+// ============================================================
+
+// PathsResponse wraps the path calculation results for JSON response.
+type PathsResponse struct {
+	Paths      []PathItem `json:"paths"`
+	EntryPoint string     `json:"entry_point"`
+	Target     string     `json:"target"`
+	Hops       int        `json:"hops"`
+	Total      int        `json:"total"`
+}
+
+// PathItem represents one loop-free directed path with its TTA metric.
+type PathItem struct {
+	PathID string `json:"path_id"`
+	Hosts  string `json:"hosts"`
+	TTA    int    `json:"tta"`
+}
+
+// BuildPathsResponse converts the raw query maps into the typed response.
+// entryTTB is subtracted from each path's TTA per REQ-032.
+func BuildPathsResponse(items []map[string]interface{}, entryID, targetID string, maxHops, entryTTB int) PathsResponse {
+	paths := make([]PathItem, 0, len(items))
+	for i, item := range items {
+		rawTTA := mapInt(item, "tta")
+		adjustedTTA := rawTTA - entryTTB
+		if adjustedTTA < 0 {
+			adjustedTTA = 0
+		}
+
+		paths = append(paths, PathItem{
+			PathID: fmt.Sprintf("P%03d", i+1),
+			Hosts:  mapStr(item, "hosts"),
+			TTA:    adjustedTTA,
+		})
+	}
+	return PathsResponse{
+		Paths:      paths,
+		EntryPoint: entryID,
+		Target:     targetID,
+		Hops:       maxHops,
+		Total:      len(paths),
+	}
 }

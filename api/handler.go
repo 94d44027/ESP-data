@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -233,6 +234,117 @@ func EdgesHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 		requestDuration := time.Since(requestStart)
 		log.Printf("[%s] api: returned %d connections for %s -> %s in %.3f seconds",
 			time.Now().Format("15:04:05.000"), len(connections), sourceID, targetID, requestDuration.Seconds())
+	}
+}
+
+// EntryPointsHandler returns assets with is_entrance == true (REQ-030).
+func EntryPointsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		requestStart := time.Now()
+		log.Printf("[%s] api: /api/entry-points request", requestStart.Format("15:04:05.000"))
+
+		entries, err := nebula.QueryEntryPoints(pool, cfg)
+		if err != nil {
+			log.Printf("[%s] api: QueryEntryPoints failed: %v", time.Now().Format("15:04:05.000"), err)
+			http.Error(w, "Failed to query entry points", http.StatusInternalServerError)
+			return
+		}
+
+		response := graph.BuildEntryPointsList(entries)
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
+		}
+
+		requestDuration := time.Since(requestStart)
+		log.Printf("[%s] api: returned %d entry points in %.3f seconds", time.Now().Format("15:04:05.000"), len(entries), requestDuration.Seconds())
+	}
+}
+
+// TargetsHandler returns assets with is_target == true (REQ-031).
+func TargetsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		requestStart := time.Now()
+		log.Printf("[%s] api: /api/targets request", requestStart.Format("15:04:05.000"))
+
+		targets, err := nebula.QueryTargets(pool, cfg)
+		if err != nil {
+			log.Printf("[%s] api: QueryTargets failed: %v", time.Now().Format("15:04:05.000"), err)
+			http.Error(w, "Failed to query targets", http.StatusInternalServerError)
+			return
+		}
+
+		response := graph.BuildTargetsList(targets)
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
+		}
+
+		requestDuration := time.Since(requestStart)
+		log.Printf("[%s] api: returned %d targets in %.3f seconds", time.Now().Format("15:04:05.000"), len(targets), requestDuration.Seconds())
+	}
+}
+
+// PathsHandler calculates loop-free paths between entry and target (REQ-029).
+func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		requestStart := time.Now()
+
+		// Parse query parameters
+		fromID := r.URL.Query().Get("from")
+		toID := r.URL.Query().Get("to")
+		hopsStr := r.URL.Query().Get("hops")
+
+		// REQ-025: validate both asset IDs
+		if !validAssetID.MatchString(fromID) {
+			http.Error(w, fmt.Sprintf("Invalid entry point ID: %q", fromID), http.StatusBadRequest)
+			return
+		}
+		if !validAssetID.MatchString(toID) {
+			http.Error(w, fmt.Sprintf("Invalid target ID: %q", toID), http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate hops (default 6, range 2-9 per REQ-029)
+		maxHops := 6
+		if hopsStr != "" {
+			n, err := strconv.Atoi(hopsStr)
+			if err != nil || n < 2 || n > 9 {
+				http.Error(w, "hops must be an integer between 2 and 9", http.StatusBadRequest)
+				return
+			}
+			maxHops = n
+		}
+
+		log.Printf("[%s] api: /api/paths?from=%s&to=%s&hops=%d request", requestStart.Format("15:04:05.000"), fromID, toID, maxHops)
+
+		// REQ-032: fetch the entry point's TTB so we can subtract it from each path's TTA
+		entryTTB, err := nebula.QueryAssetTTB(pool, cfg, fromID)
+		if err != nil {
+			log.Printf("[%s] api: QueryAssetTTB failed: %v", time.Now().Format("15:04:05.000"), err)
+			entryTTB = 0
+		}
+
+		// REQ-029: calculate paths
+		paths, err := nebula.QueryPaths(pool, cfg, fromID, toID, maxHops)
+		if err != nil {
+			log.Printf("[%s] api: QueryPaths failed: %v", time.Now().Format("15:04:05.000"), err)
+			http.Error(w, "Failed to calculate paths", http.StatusInternalServerError)
+			return
+		}
+
+		response := graph.BuildPathsResponse(paths, fromID, toID, maxHops, entryTTB)
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
+		}
+
+		requestDuration := time.Since(requestStart)
+		log.Printf("[%s] api: returned %d paths for %s -> %s in %.3f seconds",
+			time.Now().Format("15:04:05.000"), len(paths), fromID, toID, requestDuration.Seconds())
 	}
 }
 
