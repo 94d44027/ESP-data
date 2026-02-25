@@ -648,27 +648,6 @@ When a node is selected, the detail panel MAY show a **radial mini-graph** (per 
 - "Cancel" (bottom-left)
 - "Apply" or "Save" (bottom-right, primary style)
 
-### UI-REQ-241: Path Analysis Dialog (Future - Out of Scope for v1.0)
-
-When user selects "Calculate Path" (future feature, see Requirements.md "Out of Scope"):
-
-**Structure:**
-- Modal dialog, ~500px width
-- Title: "Calculate Attack Path"
-- **Entry Point Selector:** Dropdown populated from predefined list
-- **Target Selector:** Dropdown populated from predefined list
-- **Options:**
-  - Max path length (number input, default 5)
-  - Path algorithm (shortest/all paths/k-shortest)
-- **Buttons:**
-  - "Cancel"
-  - "Calculate" (primary)
-
-**Result Display:**
-- Closes modal
-- Highlights path(s) on graph with animated orange edges
-- Shows path list in right panel with hop-by-hop breakdown
-
 ## 8B. Mitigations Editor
 ### UI-REQ-250: Mitigations Editor Activation
 Trigger: "Edit Mitigations" button in the Inspector panel Actions section (UI-REQ-210 §5), visible when any asset is selected.
@@ -1371,11 +1350,11 @@ The UI implementation SHALL be considered complete when:
 
 ## Change Log
 
-| Version | Date         | Changes                                                                                                                                                                                                                                  | Author          |
-|---------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
-| 1.0     | feb 16, 2026 | Initial specification based on visual reference analysis                                                                                                                                                                                 | AI + K. Smirnov |
-| 1.1     | Feb 17, 2026 | Aligned with SRS v1.3: updated API endpoint specs (UI-REQ-402) with concrete JSON formats per REQ-020–024; added data source references to UI-REQ-200, UI-REQ-210; added Segment_Name to inspector panel; updated Appendix B mapping     | AI + K. Smirnov |
-| 1.4     | Feb 20, 2026 | UI-REQ-202 amended (edge consolidation); UI-REQ-212 added (edge inspector); UI-REQ-200 amended (edge de-duplication note); UI-REQ-330 amended (edge selection flow); UI-REQ-402 updated (new endpoint + JSON format); Appendix B updated | AI + K. Smirnov |
-| 1.6     | Feb 23, 2026 | Added UI-REQ-206 - 209, Amended UI-REQ-110, Promoted from "Future" to "Partially implemented" UI-REQ-332, updated UI-REQ-402, Appendix B, UI-REQ-401 updated - new static UI files structure                                             | AI + K.Smirnov  |
-| 1.7     | Feb 24, 2026 | Added UI-REQ-124 (scroll to asset), enrich UI-REQ-201 and UI-REQ-330 with references to the new UI-REQ-124                                                                                                                               | AI + K.Smirnov  |
-| 1.8     | Feb 25. 2026 | UI-REQ-210 §5 updated (Edit Mitigations button); UI-REQ-250–258 added (Mitigations Editor modal); UI-REQ-401 updated (mitigation-editor.js); UI-REQ-402 updated (4 new endpoints); §16 updated; Appendix B updated                       | AI + K.Smirnov  |
+| Version | Date         | Changes                                                                                                                                                                                                                                              | Author          |
+|---------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
+| 1.0     | feb 16, 2026 | Initial specification based on visual reference analysis                                                                                                                                                                                             | AI + K. Smirnov |
+| 1.1     | Feb 17, 2026 | Aligned with SRS v1.3: updated API endpoint specs (UI-REQ-402) with concrete JSON formats per REQ-020–024; added data source references to UI-REQ-200, UI-REQ-210; added Segment_Name to inspector panel; updated Appendix B mapping                 | AI + K. Smirnov |
+| 1.4     | Feb 20, 2026 | UI-REQ-202 amended (edge consolidation); UI-REQ-212 added (edge inspector); UI-REQ-200 amended (edge de-duplication note); UI-REQ-330 amended (edge selection flow); UI-REQ-402 updated (new endpoint + JSON format); Appendix B updated             | AI + K. Smirnov |
+| 1.6     | Feb 23, 2026 | Added UI-REQ-206 - 209, Amended UI-REQ-110, Promoted from "Future" to "Partially implemented" UI-REQ-332, updated UI-REQ-402, Appendix B, UI-REQ-401 updated - new static UI files structure                                                         | AI + K.Smirnov  |
+| 1.7     | Feb 24, 2026 | Added UI-REQ-124 (scroll to asset), enrich UI-REQ-201 and UI-REQ-330 with references to the new UI-REQ-124                                                                                                                                           | AI + K.Smirnov  |
+| 1.8     | Feb 25. 2026 | UI-REQ-210 §5 updated (Edit Mitigations button); UI-REQ-250–258 added (Mitigations Editor modal); UI-REQ-401 updated (mitigation-editor.js); UI-REQ-402 updated (4 new endpoints); §16 updated; Appendix B updated; Redundant UI-REQ-241 is removed. | AI + K.Smirnov  |
