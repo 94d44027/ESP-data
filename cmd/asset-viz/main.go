@@ -26,7 +26,9 @@ func main() {
 	http.HandleFunc("/api/assets", api.AssetsHandler(pool, cfg))
 
 	// REQ-022: Single asset detail for inspector panel
-	http.HandleFunc("/api/asset/", api.AssetDetailHandler(pool, cfg))
+	// REQ-034 (GET), REQ-035 (PUT), REQ-036 (DELETE): Asset mitigations CRUD
+	// AssetHandler dispatches based on URL path depth and HTTP method
+	http.HandleFunc("/api/asset/", api.AssetHandler(pool, cfg))
 
 	// REQ-023: Neighbor list for inspector connections summary
 	http.HandleFunc("/api/neighbors/", api.NeighborsHandler(pool, cfg))
@@ -46,6 +48,9 @@ func main() {
 	// REQ-031: Targets for Path Inspector dropdown
 	http.HandleFunc("/api/targets", api.TargetsHandler(pool, cfg))
 
+	// REQ-033: All MITRE mitigations for editor dropdown
+	http.HandleFunc("/api/mitigations", api.MitigationsListHandler(pool, cfg))
+
 	// Serve static files (HTML, CSS, JS) from /static directory
 	// This serves the VIS layer (REQ-123, UI-Requirements.MD)
 	http.Handle("/", http.FileServer(http.Dir("static")))
@@ -64,6 +69,10 @@ func main() {
 	log.Printf("  GET /api/paths         - Path calculation (REQ-029)")
 	log.Printf("  GET /api/entry-points  - Entry points (REQ-030)")
 	log.Printf("  GET /api/targets       - Targets (REQ-031)")
+	log.Printf("  GET /api/mitigations   - All mitigations (REQ-033)")
+	log.Printf("  GET /api/asset/{id}/mitigations    - Asset mitigations (REQ-034)")
+	log.Printf("  PUT /api/asset/{id}/mitigations    - Upsert mitigation (REQ-035)")
+	log.Printf("  DELETE /api/asset/{id}/mitigations/{mid} - Delete mitigation (REQ-036)")
 	log.Printf("Static files served from ./static/")
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

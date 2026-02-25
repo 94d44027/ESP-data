@@ -469,3 +469,71 @@ func BuildPathsResponse(items []map[string]interface{}, entryID, targetID string
 		Total:      len(paths),
 	}
 }
+
+// ============================================================
+// Mitigations list response (REQ-033 — editor dropdown)
+// ============================================================
+
+// MitigationsListResponse wraps the mitigations list for JSON response.
+type MitigationsListResponse struct {
+	Mitigations []MitigationItem `json:"mitigations"`
+	Total       int              `json:"total"`
+}
+
+// MitigationItem represents one MITRE mitigation.
+type MitigationItem struct {
+	MitigationID   string `json:"mitigation_id"`
+	MitigationName string `json:"mitigation_name"`
+}
+
+// BuildMitigationsList converts the raw query maps into the typed response.
+func BuildMitigationsList(items []map[string]interface{}) MitigationsListResponse {
+	mitigations := make([]MitigationItem, 0, len(items))
+	for _, item := range items {
+		mitigations = append(mitigations, MitigationItem{
+			MitigationID:   mapStr(item, "mitigation_id"),
+			MitigationName: mapStr(item, "mitigation_name"),
+		})
+	}
+	return MitigationsListResponse{
+		Mitigations: mitigations,
+		Total:       len(mitigations),
+	}
+}
+
+// ============================================================
+// Asset mitigations response (REQ-034 — editor table)
+// ============================================================
+
+// AssetMitigationsResponse wraps the applied mitigations for a specific asset.
+type AssetMitigationsResponse struct {
+	AssetID     string              `json:"asset_id"`
+	Mitigations []AppliedMitigation `json:"mitigations"`
+	Total       int                 `json:"total"`
+}
+
+// AppliedMitigation represents one mitigation applied to an asset via applied_to edge.
+type AppliedMitigation struct {
+	MitigationID   string `json:"mitigation_id"`
+	MitigationName string `json:"mitigation_name"`
+	Maturity       int    `json:"maturity"`
+	Active         bool   `json:"active"`
+}
+
+// BuildAssetMitigationsResponse converts the raw query maps into the typed response.
+func BuildAssetMitigationsResponse(assetID string, items []map[string]interface{}) AssetMitigationsResponse {
+	mitigations := make([]AppliedMitigation, 0, len(items))
+	for _, item := range items {
+		mitigations = append(mitigations, AppliedMitigation{
+			MitigationID:   mapStr(item, "mitigation_id"),
+			MitigationName: mapStr(item, "mitigation_name"),
+			Maturity:       mapInt(item, "maturity"),
+			Active:         mapBool(item, "active"),
+		})
+	}
+	return AssetMitigationsResponse{
+		AssetID:     assetID,
+		Mitigations: mitigations,
+		Total:       len(mitigations),
+	}
+}

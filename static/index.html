@@ -11,6 +11,7 @@
     <!-- Application stylesheets (UI-REQ-401) -->
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/mitigation-editor.css">
 </head>
 <body>
     <!-- Top Bar (UI-REQ-110) -->
@@ -134,6 +135,36 @@
         </div>
     </div>
 
+    <!-- Mitigations Editor Modal (UI-REQ-250 through UI-REQ-258) -->
+    <div class="mit-backdrop" id="mit-modal-backdrop" onclick="if(event.target===this){MitEditor.deselectAll();}">
+        <div class="mit-modal" onclick="MitEditor.deselectAll();">
+            <div class="mit-header">
+                <span class="mit-header-title" id="mit-modal-title">Mitigations for Asset</span>
+                <button class="mit-close-btn" onclick="MitEditor.close();">&times;</button>
+            </div>
+            <div class="mit-body">
+                <div class="mit-table-wrapper" id="mit-table-wrapper" onclick="event.stopPropagation();">
+                    <table class="mit-table">
+                        <thead>
+                            <tr>
+                                <th>Mitigation</th>
+                                <th>Mitigation Name</th>
+                                <th>Maturity</th>
+                                <th>Active</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mit-table-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="mit-footer">
+                <button class="mit-add-btn" onclick="MitEditor.addNewRow();">➕ Add</button>
+                <button class="mit-close-footer-btn" onclick="MitEditor.close();">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Application JavaScript (UI-REQ-401: modular file structure) -->
     <!-- Load order: state first, then API, then features, app.js last -->
     <script src="js/state.js"></script>
@@ -144,6 +175,7 @@
     <script src="js/edge-inspector.js"></script>
     <script src="js/ui-controls.js"></script>
     <script src="js/path-inspector.js"></script>
+    <script src="js/mitigation-editor.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

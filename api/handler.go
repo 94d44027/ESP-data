@@ -21,6 +21,13 @@ import (
 // Used by REQ-025 to reject malformed or injected input before it reaches nGQL.
 var validAssetID = regexp.MustCompile(`^A\d{4,5}$`)
 
+// validMitigationID matches the Mitigation ID format (e.g. "M1020").
+// Used by REQ-038 to reject malformed input before it reaches nGQL.
+var validMitigationID = regexp.MustCompile(`^M\d{4}$`)
+
+// validMaturity defines the allowed maturity values per REQ-039.
+var validMaturity = map[int]bool{25: true, 50: true, 80: true, 100: true}
+
 // GraphHandler returns an http.HandlerFunc that queries Nebula and writes CyGraph JSON.
 // This satisfies REQ-122 (JSON output) and REQ-131 (JSON format for API responses).
 func GraphHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
@@ -85,38 +92,70 @@ func AssetsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handl
 	}
 }
 
-// AssetDetailHandler returns detail for single asset (REQ-022).
-func AssetDetailHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
+// AssetHandler dispatches /api/asset/{id}[/mitigations[/{mid}]] requests.
+// It routes to asset detail (REQ-022) or mitigations CRUD (REQ-034/035/036)
+// based on the URL path structure.
+func AssetHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		requestStart := time.Now()
+		parts := strings.Split(strings.TrimRight(r.URL.Path, "/"), "/")
+		// /api/asset/{id}                       → len 4
+		// /api/asset/{id}/mitigations           → len 5
+		// /api/asset/{id}/mitigations/{mid}     → len 6
 
-		// Extract and validate asset ID from URL path: /api/asset/{id}
-		assetID, err := extractAssetID(r.URL.Path, 3)
-		if err != nil {
-			log.Printf("[%s] api: /api/asset/ bad request: %v", requestStart.Format("15:04:05.000"), err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		switch {
+		case len(parts) == 4:
+			handleAssetDetail(pool, cfg, w, r)
+		case len(parts) >= 5 && parts[4] == "mitigations":
+			switch r.Method {
+			case http.MethodGet:
+				handleGetAssetMitigations(pool, cfg, w, r)
+			case http.MethodPut:
+				handleUpsertAssetMitigation(pool, cfg, w, r)
+			case http.MethodDelete:
+				if len(parts) < 6 {
+					http.Error(w, "Missing mitigation ID for DELETE", http.StatusBadRequest)
+					return
+				}
+				handleDeleteAssetMitigation(pool, cfg, w, r)
+			default:
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
+		default:
+			http.Error(w, "Not found", http.StatusNotFound)
 		}
-
-		log.Printf("[%s] api: /api/asset/%s request", requestStart.Format("15:04:05.000"), assetID)
-
-		detail, err := nebula.QueryAssetDetail(pool, cfg, assetID)
-		if err != nil {
-			log.Printf("[%s] api: QueryAssetDetail failed: %v", time.Now().Format("15:04:05.000"), err)
-			http.Error(w, "Asset not found", http.StatusNotFound)
-			return
-		}
-
-		response := graph.BuildAssetDetailResponse(detail)
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
-		}
-
-		requestDuration := time.Since(requestStart)
-		log.Printf("[%s] api: returned detail for %s in %.3f seconds", time.Now().Format("15:04:05.000"), assetID, requestDuration.Seconds())
 	}
+}
+
+// handleAssetDetail returns detail for single asset (REQ-022).
+func handleAssetDetail(pool *nebulago.ConnectionPool, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
+	requestStart := time.Now()
+
+	// Extract and validate asset ID from URL path: /api/asset/{id}
+	assetID, err := extractAssetID(r.URL.Path, 3)
+	if err != nil {
+		log.Printf("[%s] api: /api/asset/ bad request: %v", requestStart.Format("15:04:05.000"), err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[%s] api: /api/asset/%s request", requestStart.Format("15:04:05.000"), assetID)
+
+	detail, err := nebula.QueryAssetDetail(pool, cfg, assetID)
+	if err != nil {
+		log.Printf("[%s] api: QueryAssetDetail failed: %v", time.Now().Format("15:04:05.000"), err)
+		http.Error(w, "Asset not found", http.StatusNotFound)
+		return
+	}
+
+	response := graph.BuildAssetDetailResponse(detail)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
+	}
+
+	requestDuration := time.Since(requestStart)
+	log.Printf("[%s] api: returned detail for %s in %.3f seconds", time.Now().Format("15:04:05.000"), assetID, requestDuration.Seconds())
 }
 
 // NeighborsHandler returns neighbors for inspector panel (REQ-023).
@@ -348,6 +387,163 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 	}
 }
 
+// ============================================================
+// Mitigations API handlers (REQ-033 through REQ-036)
+// ============================================================
+
+// MitigationsListHandler returns all MITRE mitigations for the editor dropdown (REQ-033).
+func MitigationsListHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		requestStart := time.Now()
+		log.Printf("[%s] api: /api/mitigations request", requestStart.Format("15:04:05.000"))
+
+		mitigations, err := nebula.QueryMitigations(pool, cfg)
+		if err != nil {
+			log.Printf("[%s] api: QueryMitigations failed: %v", time.Now().Format("15:04:05.000"), err)
+			http.Error(w, "Failed to query mitigations", http.StatusInternalServerError)
+			return
+		}
+
+		response := graph.BuildMitigationsList(mitigations)
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
+		}
+
+		requestDuration := time.Since(requestStart)
+		log.Printf("[%s] api: returned %d mitigations in %.3f seconds", time.Now().Format("15:04:05.000"), len(mitigations), requestDuration.Seconds())
+	}
+}
+
+// handleGetAssetMitigations returns mitigations applied to an asset (REQ-034).
+func handleGetAssetMitigations(pool *nebulago.ConnectionPool, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
+	requestStart := time.Now()
+
+	// URL: /api/asset/{id}/mitigations — asset ID is segment 3
+	assetID, err := extractAssetID(r.URL.Path, 3)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[%s] api: GET /api/asset/%s/mitigations request", requestStart.Format("15:04:05.000"), assetID)
+
+	mitigations, err := nebula.QueryAssetMitigations(pool, cfg, assetID)
+	if err != nil {
+		log.Printf("[%s] api: QueryAssetMitigations failed: %v", time.Now().Format("15:04:05.000"), err)
+		http.Error(w, "Failed to query asset mitigations", http.StatusInternalServerError)
+		return
+	}
+
+	response := graph.BuildAssetMitigationsResponse(assetID, mitigations)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
+	}
+
+	requestDuration := time.Since(requestStart)
+	log.Printf("[%s] api: returned %d mitigations for asset %s in %.3f seconds",
+		time.Now().Format("15:04:05.000"), len(mitigations), assetID, requestDuration.Seconds())
+}
+
+// MitigationUpsertRequest is the JSON body for PUT /api/asset/{id}/mitigations (REQ-035).
+type MitigationUpsertRequest struct {
+	MitigationID string `json:"mitigation_id"`
+	Maturity     int    `json:"maturity"`
+	Active       bool   `json:"active"`
+}
+
+// handleUpsertAssetMitigation adds or updates an applied_to edge (REQ-035).
+func handleUpsertAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
+	requestStart := time.Now()
+
+	assetID, err := extractAssetID(r.URL.Path, 3)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var req MitigationUpsertRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// REQ-038: validate mitigation ID format
+	if !validMitigationID.MatchString(req.MitigationID) {
+		http.Error(w, fmt.Sprintf("Invalid mitigation ID format: %q (expected pattern like M1020)", req.MitigationID), http.StatusBadRequest)
+		return
+	}
+
+	// REQ-039: validate maturity is in the fixed set {25, 50, 80, 100}
+	if !validMaturity[req.Maturity] {
+		http.Error(w, fmt.Sprintf("Invalid maturity value: %d (allowed: 25, 50, 80, 100)", req.Maturity), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[%s] api: PUT /api/asset/%s/mitigations {%s, maturity=%d, active=%v}",
+		requestStart.Format("15:04:05.000"), assetID, req.MitigationID, req.Maturity, req.Active)
+
+	err = nebula.UpsertMitigation(pool, cfg, req.MitigationID, assetID, req.Maturity, req.Active)
+	if err != nil {
+		log.Printf("[%s] api: UpsertMitigation failed: %v", time.Now().Format("15:04:05.000"), err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+
+	requestDuration := time.Since(requestStart)
+	log.Printf("[%s] api: UPSERT %s -> %s completed in %.3f seconds",
+		time.Now().Format("15:04:05.000"), req.MitigationID, assetID, requestDuration.Seconds())
+}
+
+// handleDeleteAssetMitigation removes an applied_to edge (REQ-036).
+func handleDeleteAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
+	requestStart := time.Now()
+
+	// URL: /api/asset/{id}/mitigations/{mid}
+	assetID, err := extractAssetID(r.URL.Path, 3)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	mitigationID, err := extractMitigationID(r.URL.Path, 5)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[%s] api: DELETE /api/asset/%s/mitigations/%s request",
+		requestStart.Format("15:04:05.000"), assetID, mitigationID)
+
+	err = nebula.DeleteMitigation(pool, cfg, mitigationID, assetID)
+	if err != nil {
+		log.Printf("[%s] api: DeleteMitigation failed: %v", time.Now().Format("15:04:05.000"), err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+
+	requestDuration := time.Since(requestStart)
+	log.Printf("[%s] api: DELETE %s -> %s completed in %.3f seconds",
+		time.Now().Format("15:04:05.000"), mitigationID, assetID, requestDuration.Seconds())
+}
+
+// ============================================================
+// URL path helpers
+// ============================================================
+
 // extractAssetID pulls the asset ID from the given URL path segment,
 // validates it against the expected format (REQ-025), and returns
 // it or a descriptive error for an HTTP 400 response.
@@ -367,4 +563,25 @@ func extractAssetID(urlPath string, segmentIndex int) (string, error) {
 	}
 
 	return assetID, nil
+}
+
+// extractMitigationID pulls the mitigation ID from the given URL path segment,
+// validates it against the expected format (REQ-038), and returns it or a
+// descriptive error for an HTTP 400 response.
+func extractMitigationID(urlPath string, segmentIndex int) (string, error) {
+	parts := strings.Split(urlPath, "/")
+	if len(parts) <= segmentIndex {
+		return "", fmt.Errorf("missing mitigation ID in path")
+	}
+
+	mitigationID := parts[segmentIndex]
+	if mitigationID == "" {
+		return "", fmt.Errorf("mitigation ID cannot be empty")
+	}
+
+	if !validMitigationID.MatchString(mitigationID) {
+		return "", fmt.Errorf("invalid mitigation ID format: %q (expected pattern like M1020)", mitigationID)
+	}
+
+	return mitigationID, nil
 }

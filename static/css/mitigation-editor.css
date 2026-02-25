@@ -1,0 +1,267 @@
+/* ============================================
+   MITIGATIONS EDITOR MODAL (UI-REQ-250 through UI-REQ-258)
+   ============================================ */
+
+/* Backdrop (UI-REQ-251) */
+.mit-backdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 10, 10, 0.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    animation: mit-fade-in 200ms ease;
+}
+
+@keyframes mit-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Modal card (UI-REQ-251) */
+.mit-modal {
+    width: 850px;
+    min-height: 350px;
+    max-height: 550px;
+    background-color: #252525;
+    border-radius: 12px;
+    border: 1px solid var(--color-border-strong);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* Header */
+.mit-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+.mit-header-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 750px;
+}
+
+.mit-close-btn {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.mit-close-btn:hover {
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-elevated);
+}
+
+/* Body */
+.mit-body {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+}
+
+/* Table wrapper (scrollable) */
+.mit-table-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 var(--spacing-xl);
+}
+
+.mit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.mit-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.mit-table th {
+    text-align: left;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: #252525;
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--color-border-strong);
+    white-space: nowrap;
+}
+
+.mit-table th:nth-child(1) { width: 120px; }
+.mit-table th:nth-child(3) { width: 100px; }
+.mit-table th:nth-child(4) { width: 110px; }
+
+.mit-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--color-text-primary);
+    border-bottom: 1px solid var(--color-border);
+    position: relative;
+}
+
+/* Row states (UI-REQ-253) */
+.mit-row {
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.mit-row:hover {
+    background-color: var(--color-bg-elevated);
+}
+
+.mit-row-selected {
+    background-color: #2a4a5a !important;
+}
+
+.mit-row-editing {
+    background-color: var(--color-bg-elevated) !important;
+}
+
+/* Action icons on selected row (UI-REQ-253) */
+.mit-row-actions {
+    display: inline-flex;
+    gap: 8px;
+    margin-left: 8px;
+    animation: mit-fade-in 150ms ease;
+}
+
+.mit-icon {
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: background-color var(--transition-fast);
+}
+
+.mit-icon:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.mit-icon-delete {
+    color: var(--color-danger);
+    font-weight: bold;
+}
+
+.mit-icon-save {
+    color: var(--color-success);
+    font-weight: bold;
+    cursor: pointer;
+    margin-left: 8px;
+}
+
+.mit-icon-save:hover {
+    background-color: rgba(34, 197, 94, 0.2);
+}
+
+/* Edit mode selects (UI-REQ-254) */
+.mit-edit-select {
+    width: 100%;
+    padding: 4px 6px;
+    background-color: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    outline: none;
+}
+
+.mit-edit-select:focus {
+    border-color: var(--color-accent-primary);
+}
+
+.mit-edit-select option {
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+}
+
+.mit-edit-name-display {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+/* Flash animations (UI-REQ-256 §4) */
+.mit-flash-success {
+    animation: mit-flash-green 600ms ease;
+}
+
+@keyframes mit-flash-green {
+    0%   { background-color: rgba(34, 197, 94, 0.3); }
+    100% { background-color: transparent; }
+}
+
+.mit-flash-error {
+    animation: mit-flash-red 600ms ease;
+}
+
+@keyframes mit-flash-red {
+    0%   { background-color: rgba(239, 68, 68, 0.3); }
+    100% { background-color: transparent; }
+}
+
+/* Footer: add button row (UI-REQ-255) */
+.mit-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-xl);
+    border-top: 1px solid var(--color-border);
+    flex-shrink: 0;
+    gap: var(--spacing-md);
+}
+
+.mit-add-btn {
+    background-color: rgba(34, 197, 94, 0.15);
+    border: 1px solid var(--color-success);
+    color: var(--color-success);
+    border-radius: 6px;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.mit-add-btn:hover {
+    background-color: rgba(34, 197, 94, 0.3);
+}
+
+.mit-close-footer-btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.mit-close-footer-btn:hover {
+    background-color: var(--color-bg-primary);
+    border-color: var(--color-accent-primary);
+}

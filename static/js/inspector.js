@@ -141,5 +141,15 @@ function renderInspector(detail, neighbors) {
                 }
             </div>
         </div>
+
+        <!-- Actions (UI-REQ-210 §5) -->
+        <div class="property-section">
+            <div class="property-section-title">Actions</div>
+            <div style="padding: 0 var(--spacing-md);">
+                <button class="btn btn-primary" style="width: 100%;" onclick="MitEditor.open('${detail.asset_id}', '${detail.asset_name.replace(/'/g, "\\'")}', '${(detail.asset_description || '').replace(/'/g, "\\'")}')">
+                    🛡️✏️ Edit Mitigations
+                </button>
+            </div>
+        </div>
     `;
 }
