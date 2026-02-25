@@ -1,0 +1,19 @@
+# === macOS ===
+.DS_Store
+
+# === JetBrains IDE ===
+.idea/
+!.idea/vcs.xml
+!.idea/.gitignore
+
+# === Go binaries ===
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# === Go test/coverage ===
+*.test
+*.out
