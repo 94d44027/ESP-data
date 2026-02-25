@@ -1,10 +1,10 @@
 # UI Requirements Specification
 ## ESP PoC - Visual Layer
 
-**Version:** 1.7  
-**Date:** February 24, 2026  
-**Prepared by:** K. Smirnov + AI  
-**Project:** ESP PoC for Nebula Graph  
+**Version:** 1.8  
+**Date:** February 25, 2026  
+**Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
+**Project:** ESP PoC for Nebula Graph
 **Reference:** Derived from demo UI screenshots and more
 
 ---
@@ -497,10 +497,13 @@ Note: inbound/outbound summary counts as a future enhancement.
    - Each item: Icon + Asset_ID + direction badge (inbound/outbound) + edge label
    - Click neighbor to navigate to that node
 
-5.**Actions** (future)
-   - "Set as Entry Point" button
-   - "Set as Target" button
-   - "Find Paths" button
+5.**Actions**
+  - "Edit Mitigations" button (shield + pencil icon, or 🛡️✏️)
+  - Opens the Mitigations Editor modal (UI-REQ-250). Visible for all assets. Passes Asset_ID, Asset_Name, and Asset_Description to the modal.
+  - "Set as Entry Point" button (future)
+  - "Set as Target" button (future)
+  - "Find Paths" button (future)
+
 
 **Visual Style:**
 - Background: Same as left sidebar (`#202020` - `#282828`)
@@ -665,6 +668,138 @@ When user selects "Calculate Path" (future feature, see Requirements.md "Out of 
 - Closes modal
 - Highlights path(s) on graph with animated orange edges
 - Shows path list in right panel with hop-by-hop breakdown
+
+## 8B. Mitigations Editor
+### UI-REQ-250: Mitigations Editor Activation
+Trigger: "Edit Mitigations" button in the Inspector panel Actions section (UI-REQ-210 §5), visible when any asset is selected.
+
+Behaviour:
+
+- Clicking the button opens the Mitigations Editor as a modal overlay (centered on canvas)
+- The modal receives: asset_id, asset_name, asset_description from the current Inspector context
+- The modal fetches applied mitigations from `GET /api/asset/{id}/mitigations` (REQ-034) on open
+- If the Inspector is closed while the modal is open, the modal remains open (it is independent once launched)
+- Only one Mitigations Editor modal can be open at a time
+
+### UI-REQ-251: Mitigations Editor Modal Structure
+Dimensions: ~850px width, auto height (min ~350px, max ~550px)
+
+Layout (top to bottom):
+1. Header bar
+   - Title: `Mitigations for: {Asset_Name} {Asset_Description} Asset: {Asset_ID}`
+   - Close button (X) at top-right corner
+   - Closing discards any unsaved in-progress edits (no warning — PoC simplification)
+
+2. Mitigations table (UI-REQ-252)
+3. Add button row
+   - Green plus (➕) icon button, right-aligned below the table
+   - Adds a new editable row at the bottom of the table (UI-REQ-255)
+
+Visual style:
+- Background: Dark card (#252525) with rounded corners, consistent with Settings Modal (UI-REQ-240)
+- Backdrop: Semi-transparent overlay (rgba(10, 10, 10, 0.85))
+- Animation: Fade-in 200ms
+
+Keyboard:
+- `Escape` closes the modal (when not in row edit mode)
+
+### UI-REQ-252: Mitigations Table
+Columns:
+
+| Column          | Width            | Content                            | Esitable                                  |
+|-----------------|------------------|------------------------------------|-------------------------------------------|
+| Mitigation      | ~120px           | Mitigation_ID (e.g. "M1020")       | Dropdown (UI-REQ-254)                     |
+| Mitigation Name | flex (remaining) | Mitigation_Name                    | Read-only (auto-populated from selection) |
+| Maturity        | ~100px           | Maturity level label (e.g. "High") | Dropdown (UI-REQ-254)                     |
+| Active          | ~90px            | "Active" or "Disabled"             | Dropdown (UI-REQ-254)                     |
+
+Data source: `GET /api/asset/{id}/mitigations` (REQ-034)
+
+Scrolling:
+- Table body is scrollable vertically
+- Visible rows: 4–6 maximum before scrolling engages
+- Scroll bar on the right side (standard convention)
+- Table header remains fixed during scroll
+
+>Empty state: If no mitigations are applied, show a single centered message row: "No mitigations applied. Click ➕ to add one."
+
+## UI-REQ-253: Row Selection and Inline Actions
+Selection:
+Single-click on a table row highlights it (background `#2a4a5a` or accent colour with opacity)
+- Only one row can be selected at a time
+- Clicking a different row moves the selection
+- Clicking outside the table (but inside the modal) deselects
+Action icons (appear on selected row):
+- Edit icon (pencil ✏️) — appears at the right edge of the selected row
+- Delete icon (red ✗) — appears next to the edit icon
+- Icons appear with a subtle fade-in (150ms)
+Double-click:
+- Double-clicking a row enters edit mode directly (equivalent to click + edit icon)
+
+## UI-REQ-254: Edit Mode
+Entering edit mode: Click the edit icon on a selected row, or double-click the row.
+
+Editable fields in the selected row:
+1. Mitigation (dropdown)
+- Populated from `GET /api/mitigations` (REQ-033)
+- Excludes mitigations already applied to this asset (i.e., already in the table), except the currently edited one
+- First implementation: may show only Mitigation_ID in the dropdown; Mitigation_Name display is optional enhancement
+- Selecting a mitigation auto-populates the Mitigation Name column (read-only)
+
+2. Maturity (dropdown)
+- Fixed value set:
+
+| Value | Label  |
+|-------|--------|
+| 25    | Low    |
+| 50    | Medium |
+| 80    | High   |
+| 100   | Best   |
+
+3. Active (dropdown)
+- Two options: "Active" (maps to `true`) / "Disabled" (maps to `false`)
+
+Non-editable rows: All other rows in the table remain in read-only display while one row is being edited.
+
+Keyboard behavior:
+- `Enter` — confirms the edit (triggers save flow, UI-REQ-256)
+- `Escape` — cancels the edit, reverts the row to its previous values, exits edit mode
+
+## UI-REQ-255: Add New Mitigation
+Trigger: Green plus (➕) icon button below the table.
+
+Behaviour:
+- If the table is empty, the plus button adds the first row in edit mode
+- If the table has rows, the plus button appends a new empty row at the bottom and enters edit mode on it
+- The new row has empty/default values: Mitigation dropdown unselected, Maturity = "Best" (100), Active = "Active" (true)
+- The user MUST select a mitigation from the dropdown before saving
+- If the user presses `Escape` on a new unsaved row, the row is removed entirely
+
+## UI-REQ-256: Save Confirmation Flow
+Trigger: User presses Enter in edit mode, or clicks a "Save" (✓) icon if one is displayed.
+
+Flow:
+
+1. Validation: Check that Mitigation is selected, Maturity is set, Active is set. If validation fails, highlight the missing field with a red border and do not proceed. 
+2. Confirmation dialog: Modal dialog appears (centered, ~400px):
+   - Title: "Confirm Mitigation Change"
+   - Body: "Apply {MitigationName} (maturity: {Label}, {Active/Disabled}) to asset {Asset_ID}?"
+   - Buttons: "Cancel" (secondary) | "Confirm" (primary)
+3. On Confirm: Send `PUT /api/asset/{id}/mitigations` (REQ-035) with the mitigation data
+4. Wait for server response:
+   - Success (HTTP 200): Exit edit mode, update the row with confirmed values. Optional: brief green flash on the row.
+   - Error (HTTP 4xx/5xx): Log the full error to the browser console (console.error). The row remains in edit mode. Optional: brief red flash on the row. (Detailed error messages deferred — PoC.)
+5. On Cancel: Return to edit mode (the row remains editable, no data is lost)
+
+
+### UI-REQ-258: Mitigations Editor Error Handling
+- Loading failure (`GET /api/asset/{id}/mitigations` fails): Show message in the table area: "Failed to load mitigations. [Retry]"
+- Mitigations list failure (`GET /api/mitigations` fails): Mitigation dropdown shows "Error loading mitigations" and is disabled
+- Write failures (`PUT/DELETE`): Logged to `console.error`. No user-facing toast in this version (PoC simplification). Row remains in pre-action state.
+- Network timeout: After 5 seconds (per CNST003), treat as error
+
+
+
 
 ---
 
@@ -936,7 +1071,8 @@ The following features are illustrated in reference UI but marked for future rel
 - [ ] Export to PDF/PNG with annotations
 - [ ] Advanced filtering (date ranges, custom properties)
 - [ ] Path probability scoring
-- [ ] Mitigation simulation
+- [x] Mitigation editing (basic CRUD via Mitigations Editor — UI-REQ-250–258)
+- [ ] Mitigation impact simulation (recalculate TTA with modified mitigations)
 
 ---
 
@@ -974,9 +1110,10 @@ static/
 │   ├── edge-inspector.js   # selectEdge, renderEdgeInspector
 │   ├── path-inspector.js   # entire Path Inspector feature
 │   ├── ui-controls.js      # toggleSidebar, toggleInspector, updateStats
+│   ├── mitigation-editor.js  # Mitigations Editor modal, table, CRUD
 │   └── app.js              # initialize(), event listeners, DOMContentLoaded
 ├── assets/
-│   ├── icons/              # For future use - any icons to be stored here
+│   └──icons/              # For future use - any icons to be stored here
 ```
 
 All files still served from `/opt/asset-viz/static/` as currently configured.
@@ -985,17 +1122,21 @@ All files still served from `/opt/asset-viz/static/` as currently configured.
 
 The following API endpoints are defined in Requirements.md (SRS v1.6) sections REQ-020 through REQ-032. See also Appendix C of Requirements.md for the full endpoint summary.
 
-| Endpoint                               | SRS Req | Purpose                                               | Used by UI-REQ       |
-|----------------------------------------|---------|-------------------------------------------------------|----------------------|
-| `GET /api/graph`                       | REQ-020 | Graph nodes + edges with properties/types             | UI-REQ-200, 201, 202 |
-| `GET /api/assets`                      | REQ-021 | Asset list for sidebar (with filtering)               | UI-REQ-120, 121, 122 |
-| `GET /api/asset/{id}`                  | REQ-022 | Single asset detail for inspector panel               | UI-REQ-210           |
-| `GET /api/neighbors/{id}`              | REQ-023 | Immediate neighbors of an asset                       | UI-REQ-210 §3–4      |
-| `GET /api/asset-types`                 | REQ-024 | Distinct asset types for filter checkboxes            | UI-REQ-122           |
-| `GET /api/edges/{sourceId}/{targetId}` | REQ-026 | All connections between two assets for edge inspector | UI-REQ-212           |
-| `GET /api/paths?from=&to=&hops=`       | REQ-029 | Path calculation with TTA                             | UI-REQ-207           |
-| `GET /api/entry-points`                | REQ-030 | Entry points for dropdown                             | UI-REQ-207 §1        |
-| `GET /api/targets`                     | REQ-031 | Targets for dropdown                                  | UI-REQ-207 §2        |
+| Endpoint                                   | SRS Req | Purpose                                               | Used by UI-REQ       |
+|--------------------------------------------|---------|-------------------------------------------------------|----------------------|
+| `GET /api/graph`                           | REQ-020 | Graph nodes + edges with properties/types             | UI-REQ-200, 201, 202 |
+| `GET /api/assets`                          | REQ-021 | Asset list for sidebar (with filtering)               | UI-REQ-120, 121, 122 |
+| `GET /api/asset/{id}`                      | REQ-022 | Single asset detail for inspector panel               | UI-REQ-210           |
+| `GET /api/neighbors/{id}`                  | REQ-023 | Immediate neighbors of an asset                       | UI-REQ-210 §3–4      |
+| `GET /api/asset-types`                     | REQ-024 | Distinct asset types for filter checkboxes            | UI-REQ-122           |
+| `GET /api/edges/{sourceId}/{targetId}`     | REQ-026 | All connections between two assets for edge inspector | UI-REQ-212           |
+| `GET /api/paths?from=&to=&hops=`           | REQ-029 | Path calculation with TTA                             | UI-REQ-207           |
+| `GET /api/entry-points`                    | REQ-030 | Entry points for dropdown                             | UI-REQ-207 §1        |
+| `GET /api/targets`                         | REQ-031 | Targets for dropdown                                  | UI-REQ-207 §2        |
+| `GET /api/mitigations`                     | REQ-033 | All MITRE mitigations for editor dropdown             | UI-REQ-254           |
+| `GET /api/asset/{id}/mitigations`          | REQ-034 | Applied mitigations for editor table                  | UI-REQ-252           |
+| `PUT /api/asset/{id}/mitigations`          | REQ-035 | Add/update applied mitigation                         | UI-REQ-256           |
+| `DELETE /api/asset/{id}/mitigations/{mid}` | REQ-036 | Remove applied mitigation                             | UI-REQ-257           |
 
 **`/api/graph` node data format (per REQ-020):**
 ```json
@@ -1177,26 +1318,31 @@ The UI implementation SHALL be considered complete when:
 
 ## Appendix B: Mapping to Existing Requirements
 
-| New UI Req           | Original Req              | Notes                                           |
-|----------------------|---------------------------|-------------------------------------------------|
-| UI-REQ-200, 201, 202 | REQ-010                   | Cytoscape.js usage confirmed                    |
-| UI-REQ-300, 301      | REQ-011, REQ-101          | Contrast colors specified                       |
-| UI-REQ-202           | REQ-012                   | Arrowhead on edges                              |
-| UI-REQ-201           | REQ-013                   | Asset ID fits in/near node                      |
-| UI-REQ-200           | REQ-020                   | Graph data with asset properties and types      |
-| UI-REQ-120, 121, 122 | REQ-021                   | Asset list endpoint for sidebar                 |
-| UI-REQ-210           | REQ-022                   | Single asset detail for inspector panel         |
-| UI-REQ-210 §3–4      | REQ-023                   | Neighbor list and connection summary            |
-| UI-REQ-122           | REQ-024                   | Asset types list for filter checkboxes          |
-| UI-REQ-310           | REQ-100                   | 1920x1080 minimum resolution                    |
-| UI-REQ-400           | REQ-121, REQ-122          | Go backend, JSON API                            |
-| UI-REQ-401           | REQ-123                   | Multi-file VIS layer (per SRS v1.6)             |
-| UI-REQ-212           | REQ-026                   | Edge inspector panel, edge detail endpoint      |
-| UI-REQ-202           | REQ-027                   | Edge consolidation (de-duplication)             |
-| UI-REQ-206           | REQ-029                   | Inspector activation                            |
-| UI-REQ-207           | REQ-029, REQ-030, REQ-031 | Path Inspector panel with dropdowns and results |
-| UI-REQ-208           | REQ-029                   | Path selection and graph highlighting           |
-| UI-REQ-209           | ---                       | Stateless close behaviour                       |
+| New UI Req           | Original Req              | Notes                                                        |
+|----------------------|---------------------------|--------------------------------------------------------------|
+| UI-REQ-200, 201, 202 | REQ-010                   | Cytoscape.js usage confirmed                                 |
+| UI-REQ-300, 301      | REQ-011, REQ-101          | Contrast colors specified                                    |
+| UI-REQ-202           | REQ-012                   | Arrowhead on edges                                           |
+| UI-REQ-201           | REQ-013                   | Asset ID fits in/near node                                   |
+| UI-REQ-200           | REQ-020                   | Graph data with asset properties and types                   |
+| UI-REQ-120, 121, 122 | REQ-021                   | Asset list endpoint for sidebar                              |
+| UI-REQ-210           | REQ-022                   | Single asset detail for inspector panel                      |
+| UI-REQ-210 §3–4      | REQ-023                   | Neighbor list and connection summary                         |
+| UI-REQ-122           | REQ-024                   | Asset types list for filter checkboxes                       |
+| UI-REQ-310           | REQ-100                   | 1920x1080 minimum resolution                                 |
+| UI-REQ-400           | REQ-121, REQ-122          | Go backend, JSON API                                         |
+| UI-REQ-401           | REQ-123                   | Multi-file VIS layer (per SRS v1.6)                          |
+| UI-REQ-212           | REQ-026                   | Edge inspector panel, edge detail endpoint                   |
+| UI-REQ-202           | REQ-027                   | Edge consolidation (de-duplication)                          |
+| UI-REQ-206           | REQ-029                   | Inspector activation                                         |
+| UI-REQ-207           | REQ-029, REQ-030, REQ-031 | Path Inspector panel with dropdowns and results              |
+| UI-REQ-208           | REQ-029                   | Path selection and graph highlighting                        |
+| UI-REQ-209           | ---                       | Stateless close behaviour                                    |
+| UI-REQ-250           | REQ-034                   | Editor activation, fetches applied mitigations               |
+| UI-REQ-252           | REQ-034                   | Table data source                                            |
+| UI-REQ-254           | REQ-033, REQ-039          | Dropdown populated from mitigations list, maturity fixed set |
+| UI-REQ-256           | REQ-035                   | Save triggers UPSERT EDGE                                    |
+| UI-REQ-257           | REQ-036                   | Delete triggers DELETE EDGE                                  |
 
 
 ---
@@ -1213,4 +1359,5 @@ The UI implementation SHALL be considered complete when:
 | 1.1     | Feb 17, 2026 | Aligned with SRS v1.3: updated API endpoint specs (UI-REQ-402) with concrete JSON formats per REQ-020–024; added data source references to UI-REQ-200, UI-REQ-210; added Segment_Name to inspector panel; updated Appendix B mapping     | AI + K. Smirnov |
 | 1.4     | Feb 20, 2026 | UI-REQ-202 amended (edge consolidation); UI-REQ-212 added (edge inspector); UI-REQ-200 amended (edge de-duplication note); UI-REQ-330 amended (edge selection flow); UI-REQ-402 updated (new endpoint + JSON format); Appendix B updated | AI + K. Smirnov |
 | 1.6     | Feb 23, 2026 | Added UI-REQ-206 - 209, Amended UI-REQ-110, Promoted from "Future" to "Partially implemented" UI-REQ-332, updated UI-REQ-402, Appendix B, UI-REQ-401 updated - new static UI files structure                                             | AI + K.Smirnov  |
-| 1.7     | Feb 24, 2026 | Added UI-REQ-124 (scroll to asset), enrich UI-REQ-201 and UI-REQ-330 with references to the new UI-REQ-124                                                                                                                               |                 |
+| 1.7     | Feb 24, 2026 | Added UI-REQ-124 (scroll to asset), enrich UI-REQ-201 and UI-REQ-330 with references to the new UI-REQ-124                                                                                                                               | AI + K.Smirnov  |
+| 1.8     | Feb 25. 2026 | UI-REQ-210 §5 updated (Edit Mitigations button); UI-REQ-250–258 added (Mitigations Editor modal); UI-REQ-401 updated (mitigation-editor.js); UI-REQ-402 updated (4 new endpoints); §16 updated; Appendix B updated                       | AI + K.Smirnov  |

@@ -1,9 +1,9 @@
 # Software Requirements Specification (SRS)
 ## ESP Proof Of Concept system
 
-**Version:** 1.6  
-**Date:** February 23, 2026  
-**Prepared by:** Konstantin Smirnov  
+**Version:** 1.7  
+**Date:** February 25, 2026  
+**Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
 
 ---
@@ -29,11 +29,11 @@ ESP PoC will provide a web-based platform enabling a user to analyse the fixed (
 - Selecting targets (from the predefined list)
 - Calculating the paths from entry point to a target (by sum of TTB = TTA) within IT Infrastructure
 - Displaying these paths to the user over the IT infrastructure graph
+- Viewing and editing mitigations applied to assets (add, modify, remove applied_to relationships)
 
 **Out of Scope (Future Releases):**
 - Displaying the network segments
 - Performing calculations of TTA/TTB against the existing set of mitigations
-- Changing the applied mitigations
 - Loading new data in the database
 - Administrative functions
 - Secure access
@@ -330,7 +330,7 @@ YIELD id(vertex) AS vid, Asset.Asset_ID AS asset_id, Asset.Asset_Name AS asset_n
 ```
 **REQ-031:** Targets List Endpoint. The APP layer SHALL provide an API endpoint (`GET /api/targets`) that returns all assets where `is_target == true`, along with their Asset_ID and Asset_Name. This populates the target dropdown in the Path Inspector UI. The underlying query:
 
-```
+``` nGQL
 LOOKUP ON Asset WHERE Asset.is_target == true
 YIELD id(vertex) AS vid, Asset.Asset_ID AS asset_id, Asset.Asset_Name AS asset_name;
 ```
@@ -338,6 +338,102 @@ YIELD id(vertex) AS vid, Asset.Asset_ID AS asset_id, Asset.Asset_Name AS asset_n
 >Design note on REQ-030/031: Alternatively, these could have been derived client-side from the existing `/api/assets` response (REQ-021), which already returns is_entrance and is_target for every asset. However, dedicated endpoints are cleaner for the Path Inspector and avoid coupling to the full asset list load.
 
 **REQ-032**: TTA Calculation Rule. TTA for a given path SHALL be computed as the sum of TTB property values of all Asset nodes in the path excluding the first node (the entry point). The entry point is excluded because it represents the attacker's starting position, not a host that needs to be bypassed. If any TTB value is NULL for a node in the path, the default value of 10 (per schema TA001 default) SHALL be used.
+
+#### 3.1.3A Mitigations API
+
+**REQ-033:** Mitigations List Endpoint. The APP layer SHALL provide an API endpoint (G`ET /api/mitigations`) that returns all MITRE mitigations stored in the database. This populates the mitigation dropdown in the Mitigations Editor (UI-REQ-253). The underlying nGQL query (pure nGQL per REQ-243):
+
+``` nGQL
+LOOKUP ON tMitreMitigation
+YIELD
+id(vertex) AS vid,
+tMitreMitigation.Mitigation_ID AS mitigation_id,
+tMitreMitigation.Mitigation_Name AS mitigation_name;
+```
+Response format:
+
+```json
+{
+"mitigations": [
+{ "mitigation_id": "M1020", "mitigation_name": "SSL/TLS Inspection" },
+{ "mitigation_id": "M1027", "mitigation_name": "Password Policies" }
+],
+"total": 43
+}
+```
+>Note: The number of Mitre Mitigations may change in time
+
+**REQ-034:** Asset Mitigations Endpoint. The APP layer SHALL provide an API endpoint (`GET /api/asset/{id}/mitigations`) that returns all mitigations applied to a specific asset, including edge properties. The {`id`} parameter SHALL be validated per REQ-025. Justification for using MATCH syntax (per REQ-244): traversing `applied_to` edge from `tMitreMitigation` to `Asset` with property retrieval on both the edge and the source vertex is cleaner with MATCH than with chained GO/FETCH statements. The underlying query:
+
+``` nGQL
+MATCH (m:tMitreMitigation)-[e:applied_to]->(a:Asset)
+WHERE a.Asset.Asset_ID == "{assetId}"
+RETURN m.tMitreMitigation.Mitigation_ID AS mitigation_id,
+m.tMitreMitigation.Mitigation_Name AS mitigation_name,
+e.Maturity AS maturity,
+e.Active AS active;
+```
+
+Response format:
+
+```json
+{
+"asset_id": "A00014",
+"mitigations": [
+{
+"mitigation_id": "M1020",
+"mitigation_name": "SSL/TLS Inspection",
+"maturity": 100,
+"active": true
+},
+{
+"mitigation_id": "M1037",
+"mitigation_name": "Limit Access to Resource Over Network",
+"maturity": 50,
+"active": false
+}
+],
+"total": 4
+}
+```
+
+**REQ-035:** Upsert Mitigation Endpoint. The APP layer SHALL provide an API endpoint (`PUT /api/asset/{id}/mitigations`) that adds or updates a mitigation applied to a given asset by performing an `UPSERT EDGE` on the `applied_to` relationship. Both `{id}` (asset) and the `mitigation_id` in the request body SHALL be validated (REQ-025, REQ-038). The underlying nGQL statement:
+
+```nGQL
+UPSERT EDGE ON applied_to
+"{mitigationId}" -> "{assetId}" @0
+SET Version = "1.0", Maturity = {maturity}, Active = {active};
+```
+Request body:
+
+```json
+{
+"mitigation_id": "M1032",
+"maturity": 100,
+"active": true
+}
+```
+Response: HTTP 200 on success with `{ "status": "ok" }`. HTTP 500 on database error with `{ "error": "..." }`.
+
+>Note: The `@0` rank is fixed. Per schema ED001, there cannot be multiple `applied_to` edges between the same pair of Mitigation and Asset. Version is hardcoded to `"1.0"` in this release — version-aware infrastructure modelling is deferred.
+
+>Note: The `UPSERT EDGE` performance is lower than INSERT due to read-modify-write at partition level (per NebulaGraph documentation). This is acceptable for PoC given `CNST004` (no concurrency requirement). Anyhow, no huge volume of such `UPSERT` operations is expected.
+
+**REQ-036:** Delete Mitigation Endpoint. The APP layer SHALL provide an API endpoint (`DELETE /api/asset/{id}/mitigations/{mitigationId}`) that removes an `applied_to` edge between a Mitigation and an Asset. Both ID parameters SHALL be validated (REQ-025, REQ-038). The underlying nGQL statement:
+
+```nGQL
+DELETE EDGE applied_to "{mitigationId}" -> "{assetId}" @0;
+```
+Response: HTTP 200 on success with `{ "status": "ok" }`. HTTP 500 on database error with `{ "error": "..." }`.
+
+>**Caution:** If no `@rank` is specified, NebulaGraph only deletes rank `0`. Since all applied_to edges use rank `0` (per REQ-035 note), this is correct for the current design. Candidate for the future reconsideration.
+
+**REQ-038:** Mitigation ID parameters received from API requests SHALL be validated against the format `^M\d{4}$` before being used in database queries. Invalid parameters SHALL result in an HTTP 400 response with a descriptive error message.
+
+**REQ-039:** Maturity values received from API requests SHALL be validated as integers in the set `{25, 50, 80, 100}`. Values outside this set SHALL result in an HTTP 400 response. The schema permits 0–100 (int16), but the UI enforces fixed levels per UI-REQ-253.
+
+>Design note: The backend validates against the fixed set `{25, 50, 80, 100}` rather than the full 0–100 range, because the Mitigations Editor is the only write path for this field. If a future bulk-import or API consumer needs the full range, this validation can be relaxed.
+
 
 
 #### 3.1.4 Data Validation
@@ -361,9 +457,9 @@ None so far
 
 **REQ-121:** The APP layer shall connect to the GrDB using Vesoft's Go client libraries.
 
-**REQ-122:** The APP layer shall publish the results intended for visualisation as JSON. All API endpoints defined in REQ-020 - REQ-031 SHALL return JSON responses.
+**REQ-122:** The APP layer shall publish the results intended for visualisation as JSON. All API endpoints defined in REQ-020 - REQ-031 SHALL return JSON responses. Endpoints REQ-035 and REQ-036 additionally accept JSON request bodies.
 
-**REQ-123:** The VIS layer SHALL be implemented as described in UI-Requirements.MD (Version 1.7). Cytoscape.js is the graph rendering library. The implementation may use multiple HTML files or a single-page application architecture as needed for functionality.
+**REQ-123:** The VIS layer SHALL be implemented as described in UI-Requirements.MD (Version 1.8). Cytoscape.js is the graph rendering library. The implementation may use multiple HTML files or a single-page application architecture as needed for functionality.
 
 
 
@@ -461,17 +557,21 @@ https://github.com/94d44027/ESP-data/blob/main/Data/ESP01_NebulaGraph_Schema.md
 
 ### Appendix C: API Endpoint Summary
 
-| Endpoint                           | Method | Implements | Purpose                                               | Response format                               |
-|------------------------------------|--------|------------|-------------------------------------------------------|-----------------------------------------------|
-| `/api/graph`                       | GET    | REQ-020    | Graph nodes + edges for Cytoscape.js                  | `{ nodes, edges }`                            |
-| `/api/assets`                      | GET    | REQ-021    | Asset list for sidebar entity browser                 | `{ assets, total, filtered }`                 |
-| `/api/asset/{id}`                  | GET    | REQ-022    | Single asset detail for inspector panel               | `{ asset_id, ... }`                           |
-| `/api/neighbors/{id}`              | GET    | REQ-023    | Immediate neighbors of an asset                       | `[ { neighbor_id, direction } ]`              |
-| `/api/asset-types`                 | GET    | REQ-024    | Distinct asset types for filter UI                    | `[ { type_id, type_name } ]`                  |
-| `/api/edges/{sourceId}/{targetId}` | GET    | REQ-026    | All connections between two assets for edge inspector | `{ source, target, connections, total }`      |
-| `/api/paths?from=&to=&hops=`       | GET    | REQ-029    | Path calculation with TTA metric                      | `{ paths, entry_point, target, hops, total }` |
-| `/api/entry-points`                | GET    | REQ-030    | Entry point assets for Path Inspector dropdown        | `[ { asset_id, asset_name } ]`                |
-| `/api/targets`                     | GET    | REQ-031    | Target assets for Path Inspector dropdown             | `[ { asset_id, asset_name } ]`                |
+| Endpoint                            | Method | Implements | Purpose                                               | Response format                               |
+|-------------------------------------|--------|------------|-------------------------------------------------------|-----------------------------------------------|
+| `/api/graph`                        | GET    | REQ-020    | Graph nodes + edges for Cytoscape.js                  | `{ nodes, edges }`                            |
+| `/api/assets`                       | GET    | REQ-021    | Asset list for sidebar entity browser                 | `{ assets, total, filtered }`                 |
+| `/api/asset/{id}`                   | GET    | REQ-022    | Single asset detail for inspector panel               | `{ asset_id, ... }`                           |
+| `/api/neighbors/{id}`               | GET    | REQ-023    | Immediate neighbors of an asset                       | `[ { neighbor_id, direction } ]`              |
+| `/api/asset-types`                  | GET    | REQ-024    | Distinct asset types for filter UI                    | `[ { type_id, type_name } ]`                  |
+| `/api/edges/{sourceId}/{targetId}`  | GET    | REQ-026    | All connections between two assets for edge inspector | `{ source, target, connections, total }`      |
+| `/api/paths?from=&to=&hops=`        | GET    | REQ-029    | Path calculation with TTA metric                      | `{ paths, entry_point, target, hops, total }` |
+| `/api/entry-points`                 | GET    | REQ-030    | Entry point assets for Path Inspector dropdown        | `[ { asset_id, asset_name } ]`                |
+| `/api/targets`                      | GET    | REQ-031    | Target assets for Path Inspector dropdown             | `[ { asset_id, asset_name } ]`                |
+| `/api/mitigations`                  | GET    | REQ-033    | All MITRE mitigations for dropdown                    | `{ mitigations, total }`                      |
+| `/api/asset/{id}/mitigations`       | GET    | REQ-034    | Mitigations applied to an asset                       | `{ asset_id, mitigations, total } `           |
+| `/api/asset/{id}/mitigations `      | PUT    | REQ-035    | Add/update applied mitigation (UPSERT)                | `{ status }`                                  |
+| `/api/asset/{id}/mitigations/{mid}` | DELETE | REQ-036    | Remove applied mitigation                             | `{ status }`                                  |
 
 ### Appendix D: nGQL Specification
 https://docs.nebula-graph.io/3.8.0/
@@ -486,14 +586,15 @@ Each requirement shall be considered complete when:
 
 ## Document Change History
 
-| Version | Date         | Author   | Changes                                                                                                                                                                                            |
-|---------|--------------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1.1     | Feb 12, 2026 | KSmirnov | Second release                                                                                                                                                                                     |
-| 1.2     | Feb 17, 2026 | KSmirnov | REQ-123 updated                                                                                                                                                                                    |
-| 1.3     | Feb 17, 2026 | KSmirnov | REQ-020 revised (asset properties + type); REQ-021–025 added (asset list, detail, neighbors, asset types, input validation); REQ-122/REQ-123 revised; Appendix C added; section 3.1.3 restructured |
-| 1.4     | Feb 20, 2026 | KSmirnov | REQ-026 added (edge detail endpoint); REQ-027 added (edge de-duplication); REQ-122 range updated; Appendix C updated                                                                               |
-| 1.5     | Feb 22, 2026 | KSmirnov | REQ-028 added (edge rank requirement); REQ-020 clarifying note on rank rows added                                                                                                                  |
-| 1.6     | Feb 23, 2026 | KSmirnov | REQ-029, REQ-030, REQ-031, REQ-032 added, added Path ID definition, Move /api/paths from Future → REQ-029; add two new endpoints; VIS layer refactored under new version of UI-REQ-401             |
+| Version | Date         | Author   | Changes                                                                                                                                                                                              |
+|---------|--------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1.1     | Feb 12, 2026 | KSmirnov | Second release                                                                                                                                                                                       |
+| 1.2     | Feb 17, 2026 | KSmirnov | REQ-123 updated                                                                                                                                                                                      |
+| 1.3     | Feb 17, 2026 | KSmirnov | REQ-020 revised (asset properties + type); REQ-021–025 added (asset list, detail, neighbors, asset types, input validation); REQ-122/REQ-123 revised; Appendix C added; section 3.1.3 restructured   |
+| 1.4     | Feb 20, 2026 | KSmirnov | REQ-026 added (edge detail endpoint); REQ-027 added (edge de-duplication); REQ-122 range updated; Appendix C updated                                                                                 |
+| 1.5     | Feb 22, 2026 | KSmirnov | REQ-028 added (edge rank requirement); REQ-020 clarifying note on rank rows added                                                                                                                    |
+| 1.6     | Feb 23, 2026 | KSmirnov | REQ-029, REQ-030, REQ-031, REQ-032 added, added Path ID definition, Move /api/paths from Future → REQ-029; add two new endpoints; VIS layer refactored under new version of UI-REQ-401               |
+| 1.7     | Feb 25, 2026 | KSmirnov | REQ-033–036 added (mitigations CRUD endpoints); REQ-038–039 added (mitigation validation); §1.4 updated (mitigations moved from Out of Scope to In Scope); REQ-122 range updated; Appendix C updated |
 ---
 
 
