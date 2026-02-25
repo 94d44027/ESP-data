@@ -341,19 +341,23 @@ body {
 
 /* Mitigations icon button in inspector header (UI-REQ-210 §5) */
 .btn-mit-edit {
-    width: 32px;
-    height: 32px;
-    font-size: 16px;
-    display: flex;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0;
+    margin: 0;
     border: 1px solid var(--color-border);
     background: transparent;
     border-radius: 6px;
     cursor: pointer;
     transition: all var(--transition-fast);
     flex-shrink: 0;
+}
+
+.btn-mit-edit img {
+    display: block;
 }
 
 .btn-mit-edit:hover {
