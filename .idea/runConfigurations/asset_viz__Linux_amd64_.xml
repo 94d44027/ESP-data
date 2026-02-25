@@ -1,0 +1,19 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="asset-viz (Linux/amd64)" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="ESP-data" />
+    <working_directory value="$PROJECT_DIR$" />
+    <go_parameters value="-o $ProjectFileDir$/bin/asset-viz" />
+    <envs>
+      <env name="CGO_ENABLED" value="0" />
+      <env name="GOARCH" value="amd64" />
+      <env name="GOOS" value="linux" />
+    </envs>
+    <kind value="PACKAGE" />
+    <package value="ESP-data/cmd/asset-viz" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$" />
+    <output_directory value="$ProjectFileDir$/bin" />
+    <option name="run" value="false" />
+    <method v="2" />
+  </configuration>
+</component>

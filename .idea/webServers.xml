@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="288aa413-824c-4f6a-aa6b-c6055efed808" name="neb82srv">
+        <fileTransfer rootFolder="/opt/asset-viz" accessType="SFTP" host="nebbie.m82" port="22" sshConfigId="edcaa300-689e-4578-99a7-f26939afd40f" sshConfig="ksmirnov@nebbie.m82:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
