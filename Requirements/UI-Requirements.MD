@@ -15,7 +15,7 @@ This document specifies the user interface requirements for the ESP PoC Visual L
 
 ### 1.1 Document Scope
 
-This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.6) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
+This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.7) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
 
 
 ### 1.2 Design Philosophy
@@ -700,13 +700,14 @@ Visual style:
 - Backdrop: Semi-transparent overlay (rgba(10, 10, 10, 0.85))
 - Animation: Fade-in 200ms
 
-Keyboard:
+Keyboard:   
 - `Escape` closes the modal (when not in row edit mode)
+
 
 ### UI-REQ-252: Mitigations Table
 Columns:
 
-| Column          | Width            | Content                            | Esitable                                  |
+| Column          | Width            | Content                            | Editable                                  |
 |-----------------|------------------|------------------------------------|-------------------------------------------|
 | Mitigation      | ~120px           | Mitigation_ID (e.g. "M1020")       | Dropdown (UI-REQ-254)                     |
 | Mitigation Name | flex (remaining) | Mitigation_Name                    | Read-only (auto-populated from selection) |
@@ -723,7 +724,7 @@ Scrolling:
 
 >Empty state: If no mitigations are applied, show a single centered message row: "No mitigations applied. Click ➕ to add one."
 
-## UI-REQ-253: Row Selection and Inline Actions
+### UI-REQ-253: Row Selection and Inline Actions
 Selection:
 Single-click on a table row highlights it (background `#2a4a5a` or accent colour with opacity)
 - Only one row can be selected at a time
@@ -736,7 +737,7 @@ Action icons (appear on selected row):
 Double-click:
 - Double-clicking a row enters edit mode directly (equivalent to click + edit icon)
 
-## UI-REQ-254: Edit Mode
+### UI-REQ-254: Edit Mode
 Entering edit mode: Click the edit icon on a selected row, or double-click the row.
 
 Editable fields in the selected row:
@@ -765,7 +766,7 @@ Keyboard behavior:
 - `Enter` — confirms the edit (triggers save flow, UI-REQ-256)
 - `Escape` — cancels the edit, reverts the row to its previous values, exits edit mode
 
-## UI-REQ-255: Add New Mitigation
+### UI-REQ-255: Add New Mitigation
 Trigger: Green plus (➕) icon button below the table.
 
 Behaviour:
@@ -775,7 +776,7 @@ Behaviour:
 - The user MUST select a mitigation from the dropdown before saving
 - If the user presses `Escape` on a new unsaved row, the row is removed entirely
 
-## UI-REQ-256: Save Confirmation Flow
+### UI-REQ-256: Save Confirmation Flow
 Trigger: User presses Enter in edit mode, or clicks a "Save" (✓) icon if one is displayed.
 
 Flow:
@@ -790,6 +791,23 @@ Flow:
    - Success (HTTP 200): Exit edit mode, update the row with confirmed values. Optional: brief green flash on the row.
    - Error (HTTP 4xx/5xx): Log the full error to the browser console (console.error). The row remains in edit mode. Optional: brief red flash on the row. (Detailed error messages deferred — PoC.)
 5. On Cancel: Return to edit mode (the row remains editable, no data is lost)
+
+
+### UI-REQ-257: Delete Mitigation Flow
+
+**Trigger:** Click the red ✗ (delete) icon on a selected row.
+
+**Flow:**
+1. **Confirmation dialog:** Modal dialog appears:
+    - Title: "Remove Mitigation"
+    - Body: "Remove {MitigationName} from asset {Asset_ID}? This action cannot be undone."
+    - Buttons: "Cancel" (secondary) | "Remove" (red/destructive primary)
+2. **On Confirm:** Send `DELETE /api/asset/{id}/mitigations/{mitigationId}` (REQ-036)
+3. **Wait for server response:**
+    - **Success (HTTP 200):** Remove the row from the table with a fade-out animation (200ms). Update the row count.
+    - **Error (HTTP 4xx/5xx):** Log to `console.error`. Row remains in the table unchanged.
+4. **On Cancel:** Dialog closes, no action taken
+
 
 
 ### UI-REQ-258: Mitigations Editor Error Handling
@@ -1120,7 +1138,7 @@ All files still served from `/opt/asset-viz/static/` as currently configured.
 
 ### UI-REQ-402: API Endpoints Required
 
-The following API endpoints are defined in Requirements.md (SRS v1.6) sections REQ-020 through REQ-032. See also Appendix C of Requirements.md for the full endpoint summary.
+The following API endpoints are defined in Requirements.md (SRS v1.7) sections REQ-020 through REQ-032. See also Appendix C of Requirements.md for the full endpoint summary.
 
 | Endpoint                                   | SRS Req | Purpose                                               | Used by UI-REQ       |
 |--------------------------------------------|---------|-------------------------------------------------------|----------------------|
@@ -1280,7 +1298,7 @@ The UI implementation SHALL be considered complete when:
 
 ## 20. References
 
-- **Main Requirements:** `Requirements/Requirements.md` (ESP PoC SRS v1.6)
+- **Main Requirements:** `Requirements/Requirements.md` (ESP PoC SRS v1.7)
 - **Reference UI:** Screenshots provided (demo3.mp4 frames)
 - **Existing Implementation:** `static/index.html` (ESP-data repo)
 - **Cytoscape.js Documentation:** https://js.cytoscape.org/
@@ -1331,7 +1349,7 @@ The UI implementation SHALL be considered complete when:
 | UI-REQ-122           | REQ-024                   | Asset types list for filter checkboxes                       |
 | UI-REQ-310           | REQ-100                   | 1920x1080 minimum resolution                                 |
 | UI-REQ-400           | REQ-121, REQ-122          | Go backend, JSON API                                         |
-| UI-REQ-401           | REQ-123                   | Multi-file VIS layer (per SRS v1.6)                          |
+| UI-REQ-401           | REQ-123                   | Multi-file VIS layer (per SRS v1.7)                          |
 | UI-REQ-212           | REQ-026                   | Edge inspector panel, edge detail endpoint                   |
 | UI-REQ-202           | REQ-027                   | Edge consolidation (de-duplication)                          |
 | UI-REQ-206           | REQ-029                   | Inspector activation                                         |
@@ -1344,7 +1362,7 @@ The UI implementation SHALL be considered complete when:
 | UI-REQ-256           | REQ-035                   | Save triggers UPSERT EDGE                                    |
 | UI-REQ-257           | REQ-036                   | Delete triggers DELETE EDGE                                  |
 
-
+   
 ---
 
 **End of UI Requirements Specification**
