@@ -1,8 +1,8 @@
 # UI Requirements Specification
 ## ESP PoC - Visual Layer
 
-**Version:** 1.8  
-**Date:** February 25, 2026  
+**Version:** 1.9  
+**Date:** February 26, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
 **Reference:** Derived from demo UI screenshots and more
@@ -498,8 +498,8 @@ Note: inbound/outbound summary counts as a future enhancement.
    - Click neighbor to navigate to that node
 
 5.**Actions**
-  - "Edit Mitigations" button (shield + pencil icon, or 🛡️✏️)
-  - Opens the Mitigations Editor modal (UI-REQ-250). Visible for all assets. Passes Asset_ID, Asset_Name, and Asset_Description to the modal.
+  - "Edit Mitigations" button — shield SVG icon (`assets/icons/shield.svg`), rendered as a 28×28px icon button in the Inspector header row (right-aligned, next to the "Inspector" title). Hidden when no asset is selected.
+  - Opens the Mitigations Editor modal (UI-REQ-250). Visible for all assets. Passes Asset_ID, Asset_Name, and Asset_Description to the modal via `_inspectorDetail` cache in `inspector.js`.
   - "Set as Entry Point" button (future)
   - "Set as Target" button (future)
   - "Find Paths" button (future)
@@ -650,7 +650,7 @@ When a node is selected, the detail panel MAY show a **radial mini-graph** (per 
 
 ## 8B. Mitigations Editor
 ### UI-REQ-250: Mitigations Editor Activation
-Trigger: "Edit Mitigations" button in the Inspector panel Actions section (UI-REQ-210 §5), visible when any asset is selected.
+Trigger: Shield icon button in the Inspector panel header (UI-REQ-210 §5), visible when any asset is selected.
 
 Behaviour:
 
@@ -1097,7 +1097,8 @@ static/
 ├── css/
 │   ├── main.css            # Layout, top bar, sidebar, panels
 │   ├── graph.css           # Canvas background, node/edge overrides
-│   └── components.css      # Inspector, modals, path-inspector table
+│   ├── components.css      # Inspector, modals, path-inspector table
+│   └── mitigation-editor.css  # Mitigations Editor modal styles
 ├── js/
 │   ├── state.js            # AppState object
 │   ├── api.js              # API client (fetch wrappers)
@@ -1110,7 +1111,8 @@ static/
 │   ├── mitigation-editor.js  # Mitigations Editor modal, table, CRUD
 │   └── app.js              # initialize(), event listeners, DOMContentLoaded
 ├── assets/
-│   └──icons/              # For future use - any icons to be stored here
+│   └── icons/
+│       └── shield.svg     # Edit Mitigations icon (UI-REQ-210 §5)
 ```
 
 All files still served from `/opt/asset-viz/static/` as currently configured.
@@ -1357,4 +1359,5 @@ The UI implementation SHALL be considered complete when:
 | 1.4     | Feb 20, 2026 | UI-REQ-202 amended (edge consolidation); UI-REQ-212 added (edge inspector); UI-REQ-200 amended (edge de-duplication note); UI-REQ-330 amended (edge selection flow); UI-REQ-402 updated (new endpoint + JSON format); Appendix B updated | AI + K. Smirnov |
 | 1.6     | Feb 23, 2026 | Added UI-REQ-206 - 209, Amended UI-REQ-110, Promoted from "Future" to "Partially implemented" UI-REQ-332, updated UI-REQ-402, Appendix B, UI-REQ-401 updated - new static UI files structure                                             | AI + K.Smirnov  |
 | 1.7     | Feb 24, 2026 | Added UI-REQ-124 (scroll to asset), enrich UI-REQ-201 and UI-REQ-330 with references to the new UI-REQ-124                                                                                                                               | AI + K.Smirnov  |
-| 1.8     | Feb 25. 2026 | UI-REQ-210 §5 updated (Edit Mitigations button); UI-REQ-250–258 added (Mitigations Editor modal); UI-REQ-401 updated (mitigation-editor.js); UI-REQ-402 updated (4 new endpoints); §16 updated; Appendix B updated; REQ-UI-241 deleted.                       | AI + K.Smirnov  |
+| 1.8     | Feb 25, 2026 | UI-REQ-210 §5 updated (Edit Mitigations button); UI-REQ-250–258 added (Mitigations Editor modal); UI-REQ-401 updated (mitigation-editor.js); UI-REQ-402 updated (4 new endpoints); §16 updated; Appendix B updated; REQ-UI-241 deleted.                       | AI + K.Smirnov  |
+| 1.9     | Feb 26, 2026 | UI-REQ-210 §5 amended: button moved to Inspector header, emoji replaced with SVG icon (shield.svg); UI-REQ-250 trigger updated; UI-REQ-401 updated (mitigation-editor.css, shield.svg); implementation confirmed for UI-REQ-250–258 | AI + K.Smirnov  |

@@ -1,7 +1,7 @@
 # Software Requirements Specification (SRS)
 ## ESP Proof Of Concept system
 
-**Version:** 1.7  
+**Version:** 1.8  
 **Date:** February 25, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
@@ -596,6 +596,7 @@ Each requirement shall be considered complete when:
 | 1.5     | Feb 22, 2026 | KSmirnov | REQ-028 added (edge rank requirement); REQ-020 clarifying note on rank rows added                                                                                                                    |
 | 1.6     | Feb 23, 2026 | KSmirnov | REQ-029, REQ-030, REQ-031, REQ-032 added, added Path ID definition, Move /api/paths from Future → REQ-029; add two new endpoints; VIS layer refactored under new version of UI-REQ-401               |
 | 1.7     | Feb 25, 2026 | KSmirnov | REQ-033–036 added (mitigations CRUD endpoints); REQ-038–039 added (mitigation validation); §1.4 updated (mitigations moved from Out of Scope to In Scope); REQ-122 range updated; Appendix C updated |
+| 1.8     | Feb 25, 2026 | KSmirnov | REQ-033–036, REQ-038–039 implemented (backend Go handlers, nGQL queries, model types); REQ-122 confirmed (all endpoints return/accept JSON); implementation note added to §1.4 |
 ---
 
 
