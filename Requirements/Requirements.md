@@ -330,10 +330,11 @@ YIELD id(vertex) AS vid, Asset.Asset_ID AS asset_id, Asset.Asset_Name AS asset_n
 ```
 **REQ-031:** Targets List Endpoint. The APP layer SHALL provide an API endpoint (`GET /api/targets`) that returns all assets where `is_target == true`, along with their Asset_ID and Asset_Name. This populates the target dropdown in the Path Inspector UI. The underlying query:
 
-``` nGQL   
+``` nGQL
 LOOKUP ON Asset WHERE Asset.is_target == true
 YIELD id(vertex) AS vid, Asset.Asset_ID AS asset_id, Asset.Asset_Name AS asset_name;
 ```
+
 
 >Design note on REQ-030/031: Alternatively, these could have been derived client-side from the existing `/api/assets` response (REQ-021), which already returns is_entrance and is_target for every asset. However, dedicated endpoints are cleaner for the Path Inspector and avoid coupling to the full asset list load.
 
