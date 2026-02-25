@@ -11,7 +11,7 @@
 
 ## 1. Overview
 
-This document specifies the user interface requirements for the ESP PoC Visual Layer. The interface provides graph-based visualization of IT infrastructure assets and their relationships, enabling attack path analysis through interactive exploration.
+This document specifies the user interface requirements for the ESP PoC Visual Layer. The interface provides graph-based visualization of IT infrastructure assets and their relationships, enabling attack path analysis through interactive exploration. The interface is subject to ongoing changes.
 
 ### 1.1 Document Scope
 
