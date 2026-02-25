@@ -1362,11 +1362,11 @@ The UI implementation SHALL be considered complete when:
 | UI-REQ-256           | REQ-035                   | Save triggers UPSERT EDGE                                    |
 | UI-REQ-257           | REQ-036                   | Delete triggers DELETE EDGE                                  |
 
-
+   
 ---
 
 **End of UI Requirements Specification**
-
+      
 ---
 
 ## Change Log

@@ -431,7 +431,7 @@ Response: HTTP 200 on success with `{ "status": "ok" }`. HTTP 500 on database er
 
 **REQ-038:** Mitigation ID parameters received from API requests SHALL be validated against the format `^M\d{4}$` before being used in database queries. Invalid parameters SHALL result in an HTTP 400 response with a descriptive error message.
 
-**REQ-039:** Maturity values received from API requests SHALL be validated as integers in the set `{25, 50, 80, 100}`. Values outside this set SHALL result in an HTTP 400 response. The schema permits 0–100 (int16), but the UI enforces fixed levels per UI-REQ-253.
+**REQ-039:** Maturity values received from API requests SHALL be validated as integers in the set `{25, 50, 80, 100}`. Values outside this set SHALL result in an HTTP 400 response. The schema permits 0–100 (int16), but the UI enforces fixed levels per UI-REQ-254.
 
 >Design note: The backend validates against the fixed set `{25, 50, 80, 100}` rather than the full 0–100 range, because the Mitigations Editor is the only write path for this field. If a future bulk-import or API consumer needs the full range, this validation can be relaxed.
 
