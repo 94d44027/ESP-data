@@ -332,8 +332,29 @@ body {
 }
 
 .inspector-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: var(--spacing-lg);
     border-bottom: 1px solid var(--color-border);
+}
+
+/* Mitigations icon button in inspector header (UI-REQ-210 §5) */
+.btn-mit-edit {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.btn-mit-edit:hover {
+    border-color: var(--color-accent-primary);
+    background-color: var(--color-bg-elevated);
 }
 
 .inspector-title {

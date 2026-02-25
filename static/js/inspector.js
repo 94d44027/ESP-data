@@ -1,6 +1,10 @@
 // ============================================
 // INSPECTOR PANEL (UI-REQ-210)
 // ============================================
+
+// Cached detail for the currently displayed asset (used by header button)
+let _inspectorDetail = null;
+
 async function selectAsset(assetId) {
     AppState.selectedAssetId = assetId;
 
@@ -32,7 +36,12 @@ async function selectAsset(assetId) {
             API.fetchNeighbors(assetId)
         ]);
 
+        _inspectorDetail = detail;
         renderInspector(detail, neighborsData.neighbors);
+
+        // Show the mitigations icon button in the header (UI-REQ-210 §5)
+        const mitBtn = document.getElementById('btn-edit-mitigations');
+        if (mitBtn) mitBtn.style.display = '';
     } catch (error) {
         console.error('Failed to load asset details:', error);
         inspectorContent.innerHTML = `
@@ -45,6 +54,7 @@ async function selectAsset(assetId) {
 
 function deselectAsset() {
     AppState.selectedAssetId = null;
+    _inspectorDetail = null;
 
     if (AppState.cy) {
         AppState.cy.nodes().unselect();
@@ -53,6 +63,10 @@ function deselectAsset() {
     document.querySelectorAll('.asset-item').forEach(item => {
         item.classList.remove('selected');
     });
+
+    // Hide the mitigations icon button
+    const mitBtn = document.getElementById('btn-edit-mitigations');
+    if (mitBtn) mitBtn.style.display = 'none';
 
     document.getElementById('inspector-content').innerHTML = `
         <div class="inspector-empty">Select a node to view details</div>
@@ -141,15 +155,16 @@ function renderInspector(detail, neighbors) {
                 }
             </div>
         </div>
-
-        <!-- Actions (UI-REQ-210 §5) -->
-        <div class="property-section">
-            <div class="property-section-title">Actions</div>
-            <div style="padding: 0 var(--spacing-md);">
-                <button class="btn btn-primary" style="width: 100%;" onclick="MitEditor.open('${detail.asset_id}', '${detail.asset_name.replace(/'/g, "\\'")}', '${(detail.asset_description || '').replace(/'/g, "\\'")}')">
-                    🛡️✏️ Edit Mitigations
-                </button>
-            </div>
-        </div>
     `;
 }
+
+// Wire the header icon button to MitEditor (UI-REQ-210 §5)
+document.getElementById('btn-edit-mitigations').addEventListener('click', () => {
+    if (_inspectorDetail) {
+        MitEditor.open(
+            _inspectorDetail.asset_id,
+            _inspectorDetail.asset_name || '',
+            _inspectorDetail.asset_description || ''
+        );
+    }
+});
