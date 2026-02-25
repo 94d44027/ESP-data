@@ -1366,7 +1366,7 @@ The UI implementation SHALL be considered complete when:
 ---
 
 **End of UI Requirements Specification**
-
+      
 ---
 
 ## Change Log
