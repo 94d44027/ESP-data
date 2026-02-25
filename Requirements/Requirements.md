@@ -341,7 +341,7 @@ YIELD id(vertex) AS vid, Asset.Asset_ID AS asset_id, Asset.Asset_Name AS asset_n
 
 #### 3.1.3A Mitigations API
 
-**REQ-033:** Mitigations List Endpoint. The APP layer SHALL provide an API endpoint (G`ET /api/mitigations`) that returns all MITRE mitigations stored in the database. This populates the mitigation dropdown in the Mitigations Editor (UI-REQ-253). The underlying nGQL query (pure nGQL per REQ-243):
+**REQ-033:** Mitigations List Endpoint. The APP layer SHALL provide an API endpoint (`GET /api/mitigations`) that returns all MITRE mitigations stored in the database. This populates the mitigation dropdown in the Mitigations Editor (UI-REQ-254). The underlying nGQL query (pure nGQL per REQ-243):
 
 ``` nGQL
 LOOKUP ON tMitreMitigation
@@ -457,7 +457,7 @@ None so far
 
 **REQ-121:** The APP layer shall connect to the GrDB using Vesoft's Go client libraries.
 
-**REQ-122:** The APP layer shall publish the results intended for visualisation as JSON. All API endpoints defined in REQ-020 - REQ-031 SHALL return JSON responses. Endpoints REQ-035 and REQ-036 additionally accept JSON request bodies.
+**REQ-122:** The APP layer shall publish the results intended for visualisation as JSON. All API endpoints defined in REQ-020 - REQ-036 SHALL return JSON responses. Endpoints REQ-035 and REQ-036 additionally accept JSON request bodies.
 
 **REQ-123:** The VIS layer SHALL be implemented as described in UI-Requirements.MD (Version 1.8). Cytoscape.js is the graph rendering library. The implementation may use multiple HTML files or a single-page application architecture as needed for functionality.
 
