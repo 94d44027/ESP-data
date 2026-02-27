@@ -17,3 +17,4 @@ bin/
 # === Go test/coverage ===
 *.test
 *.out
+/.gitattributes
