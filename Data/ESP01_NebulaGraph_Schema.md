@@ -1,6 +1,7 @@
 # ESP01 NebulaGraph 3.8 Schema - Complete Documentation
-**Version:** 1.5  
-**Created:** February 22, 2026  
+**Version:** 1.6  
+**Created:** February 27, 2026  
+**Prepared by:** Konstantin Smirnov
 **Space:** ESP01 (IT Infrastructure / MITRE ATT&CK Model)  
 **Source:** Full NebulaGraph Studio console, author's comments
 
@@ -277,6 +278,31 @@ No properties (pure relationship edge)
 #### Notes
 The data on connectivity is collected from MITRE ATT&CK Enterprise matrix by an external tool (going to be a part of the project later on). So far treated as static relationship.
 
+### ED011: runs_on
+#### Used for
+This is to show the relationship between Asset and the type od operating system it runs. (Asset --runs_on--> OS_type).
+#### Edge properties
+| Field             | Type     | Null | Default | Comment |
+|-------------------|----------|------|---------|---------|
+| installation_date | datetime | YES  | NULL    | _EMPTY_ |
+| license_key       | string   | YES  | NULL    | _EMPTY_ |
+#### Notes
+The data on connectivity is defined externally, at the data loading or later updated using the built-in ESP PoC system interface. None of the fields are used so far.
+
+### ED012: patterns_to
+#### Used for
+This is to show the relationship between Tactic/Tecqnique (or subtechnique) and the MITRE state (combination of tactic and technique). (tMitreTactic --patterns_to--> tMitreState, tMitreTechnique --patterns_to--> tMitreState).
+#### Edge properties
+| Field          | Type   | Null | Default | Comment |
+|----------------|--------|------|---------|---------|
+| probability    | float  | YES  | NULL    | _EMPTY_ |
+| observed_count | int64  | YES  | NULL    | _EMPTY_ |
+| comment        | string | YES  | NULL    | _EMPTY_ |
+#### Notes
+Edges are defined externally by a separate application. None of teh fields are used at the moment.
+
+
+
 ## IN: Indexes (10 Total)
 ### Tag Indexes (7)
 | Index Name         | On Tag          | Columns                    |
@@ -296,3 +322,9 @@ The data on connectivity is collected from MITRE ATT&CK Enterprise matrix by an 
 | PartOfIndex     | part_of          | []      |
 | SubtechIndex    | has_subtechnique | []      |
 
+
+
+| Version | Date         | Changes                               | Author             |
+|---------|--------------|---------------------------------------|--------------------|
+| 1.0     | Feb 16, 2026 | Initial version                       | Konstantin Smirnov |
+| 1.6     | Feb 27, 2026 | Added runs_on, patterns_to edge types | Konstantin Smirnov |
