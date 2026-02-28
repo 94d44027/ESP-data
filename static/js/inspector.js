@@ -1,5 +1,5 @@
 // ============================================
-// INSPECTOR PANEL (UI-REQ-210)
+// ASSET INSPECTOR PANEL (UI-REQ-210)
 // ============================================
 
 // Cached detail for the currently displayed asset (used by header button)
@@ -7,6 +7,10 @@ let _inspectorDetail = null;
 
 async function selectAsset(assetId) {
     AppState.selectedAssetId = assetId;
+
+    // Update panel title to "Asset Inspector" (UI-REQ-210)
+    const titleEl = document.getElementById('inspector-title');
+    if (titleEl) titleEl.textContent = 'Asset Inspector';
 
     // Highlight node in graph
     if (AppState.cy) {
@@ -39,7 +43,7 @@ async function selectAsset(assetId) {
         _inspectorDetail = detail;
         renderInspector(detail, neighborsData.neighbors);
 
-        // Show the mitigations icon button in the header (UI-REQ-210 §5)
+        // Show the mitigations icon button in the header (UI-REQ-210 §1)
         const mitBtn = document.getElementById('btn-edit-mitigations');
         if (mitBtn) mitBtn.style.display = '';
     } catch (error) {
@@ -75,90 +79,122 @@ function deselectAsset() {
 
 function renderInspector(detail, neighbors) {
     const inspectorContent = document.getElementById('inspector-content');
+
+    // Split neighbors into outbound and inbound (UI-REQ-210 §4)
+    const outbound = neighbors.filter(n => n.direction === 'outbound');
+    const inbound  = neighbors.filter(n => n.direction === 'inbound');
+
     inspectorContent.innerHTML = `
-        <!-- Basic Info (UI-REQ-211) -->
-        <div class="property-section">
-            <div class="property-section-title">Basic Information</div>
-            <div class="property-list">
-                <div class="property-item">
-                    <div class="property-label">Asset ID</div>
-                    <div class="property-value">${detail.asset_id}</div>
-                </div>
-                <div class="property-item">
-                    <div class="property-label">Name</div>
-                    <div class="property-value">${detail.asset_name}</div>
-                </div>
-                <div class="property-item">
-                    <div class="property-label">Type</div>
-                    <div class="property-value">${detail.asset_type || 'Unknown'}</div>
-                </div>
-                <div class="property-item">
-                    <div class="property-label">Priority</div>
-                    <div class="property-value">
-                        <span class="badge badge-priority-${detail.priority}">
-                            Priority ${detail.priority}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Fixed zone: Basic Info + Security Flags (UI-REQ-210) -->
+        <div class="inspector-fixed-zone">
 
-        <!-- Flags Section -->
-        <div class="property-section">
-            <div class="property-section-title">Security Flags</div>
-            <div class="property-list">
-                <div class="property-item">
-                    <div class="property-label">Entrance Point</div>
-                    <div class="property-value">
-                        ${detail.is_entrance ?
-                            '<span class="badge badge-entrance">Yes</span>' :
-                            '<span style="color: var(--color-text-muted);">No</span>'}
+            <!-- Basic Information — compact two-column grid (UI-REQ-210 §2) -->
+            <div class="property-section">
+                <div class="property-section-title">Basic Information</div>
+                <div class="basic-info-grid">
+                    <div class="property-item">
+                        <div class="property-label">Asset ID</div>
+                        <div class="property-value">${detail.asset_id}</div>
+                    </div>
+                    <div class="property-item">
+                        <div class="property-label">Name</div>
+                        <div class="property-value">${detail.asset_name || '\u2014'}</div>
                     </div>
                 </div>
-                <div class="property-item">
-                    <div class="property-label">Target Asset</div>
-                    <div class="property-value">
-                        ${detail.is_target ?
-                            '<span class="badge badge-target">Yes</span>' :
-                            '<span style="color: var(--color-text-muted);">No</span>'}
+                <div class="basic-info-full">
+                    <div class="property-item">
+                        <div class="property-label">Description</div>
+                        <div class="property-value">${detail.asset_description || '\u2014'}</div>
                     </div>
                 </div>
-                <div class="property-item">
-                    <div class="property-label">Has Vulnerability</div>
-                    <div class="property-value">
-                        ${detail.has_vulnerability ?
-                            '<span class="badge badge-vuln">Yes</span>' :
-                            '<span style="color: var(--color-text-muted);">No</span>'}
+                <div class="basic-info-grid">
+                    <div class="property-item">
+                        <div class="property-label">Type</div>
+                        <div class="property-value">${detail.asset_type || 'Unknown'}</div>
+                    </div>
+                    <div class="property-item">
+                        <div class="property-label">OS</div>
+                        <div class="property-value">${detail.os_name || '\u2014'}</div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Connections (UI-REQ-212) -->
-        <div class="property-section">
-            <div class="property-section-title">
-                Connections (${neighbors.length})
-            </div>
-            <div class="connection-list">
-                ${neighbors.length === 0 ?
-                    '<div class="inspector-empty">No connections</div>' :
-                    neighbors.map(neighbor => `
-                        <div class="connection-item" onclick="selectAsset('${neighbor.neighbor_id}')">
-                            <div class="connection-direction">
-                                ${neighbor.direction === 'outbound' ? '\u2192 Outbound' : '\u2190 Inbound'}
-                            </div>
-                            <div class="connection-target">
-                                ${neighbor.neighbor_id}
-                            </div>
+            <!-- Security Flags — compact 2x2 grid (UI-REQ-210 §3) -->
+            <div class="property-section">
+                <div class="property-section-title">Security Flags</div>
+                <div class="flags-grid">
+                    <div class="property-item">
+                        <div class="property-label">Priority</div>
+                        <div class="property-value">
+                            <span class="badge badge-priority-${detail.priority}">
+                                Priority ${detail.priority}
+                            </span>
                         </div>
-                    `).join('')
-                }
+                    </div>
+                    <div class="property-item">
+                        <div class="property-label">Target Asset</div>
+                        <div class="property-value">
+                            ${detail.is_target ?
+                                '<span class="badge badge-target">Yes</span>' :
+                                '<span style="color: var(--color-text-muted);">No</span>'}
+                        </div>
+                    </div>
+                    <div class="property-item">
+                        <div class="property-label">Has Vulnerability</div>
+                        <div class="property-value">
+                            ${detail.has_vulnerability ?
+                                '<span class="badge badge-vuln">Yes</span>' :
+                                '<span style="color: var(--color-text-muted);">No</span>'}
+                        </div>
+                    </div>
+                    <div class="property-item">
+                        <div class="property-label">Entrance Point</div>
+                        <div class="property-value">
+                            ${detail.is_entrance ?
+                                '<span class="badge badge-entrance">Yes</span>' :
+                                '<span style="color: var(--color-text-muted);">No</span>'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scrollable zone: Connections (UI-REQ-210 §4) -->
+        <div class="inspector-scroll-zone">
+            <div class="property-section">
+                <div class="property-section-title">
+                    Connections (${neighbors.length})
+                </div>
+                <div class="connections-columns">
+                    <div class="connections-column">
+                        <div class="connections-column-header">Outbound (${outbound.length})</div>
+                        ${outbound.length === 0 ?
+                            '<div class="inspector-empty" style="padding: var(--spacing-sm);">None</div>' :
+                            outbound.map(n => `
+                                <div class="connection-chip" onclick="selectAsset('${n.neighbor_id}')">
+                                    \u2192 ${n.neighbor_id}
+                                </div>
+                            `).join('')
+                        }
+                    </div>
+                    <div class="connections-column">
+                        <div class="connections-column-header">Inbound (${inbound.length})</div>
+                        ${inbound.length === 0 ?
+                            '<div class="inspector-empty" style="padding: var(--spacing-sm);">None</div>' :
+                            inbound.map(n => `
+                                <div class="connection-chip" onclick="selectAsset('${n.neighbor_id}')">
+                                    ${n.neighbor_id} \u2192
+                                </div>
+                            `).join('')
+                        }
+                    </div>
+                </div>
             </div>
         </div>
     `;
 }
 
-// Wire the header icon button to MitEditor (UI-REQ-210 §5)
+// Wire the header icon button to MitEditor (UI-REQ-210 §1)
 document.getElementById('btn-edit-mitigations').addEventListener('click', () => {
     if (_inspectorDetail) {
         MitEditor.open(

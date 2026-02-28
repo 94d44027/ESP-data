@@ -263,6 +263,7 @@ func QueryAssetDetail(pool *nebula.ConnectionPool, cfg *config.Config, assetID s
 	query := fmt.Sprintf(`MATCH (a:Asset) WHERE a.Asset.Asset_ID == "%s"
 OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
 OPTIONAL MATCH (a)-[:belongs_to]->(s:Network_Segment)
+OPTIONAL MATCH (a)-[:runs_on]->(os:OS_Type)
 RETURN
   a.Asset.Asset_ID            AS asset_id,
   a.Asset.Asset_Name          AS asset_name,
@@ -274,7 +275,8 @@ RETURN
   a.Asset.has_vulnerability   AS has_vulnerability,
   a.Asset.TTB                 AS ttb,
   t.Asset_Type.Type_Name      AS asset_type,
-  s.Network_Segment.Segment_Name AS segment_name;`, assetID)
+  s.Network_Segment.Segment_Name AS segment_name,
+  os.OS_Type.OS_Name             AS os_name;`, assetID)
 
 	queryStart := time.Now()
 	log.Printf("[%s] nebula: QueryAssetDetail executing query for asset %s", queryStart.Format("15:04:05.000"), assetID)
@@ -311,6 +313,7 @@ RETURN
 		"ttb":               safeInt(record, 8, 10),
 		"asset_type":        safeString(record, 9),
 		"segment_name":      safeString(record, 10),
+		"os_name":           safeString(record, 11),
 	}
 
 	log.Printf("nebula: QueryAssetDetail returned detail for %s", assetID)

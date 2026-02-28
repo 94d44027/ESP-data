@@ -190,6 +190,7 @@ type AssetDetail struct {
 	Priority         int    `json:"priority"`
 	HasVulnerability bool   `json:"has_vulnerability"`
 	TTB              int    `json:"ttb"`
+	OSName           string `json:"os_name"`
 }
 
 // BuildAssetDetailResponse maps the raw query result into a typed struct.
@@ -208,6 +209,7 @@ func BuildAssetDetailResponse(detail map[string]interface{}) AssetDetail {
 		Priority:         mapInt(detail, "priority"),
 		HasVulnerability: mapBool(detail, "has_vulnerability"),
 		TTB:              mapInt(detail, "ttb"),
+		OSName:           mapStr(detail, "os_name"),
 	}
 }
 

@@ -4,6 +4,10 @@
 async function selectEdge(sourceId, targetId) {
     AppState.selectedAssetId = null;
 
+    // Update panel title to "Edge Inspector" (UI-REQ-212)
+    const titleEl = document.getElementById('inspector-title');
+    if (titleEl) titleEl.textContent = 'Edge Inspector';
+
     // Deselect nodes, keep edge selected
     if (AppState.cy) {
         AppState.cy.nodes().unselect();
