@@ -32,11 +32,11 @@ This specification does **not** cover:
 
 ### 1.3 Relationship to Other Documents
 
-| Document                             | Version | Relationship                                                                                         |
-|--------------------------------------|---------|------------------------------------------------------------------------------------------------------|
-| Requirements.md (SRS)                | v1.10   | Parent document. Stubs REQ-029–032 reference this spec. API summary in Appendix C links here.        |
-| UI-Requirements.md  (UIR)            | v1.10   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.     |
-| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.6    | Defines Asset.TTB property (TA001), connects_to edges (ED005), applied_to edges (ED001).             |
+| Document                             | Version | Relationship                                                                                                                  |
+|--------------------------------------|---------|-------------------------------------------------------------------------------------------------------------------------------|
+| Requirements.md (SRS)                | v1.11   | Parent document. Stubs REQ-029–032 reference this spec. API summary in Appendix C links here.                                 |
+| UI-Requirements.md  (UIR)            | v1.11   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                              |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.6    | Defines Asset.TTB property (TA001), connects_to edges (ED005), applied_to edges (ED001) and other elements of database schema |
 
 ### 1.4 Requirement ID Convention
 

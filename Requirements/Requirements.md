@@ -17,15 +17,19 @@ This Software Requirements Specification (SRS) defines the functional and non-fu
 ### 1.2 Document Scope
 This document describes the complete set of requirements for Version 1.0 of ESP PoC. It serves as the foundation for system design, development, testing, and acceptance criteria.
 
-**Companion documents:**
-- **UI-Requirements.md** — Visual layer specification (referenced by REQ-123)
-- **AlgoSpec.md** — Path calculation and TTA/TTB algorithm specification (REQ-029 through REQ-032 migrated there)
+### 1.3 Relationship to Other Documents
 
-### 1.3 Intended Audience
+| Document                             | Version | Relationship                                                                                                    |
+|--------------------------------------|---------|-----------------------------------------------------------------------------------------------------------------|
+| UI-Requirements.md  (UIR)            | v1.11   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.6    | Defines database schema (ESP01)                                                                                 |
+| AlgoSpecs.md (ALGO)                  | v1.0    | Defines requirements to algorithms regarding attack path calculations ((REQ-029 through REQ-032 migrated there) |
+
+### 1.4 Intended Audience
 - Software developers and architects
 - Other staff working with PoC
 
-### 1.4 Product Scope
+### 1.5 Product Scope
 ESP PoC will provide a web-based platform enabling a user to analyse the fixed (pre-existing) set of data representing a simple IT infrastructure of a small company. The intended purpose of building the PoC is to verify that nGQL queries ran against Nebula Graph database will provide adequate performance to enable future scalability. 
 
 **In Scope:**
@@ -44,7 +48,7 @@ ESP PoC will provide a web-based platform enabling a user to analyse the fixed (
 - Secure access
 - User account management
 
-### 1.5 Business Objectives
+### 1.6 Business Objectives
 - Prove that graph database (Nebula Graph) is better for attack path analysis than relational database
 - Improve the existing data schema
 

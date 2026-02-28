@@ -18,13 +18,21 @@ This document specifies the user interface requirements for the ESP PoC Visual L
 
 This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.11) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
 
-
 ### 1.2 Design Philosophy
 
 - **Dark theme** as primary colour scheme (matching reference UI)
 - **High contrast** for accessibility (per REQ-011, REQ-101)
 - **Graph-centric** layout with supporting panels
 - **Minimal cognitive load** - focus on the visualization
+
+### 1.3 Relationship to Other Documents
+
+| Document                             | Version | Relationship                                                           |
+|--------------------------------------|---------|------------------------------------------------------------------------|
+| Requirements.md  (SRS)               | v1.11   | The document defining main functional requirements for PoC application |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.6    | Defines database schema (ESP01)                                        |
+| AlgoSpecs.md (ALGO)                  | v1.0    | Defines requirements to algorithms regarding attack path calculations  |
+
 
 ---
 
