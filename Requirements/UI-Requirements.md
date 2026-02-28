@@ -1,8 +1,8 @@
 # UI Requirements Specification
 ## ESP PoC - Visual Layer
 
-**Version:** 1.10  
-**Date:** February 26, 2026  
+**Version:** 1.11  
+**Date:** March 1, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
 **Reference:** Derived from demo UI screenshots and more
@@ -15,7 +15,7 @@ This document specifies the user interface requirements for the ESP PoC Visual L
 
 ### 1.1 Document Scope
 
-This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.10) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
+This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.11) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
 
 
 ### 1.2 Design Philosophy
@@ -383,13 +383,13 @@ Panel title: "Path Inspector"
 Layout (top to bottom):
 1. Entry Point dropdown
    - Label: "Entry point:"
-   - Populated from `GET /api/entry-points` (REQ-030)
+   - Populated from `GET /api/entry-points` (ALG-REQ-002 in AlgoSpec.md)
    - Each option displays: `Asset_Name (Asset_ID)` — e.g. "WiFi1 (A00002)"
    - Below the dropdown: description text showing the asset's full name/description
    
 2. Target dropdown
    - Label: "Target:"
-   - Populated from `GET /api/targets` (REQ-031)
+   - Populated from `GET /api/targets` (ALG-REQ-003 in AlgoSpec.md)
    - Same display format as entry point
    - Below the dropdown: description text
 
@@ -401,7 +401,7 @@ Layout (top to bottom):
 
 4. Run button
    - Label: "Run"
-   - Triggers the path calculation call to `GET /api/paths` (REQ-029)
+   - Triggers the path calculation call to `GET /api/paths` (ALG-REQ-001 in AlgoSpec.md)
    - Disabled until both entry point and target are selected
    - Shows loading spinner while query executes
 
@@ -1146,7 +1146,7 @@ All files still served from `/opt/asset-viz/static/` as currently configured.
 
 ### UI-REQ-402: API Endpoints Required
 
-The following API endpoints are defined in Requirements.md (SRS v1.10) sections REQ-020 through REQ-032. See also Appendix C of Requirements.md for the full endpoint summary.
+The following API endpoints are defined in Requirements.md (SRS v1.11) and AlgoSpec.md (v1.0). Path-related endpoints (formerly REQ-029–031) are now specified in AlgoSpec.md. See also Appendix C of Requirements.md for the full endpoint summary.
 
 | Endpoint                                   | SRS Req | Purpose                                               | Used by UI-REQ       |
 |--------------------------------------------|---------|-------------------------------------------------------|----------------------|
@@ -1156,9 +1156,9 @@ The following API endpoints are defined in Requirements.md (SRS v1.10) sections 
 | `GET /api/neighbors/{id}`                  | REQ-023 | Immediate neighbors of an asset                       | UI-REQ-210 §3–4      |
 | `GET /api/asset-types`                     | REQ-024 | Distinct asset types for filter checkboxes            | UI-REQ-122           |
 | `GET /api/edges/{sourceId}/{targetId}`     | REQ-026 | All connections between two assets for edge inspector | UI-REQ-212           |
-| `GET /api/paths?from=&to=&hops=`           | REQ-029 | Path calculation with TTA                             | UI-REQ-207           |
-| `GET /api/entry-points`                    | REQ-030 | Entry points for dropdown                             | UI-REQ-207 §1        |
-| `GET /api/targets`                         | REQ-031 | Targets for dropdown                                  | UI-REQ-207 §2        |
+| `GET /api/paths?from=&to=&hops=`           | ALG-REQ-001 | Path calculation with TTA (AlgoSpec.md)           | UI-REQ-207           |
+| `GET /api/entry-points`                    | ALG-REQ-002 | Entry points for dropdown (AlgoSpec.md)           | UI-REQ-207 §1        |
+| `GET /api/targets`                         | ALG-REQ-003 | Targets for dropdown (AlgoSpec.md)                | UI-REQ-207 §2        |
 | `GET /api/mitigations`                     | REQ-033 | All MITRE mitigations for editor dropdown             | UI-REQ-254           |
 | `GET /api/asset/{id}/mitigations`          | REQ-034 | Applied mitigations for editor table                  | UI-REQ-252           |
 | `PUT /api/asset/{id}/mitigations`          | REQ-035 | Add/update applied mitigation                         | UI-REQ-256           |
@@ -1360,9 +1360,9 @@ The UI implementation SHALL be considered complete when:
 | UI-REQ-401           | REQ-123                   | Multi-file VIS layer (per SRS v1.10)                         |
 | UI-REQ-212           | REQ-026                   | Edge inspector panel, edge detail endpoint                   |
 | UI-REQ-202           | REQ-027                   | Edge consolidation (de-duplication)                          |
-| UI-REQ-206           | REQ-029                   | Inspector activation                                         |
-| UI-REQ-207           | REQ-029, REQ-030, REQ-031 | Path Inspector panel with dropdowns and results              |
-| UI-REQ-208           | REQ-029                   | Path selection and graph highlighting                        |
+| UI-REQ-206           | ALG-REQ-001 (AlgoSpec.md) | Inspector activation                                         |
+| UI-REQ-207           | ALG-REQ-001, 002, 003 (AlgoSpec.md) | Path Inspector panel with dropdowns and results     |
+| UI-REQ-208           | ALG-REQ-001 (AlgoSpec.md) | Path selection and graph highlighting                        |
 | UI-REQ-209           | ---                       | Stateless close behaviour                                    |
 | UI-REQ-250           | REQ-034                   | Editor activation, fetches applied mitigations               |
 | UI-REQ-252           | REQ-034                   | Table data source                                            |
@@ -1389,3 +1389,4 @@ The UI implementation SHALL be considered complete when:
 | 1.8     | Feb 25, 2026 | UI-REQ-210 §5 updated (Edit Mitigations button); UI-REQ-250–258 added (Mitigations Editor modal); UI-REQ-401 updated (mitigation-editor.js); UI-REQ-402 updated (4 new endpoints); §16 updated; Appendix B updated; REQ-UI-241 deleted.                                               | AI + K.Smirnov  |
 | 1.9     | Feb 26, 2026 | UI-REQ-210 §5 amended: button moved to Inspector header, emoji replaced with SVG icon (shield.svg); UI-REQ-250 trigger updated; UI-REQ-401 updated (mitigation-editor.css, shield.svg); implementation confirmed for UI-REQ-250–258. The version with the working mitigations editor. | AI + K.Smirnov  |
 | 1.10    | Feb 28, 2026 | Changed UI-REQ-210 to reflect the new look of Asset Inspector, updated UI-REQ-212 (Edge inspector title - to be reviwed later).                                                                                                                                                       | AI + K. Smirnov |
+| 1.11    | Mar 1, 2026  | Refactoring: REQ-029/030/031 references updated to ALG-REQ-001/002/003 (AlgoSpec.md). Updated §1.1 SRS version ref, UI-REQ-207 inline refs, UI-REQ-402 table, Appendix B mapping.                                                                                                    | AI + K. Smirnov |
