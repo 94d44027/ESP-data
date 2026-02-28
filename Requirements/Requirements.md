@@ -1,8 +1,8 @@
 # Software Requirements Specification (SRS)
 ## ESP Proof Of Concept system
 
-**Version:** 1.8  
-**Date:** February 25, 2026  
+**Version:** 1.10  
+**Date:** February 28, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
 
@@ -191,12 +191,13 @@ Optional query parameters: `?type=Server&search=CRM` for server-side filtering.
 
 _Note “In the current version, filtering is performed client-side from the full asset list. Server-side filtering via query parameters is deferred (till we hit the larder models). 
 
-**REQ-022:** The APP layer SHALL provide an API endpoint (`GET /api/asset/{id}`) that returns all properties of a single asset together with its related type and network segment, for the detail inspector panel (UI-REQ-210). The underlying query:
+**REQ-022:** The APP layer SHALL provide an API endpoint (`GET /api/asset/{id}`) that returns all properties of a single asset together with its related type, network segment, and operating system, for the detail inspector panel (UI-REQ-210). The underlying query:
 
-```
+```nGQL
 MATCH (a:Asset) WHERE a.Asset.Asset_ID == $assetId
 OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
 OPTIONAL MATCH (a)-[:belongs_to]->(s:Network_Segment)
+OPTIONAL MATCH (a)-[:runs_on]->(os:OS_Type)
 RETURN
   a.Asset.Asset_ID AS asset_id,
   a.Asset.Asset_Name AS asset_name,
@@ -208,20 +209,22 @@ RETURN
   a.Asset.has_vulnerability AS has_vulnerability,
   a.Asset.TTB AS ttb,
   t.Asset_Type.Type_Name AS asset_type,
-  s.Network_Segment.Segment_Name AS segment_name;
+  s.Network_Segment.Segment_Name AS segment_name,
+  os.OS_Type.OS_Name AS os_name;
 ```
 
-Note: The `$assetId` parameter SHALL be validated against the expected format (e.g. `^A\d{4,5}$`) before query execution to prevent injection.
+>Note: The `$assetId` parameter SHALL be validated against the expected format (e.g. `^A\d{4,5}$`) before query execution to prevent injection.
 
 **REQ-023:** The APP layer SHALL provide an API endpoint (`GET /api/neighbors/{id}`) that returns the immediate neighbors of a given asset with edge direction, for the inspector connections summary and neighbor list (UI-REQ-210 §3–4). The underlying nGQL query (pure nGQL per REQ-243):
 
-```
+``` nGQL
 GO FROM $assetId OVER connects_to
 YIELD dst(edge) AS neighbor_id, "outbound" AS direction
 UNION
 GO FROM $assetId OVER connects_to REVERSELY
 YIELD src(edge) AS neighbor_id, "inbound" AS direction;
 ```
+>Design note: The UNION query may return the same `neighbor_id` twice — once as "outbound" and once as "inbound" — when bidirectional `connects_to` edges exist between two assets. The APP layer SHALL NOT de-duplicate these entries; both rows are passed to the VIS layer, which separates them into Outbound and Inbound columns in the inspector panel (UI-REQ-210 §3).
 
 **REQ-024:** The APP layer SHALL provide an API endpoint (`GET /api/asset-types`) that returns all distinct asset types, for populating the filter checkboxes in the sidebar (UI-REQ-122). The underlying nGQL query (pure nGQL per REQ-243):
 
@@ -324,7 +327,7 @@ Response format:
 
 **REQ-030:** Entry Points List Endpoint. The APP layer SHALL provide an API endpoint (`GET /api/entry-points`) that returns all assets where `is_entrance == true`, along with their Asset_ID and Asset_Name. This populates the entry point dropdown in the Path Inspector UI. The underlying query:
 
-```
+``` nGQL
 LOOKUP ON Asset WHERE Asset.is_entrance == true
 YIELD id(vertex) AS vid, Asset.Asset_ID AS asset_id, Asset.Asset_Name AS asset_name;
 ```
@@ -460,7 +463,7 @@ None so far
 
 **REQ-122:** The APP layer shall publish the results intended for visualisation as JSON. All API endpoints defined in REQ-020 - REQ-036 SHALL return JSON responses. Endpoints REQ-035 and REQ-036 additionally accept JSON request bodies.
 
-**REQ-123:** The VIS layer SHALL be implemented as described in UI-Requirements.MD (Version 1.8). Cytoscape.js is the graph rendering library. The implementation may use multiple HTML files or a single-page application architecture as needed for functionality.
+**REQ-123:** The VIS layer SHALL be implemented as described in UI-Requirements.MD (Version 1.10). Cytoscape.js is the graph rendering library. The implementation may use multiple HTML files or a single-page application architecture as needed for functionality.
 
 
 
@@ -596,7 +599,8 @@ Each requirement shall be considered complete when:
 | 1.5     | Feb 22, 2026 | KSmirnov | REQ-028 added (edge rank requirement); REQ-020 clarifying note on rank rows added                                                                                                                    |
 | 1.6     | Feb 23, 2026 | KSmirnov | REQ-029, REQ-030, REQ-031, REQ-032 added, added Path ID definition, Move /api/paths from Future → REQ-029; add two new endpoints; VIS layer refactored under new version of UI-REQ-401               |
 | 1.7     | Feb 25, 2026 | KSmirnov | REQ-033–036 added (mitigations CRUD endpoints); REQ-038–039 added (mitigation validation); §1.4 updated (mitigations moved from Out of Scope to In Scope); REQ-122 range updated; Appendix C updated |
-| 1.8     | Feb 25, 2026 | KSmirnov | REQ-033–036, REQ-038–039 implemented (backend Go handlers, nGQL queries, model types); REQ-122 confirmed (all endpoints return/accept JSON); implementation note added to §1.4 |
+| 1.8     | Feb 25, 2026 | KSmirnov | REQ-033–036, REQ-038–039 implemented (backend Go handlers, nGQL queries, model types); REQ-122 confirmed (all endpoints return/accept JSON); implementation note added to §1.4                       |
+| 1.10    | Feb 28, 2026 | KSmirnov | REQ-022 and REQ-023 are updated for the new Asset Inspector look. Version skipped to 1.10 to keep in sync with UI-Requirements.                                                                      |
 ---
 
 

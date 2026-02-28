@@ -1,7 +1,7 @@
 # UI Requirements Specification
 ## ESP PoC - Visual Layer
 
-**Version:** 1.9  
+**Version:** 1.10  
 **Date:** February 26, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
@@ -15,7 +15,7 @@ This document specifies the user interface requirements for the ESP PoC Visual L
 
 ### 1.1 Document Scope
 
-This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.7) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
+This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.10) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
 
 
 ### 1.2 Design Philosophy
@@ -447,70 +447,97 @@ When a row in the Path Inspector results table is clicked:
 
 ## 6. Right Panel (Detail Inspector)
 
-### UI-REQ-210: Inspector Panel Structure
+
+
+### UI-REQ-210: Asset Inspector Panel Structure
 
 **Visibility:**
 - Hidden by default
-- Appears when node or edge is selected
+- Appears when a node is selected on the canvas
 - Slides in from right with animation (250ms)
-- Close button (X) at top-right
+- Close button (X) at top-right of the header bar
 
 **Width:** 350-400px (fixed or resizable)
 
+**Panel title:** "Asset Inspector"
+
+**Overall layout principle:** The panel is divided into two vertical zones:
+- **Fixed zone** (top): Header bar, Basic Information, and Security Flags — these sections do NOT scroll and remain pinned at the top of the panel at all times.
+- **Scrollable zone** (bottom): Connections section — this section has its own vertical scroll (`overflow-y: auto`) and fills the remaining panel height. This ensures that an asset with many connections does not push Basic Information and Security Flags off-screen.
+
 **Sections (Top to Bottom):**
 
-1. **Header**
-   - Node icon (large, colored by type)
-   - Primary label: Asset_Name (large, bold font)
-   - Type badge (e.g., "Server")
-   - Close button (X icon)
+1. **Header Bar**
+    - Left: Panel title text "Asset Inspector" (bold, large)
+    - Right: "Edit Mitigations" icon button — shield SVG icon (`assets/icons/shield.svg`), rendered as a 28×28px icon button. Hidden when no asset is selected. Opens the Mitigations Editor modal (UI-REQ-250). Passes Asset_ID, Asset_Name, and Asset_Description to the modal via `_inspectorDetail` cache in `inspector.js`.
+    - Far right: Close button (X icon)
+    - Future actions (deferred): "Set as Entry Point", "Set as Target", "Find Paths" buttons
 
-2. **Primary Attributes** (Key-value pairs)
-   - Data source: `GET /api/asset/{id}` endpoint (REQ-022)
-   - Properties displayed:
-     - `Asset_ID`: (value)
-     - `Asset_Name`: (value)
-     - `Asset_Description`: (value)
-     - `Asset_Note`: (value, if present)
-     - `Asset_Type`: derived from `has_type` relationship to Asset_Type, `Type_Name` field of Asset_Type (REQ-022)
-     - `Segment_Name`: derived from `belongs_to` relationship to Network_Segment (REQ-022)
-     - `is_entrance`: boolean badge (green/gray)
-     - `is_target`: boolean badge (red/gray)
-     - `priority`: numeric (1–4, with color indicator)
-     - `has_vulnerability`: boolean badge (red/gray)
-     - `TTB`: numeric (Time To Bypass, in minutes)
-   - Display as key-value table
-   - Truncate long values with expand button
+2. **Basic Information** (compact two-column grid)
+    - Data source: `GET /api/asset/{id}` endpoint (REQ-022)
+    - Layout: CSS grid with two equal columns
 
-Note: In current implementation, the inspector renders: Asset_ID, Asset_Name, Asset_Type, Priority, is_entrance, is_target, has_vulnerability. Additional fields (Asset_Description, Asset_Note, Segment_Name, TTB) are available in the API response and will be rendered in a future update.
+   | Left column       | Right column     |
+      |--------------------|-----------------|
+   | **ASSET ID** (label + value) | **NAME** (label + value) |
 
-3. **Connections Summary**
-   - Data source: `GET /api/neighbors/{id}` endpoint (REQ-023)
-   - "N neighbor(s)" (clickable to expand list)
-   - "Inbound: M" / "Outbound: K"
+    - Below the first row, full-width:
 
-Note: inbound/outbound summary counts as a future enhancement.
+   | Full width |
+      |---|
+   | **DESCRIPTION** (label + value: `Asset_Description`) |
 
-4. **Neighbor List** (Collapsible)
-   - Data source: same as Connections Summary (REQ-023)
-   - Shows immediate neighbors
-   - Each item: Icon + Asset_ID + direction badge (inbound/outbound) + edge label
-   - Click neighbor to navigate to that node
+    - Below description, two-column row:
 
-5.**Actions**
-  - "Edit Mitigations" button — shield SVG icon (`assets/icons/shield.svg`), rendered as a 28×28px icon button in the Inspector header row (right-aligned, next to the "Inspector" title). Hidden when no asset is selected.
-  - Opens the Mitigations Editor modal (UI-REQ-250). Visible for all assets. Passes Asset_ID, Asset_Name, and Asset_Description to the modal via `_inspectorDetail` cache in `inspector.js`.
-  - "Set as Entry Point" button (future)
-  - "Set as Target" button (future)
-  - "Find Paths" button (future)
+   | Left column       | Right column     |
+      |--------------------|-----------------|
+   | **TYPE** (label + value: `Asset_Type`) | **OS** (label + value: `os_name` from REQ-022) |
 
+    - Field behaviour:
+        - If `Asset_Description` is empty or null, the DESCRIPTION row SHALL still be rendered with an em-dash "—" or empty value (do not collapse the row)
+        - If `os_name` is empty or null (asset has no `runs_on` relationship), the OS field SHALL display "—"
+        - `Asset_Note`, `Segment_Name`, and `TTB` are available in the API response but are deferred for future rendering
+
+3. **Security Flags** (compact 2×2 grid)
+    - Data source: same `GET /api/asset/{id}` endpoint (REQ-022)
+    - Section header: "SECURITY FLAGS" (bold)
+    - Layout: CSS grid, two columns, two rows:
+
+   | Left column                                                             | Right column                                                  |
+   |-------------------------------------------------------------------------|---------------------------------------------------------------|
+   | **PRIORITY** — badge `Priority N` (colored per priority level)          | **TARGET ASSET** — `Yes` badge (red) or `No` (muted text)     |
+   | **HAS VULNERABILITY** — `Yes` badge (yellow/amber) or `No` (muted text) | **ENTRANCE POINT** — `Yes` badge (green) or `No` (muted text) |
+
+    - Each cell: small uppercase label above the value/badge
+    - Badge styles are consistent with existing sidebar badges (UI-REQ-121)
+
+4. **Connections** (two-column, scrollable)
+    - Data source: `GET /api/neighbors/{id}` endpoint (REQ-023)
+    - Section header: "CONNECTIONS (N)" where N is the total neighbor count (outbound + inbound)
+    - Below the header, two sub-column headers:
+        - Left: "Outbound (K)" — where K is the count of outbound neighbors
+        - Right: "Inbound (M)" — where M is the count of inbound neighbors
+    - Each neighbor is rendered as a **compact clickable chip/button**:
+        - Outbound chip: `-> {Asset_ID}` (arrow prefix indicates direction away from current asset)
+        - Inbound chip: `{Asset_ID} ->` (arrow suffix indicates direction toward current asset)
+    - Chip appearance:
+        - Background: slightly lighter than panel background (`#2a2a2a` - `#333333`)
+        - Border-radius: 4-6px
+        - Padding: 6px 12px
+        - Font: monospace or sans-serif, 12-13px
+        - Hover: lighter background, subtle border highlight
+    - Chip interaction: Click navigates to that asset (calls `selectAsset(neighborId)`)
+    - The two columns are independent and do not need to align row-by-row (outbound and inbound lists may have different lengths)
+    - **Scroll containment:** The connections area (sub-headers + chip lists) is wrapped in a scrollable container. Max-height is dynamically calculated as the remaining panel height after the fixed zone. Standard scrollbar on the right side.
+    - Empty state: If no neighbors exist, display centered text: "No connections"
 
 **Visual Style:**
 - Background: Same as left sidebar (`#202020` - `#282828`)
 - Text: Light gray (`#e0e0e0`)
-- Section headers: Bold, slightly larger font
-- Dividers: Subtle lines between sections
-
+- Section headers: Bold, uppercase, slightly larger font (12-13px)
+- Field labels: Small uppercase text, muted color (`#808080`), 10-11px
+- Field values: Regular weight, primary text color (`#e0e0e0`), 13-14px
+- Dividers: Subtle horizontal lines (`#333333`) between sections (Basic Information, Security Flags, Connections)
 
 
 ### UI-REQ-211: Neighbor Visualization (Radial View)
@@ -533,7 +560,7 @@ When a node is selected, the detail panel MAY show a **radial mini-graph** (per 
 
 **Location:** Same right Inspector panel used for node inspection (UI-REQ-210), same position, same width (350–400px). When an edge is clicked, the Inspector panel content is replaced with the edge inspector view. When a node is subsequently clicked, it is replaced back with the node inspector view.
 
-**Panel title:** "Inspector" (same title as for nodes — the panel does not change its heading).
+**Panel title:** "Edge Inspector". When a node is subsequently clicked, the panel title changes back to "Asset Inspector" (UI-REQ-210).
 
 **Data source:** `GET /api/edges/{sourceId}/{targetId}` endpoint (REQ-026), where `sourceId` and `targetId` are taken from the clicked edge's `data.source` and `data.target` Cytoscape properties.
 
@@ -1119,7 +1146,7 @@ All files still served from `/opt/asset-viz/static/` as currently configured.
 
 ### UI-REQ-402: API Endpoints Required
 
-The following API endpoints are defined in Requirements.md (SRS v1.7) sections REQ-020 through REQ-032. See also Appendix C of Requirements.md for the full endpoint summary.
+The following API endpoints are defined in Requirements.md (SRS v1.10) sections REQ-020 through REQ-032. See also Appendix C of Requirements.md for the full endpoint summary.
 
 | Endpoint                                   | SRS Req | Purpose                                               | Used by UI-REQ       |
 |--------------------------------------------|---------|-------------------------------------------------------|----------------------|
@@ -1279,7 +1306,7 @@ The UI implementation SHALL be considered complete when:
 
 ## 20. References
 
-- **Main Requirements:** `Requirements/Requirements.md` (ESP PoC SRS v1.7)
+- **Main Requirements:** `Requirements/Requirements.md` (ESP PoC SRS v1.10)
 - **Reference UI:** Screenshots provided (demo3.mp4 frames)
 - **Existing Implementation:** `static/index.html` (ESP-data repo)
 - **Cytoscape.js Documentation:** https://js.cytoscape.org/
@@ -1330,7 +1357,7 @@ The UI implementation SHALL be considered complete when:
 | UI-REQ-122           | REQ-024                   | Asset types list for filter checkboxes                       |
 | UI-REQ-310           | REQ-100                   | 1920x1080 minimum resolution                                 |
 | UI-REQ-400           | REQ-121, REQ-122          | Go backend, JSON API                                         |
-| UI-REQ-401           | REQ-123                   | Multi-file VIS layer (per SRS v1.7)                          |
+| UI-REQ-401           | REQ-123                   | Multi-file VIS layer (per SRS v1.10)                         |
 | UI-REQ-212           | REQ-026                   | Edge inspector panel, edge detail endpoint                   |
 | UI-REQ-202           | REQ-027                   | Edge consolidation (de-duplication)                          |
 | UI-REQ-206           | REQ-029                   | Inspector activation                                         |
@@ -1361,3 +1388,4 @@ The UI implementation SHALL be considered complete when:
 | 1.7     | Feb 24, 2026 | Added UI-REQ-124 (scroll to asset), enrich UI-REQ-201 and UI-REQ-330 with references to the new UI-REQ-124                                                                                                                                                                            | AI + K.Smirnov  |
 | 1.8     | Feb 25, 2026 | UI-REQ-210 §5 updated (Edit Mitigations button); UI-REQ-250–258 added (Mitigations Editor modal); UI-REQ-401 updated (mitigation-editor.js); UI-REQ-402 updated (4 new endpoints); §16 updated; Appendix B updated; REQ-UI-241 deleted.                                               | AI + K.Smirnov  |
 | 1.9     | Feb 26, 2026 | UI-REQ-210 §5 amended: button moved to Inspector header, emoji replaced with SVG icon (shield.svg); UI-REQ-250 trigger updated; UI-REQ-401 updated (mitigation-editor.css, shield.svg); implementation confirmed for UI-REQ-250–258. The version with the working mitigations editor. | AI + K.Smirnov  |
+| 1.10    | Feb 28, 2026 | Changed UI-REQ-210 to reflect the new look of Asset Inspector, updated UI-REQ-212 (Edge inspector title - to be reviwed later).                                                                                                                                                       | AI + K. Smirnov |
