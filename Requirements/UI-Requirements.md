@@ -1,4 +1,4 @@
-# UI Requirements Specification
+# UI Requirements Specification (UIS)
 ## ESP PoC - Visual Layer
 
 **Version:** 1.11  
@@ -6,6 +6,7 @@
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
 **Reference:** Derived from demo UI screenshots and more
+**Document code:** UIS
 
 ---
 

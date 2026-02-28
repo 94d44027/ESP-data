@@ -1,11 +1,12 @@
-# Algorithm Requirements Specification
-## ESP PoC — TTA/TTB Path Calculation
+# Algorithm Requirements Specification (ALGO)
+## ESP PoC — TTA/TTB Path Calculation and related things
 
 **Version:** 1.0  
 **Date:** March 1, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI  
 **Project:** ESP PoC for Nebula Graph  
 **Reference:** Derived from Requirements.md (SRS v1.10), UI-Requirements.md (v1.10), ESP01_NebulaGraph_Schema.md
+**Document code:** ALGO 
 
 ---
 
@@ -31,11 +32,11 @@ This specification does **not** cover:
 
 ### 1.3 Relationship to Other Documents
 
-| Document                      | Version | Relationship                                                                                         |
-|-------------------------------|---------|------------------------------------------------------------------------------------------------------|
-| Requirements.md (SRS)         | v1.10   | Parent document. Stubs REQ-029–032 reference this spec. API summary in Appendix C links here.        |
-| UI-Requirements.md            | v1.10   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.     |
-| ESP01_NebulaGraph_Schema.md   | —       | Defines Asset.TTB property (TA001), connects_to edges (ED005), applied_to edges (ED001).             |
+| Document                             | Version | Relationship                                                                                         |
+|--------------------------------------|---------|------------------------------------------------------------------------------------------------------|
+| Requirements.md (SRS)                | v1.10   | Parent document. Stubs REQ-029–032 reference this spec. API summary in Appendix C links here.        |
+| UI-Requirements.md  (UIR)            | v1.10   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.     |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.6    | Defines Asset.TTB property (TA001), connects_to edges (ED005), applied_to edges (ED001).             |
 
 ### 1.4 Requirement ID Convention
 

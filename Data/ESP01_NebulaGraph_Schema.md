@@ -4,6 +4,7 @@
 **Prepared by:** Konstantin Smirnov
 **Space:** ESP01 (IT Infrastructure / MITRE ATT&CK Model)  
 **Source:** Full NebulaGraph Studio console, author's comments
+**Document code:** SCHEMA
 
 
 ## SP01: Space Configuration
