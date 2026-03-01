@@ -43,7 +43,7 @@ async function selectAsset(assetId) {
         _inspectorDetail = detail;
         renderInspector(detail, neighborsData.neighbors);
 
-        // Show the mitigations icon button in the header (UI-REQ-210 §1)
+        // Show the mitigations icon button in the header (UI-REQ-210 §5)
         const mitBtn = document.getElementById('btn-edit-mitigations');
         if (mitBtn) mitBtn.style.display = '';
     } catch (error) {

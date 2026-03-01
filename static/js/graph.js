@@ -7,12 +7,12 @@ function initCytoscape(graphData) {
         AppState.cy.destroy();
     }
 
-    // Initialize Cytoscape with graph data (REQ-300)
+    // Initialize Cytoscape with graph data (UI-REQ-200, UI-REQ-300)
     AppState.cy = cytoscape({
         container: document.getElementById('cy'),
         elements: [...graphData.nodes, ...graphData.edges],
 
-        // Graph Layout (UI-REQ-201)
+        // Graph Layout (UI-REQ-203)
         layout: {
             name: 'cose',
             animate: true,
@@ -26,7 +26,7 @@ function initCytoscape(graphData) {
             randomize: true
         },
 
-        // Visual Styling (UI-REQ-203, UI-REQ-204)
+        // Visual Styling (UI-REQ-201, UI-REQ-202)
         style: [
             // Node base styles
             {
@@ -47,7 +47,7 @@ function initCytoscape(graphData) {
                 }
             },
 
-            // Node colors by type (UI-REQ-203)
+            // Node colors by type (UI-REQ-201)
             { selector: 'node[asset_type="Server"]', style: { 'background-color': '#5a9d5a' } },
             { selector: 'node[asset_type="Workstation"]', style: { 'background-color': '#4a9d9c' } },
             { selector: 'node[asset_type="Network Device"]', style: { 'background-color': '#5a7fbf' } },
@@ -56,13 +56,13 @@ function initCytoscape(graphData) {
             { selector: 'node[asset_type="Mobile Device"]', style: { 'background-color': '#9437FF' } },
             { selector: 'node[asset_type="IoT Device"]', style: { 'background-color': '#BE5014' } },
 
-            // Priority border colors (UI-REQ-204)
+            // Priority border colors (UI-REQ-201)
             { selector: 'node[priority=1]', style: { 'border-color': '#ef4444', 'border-width': 3 } },
             { selector: 'node[priority=2]', style: { 'border-color': '#f59e0b', 'border-width': 3 } },
             { selector: 'node[priority=3]', style: { 'border-color': '#eab308', 'border-width': 2 } },
             { selector: 'node[priority=4]', style: { 'border-color': '#3b82f6', 'border-width': 2 } },
 
-            // Special markers (UI-REQ-205)
+            // Special markers (UI-REQ-201)
             { selector: 'node[?is_entrance]', style: { 'shape': 'triangle' } },
             { selector: 'node[?is_target]', style: { 'shape': 'star' } },
             { selector: 'node[?has_vulnerability]', style: { 'border-style': 'dashed' } },

@@ -22,7 +22,7 @@ type CyNode struct {
 
 // CyNodeData holds every attribute the front-end needs for rendering:
 // colours by type, labels, priority borders, entrance/target shapes,
-// and vulnerability markers (UI-REQ-201 through UI-REQ-205).
+// and vulnerability markers (UI-REQ-201).
 type CyNodeData struct {
 	ID               string `json:"id"`
 	Label            string `json:"label"`
@@ -364,9 +364,9 @@ func mapInt(m map[string]interface{}, key string) int {
 	return 0
 }
 
-// ============================================================
-// Entry points response (REQ-030 — Path Inspector dropdown)
-// ============================================================
+// ====================================================================================
+// Entry points response (ALG-REQ-002, migrated from REQ-030 — Path Inspector dropdown)
+// ====================================================================================
 
 // EntryPointsResponse wraps the entry points list for JSON response.
 type EntryPointsResponse struct {
@@ -395,9 +395,9 @@ func BuildEntryPointsList(items []map[string]interface{}) EntryPointsResponse {
 	}
 }
 
-// ============================================================
-// Targets response (REQ-031 — Path Inspector dropdown)
-// ============================================================
+// ================================================================================
+// Targets response (ALG-REQ-003, migrated from REQ-031 — Path Inspector dropdown)
+// ================================================================================
 
 // TargetsResponse wraps the targets list for JSON response.
 type TargetsResponse struct {
@@ -426,9 +426,9 @@ func BuildTargetsList(items []map[string]interface{}) TargetsResponse {
 	}
 }
 
-// ============================================================
-// Path calculation response (REQ-029 — Path Inspector results)
-// ============================================================
+// =======================================================================================
+// Path calculation response (ALG-REQ-001, migrated from REQ-029 — Path Inspector results)
+// =======================================================================================
 
 // PathsResponse wraps the path calculation results for JSON response.
 type PathsResponse struct {
@@ -447,7 +447,7 @@ type PathItem struct {
 }
 
 // BuildPathsResponse converts the raw query maps into the typed response.
-// entryTTB is subtracted from each path's TTA per REQ-032.
+// entryTTB is subtracted from each path's TTA per ALG-REQ-010 (migrated from REQ-032).
 func BuildPathsResponse(items []map[string]interface{}, entryID, targetID string, maxHops, entryTTB int) PathsResponse {
 	paths := make([]PathItem, 0, len(items))
 	for i, item := range items {
@@ -458,7 +458,7 @@ func BuildPathsResponse(items []map[string]interface{}, entryID, targetID string
 		}
 
 		paths = append(paths, PathItem{
-			PathID: fmt.Sprintf("P%03d", i+1),
+			PathID: fmt.Sprintf("P%05d", i+1), // ALG-REQ-011: P + 5-digit, e.g. P00001
 			Hosts:  mapStr(item, "hosts"),
 			TTA:    adjustedTTA,
 		})

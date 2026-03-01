@@ -276,7 +276,7 @@ func EdgesHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 	}
 }
 
-// EntryPointsHandler returns assets with is_entrance == true (REQ-030).
+// EntryPointsHandler returns assets with is_entrance == true (ALG-REQ-002, migrated from REQ-030).
 func EntryPointsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestStart := time.Now()
@@ -301,7 +301,7 @@ func EntryPointsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.
 	}
 }
 
-// TargetsHandler returns assets with is_target == true (REQ-031).
+// TargetsHandler returns assets with is_target == true (ALG-REQ-003, migrated from REQ-031).
 func TargetsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestStart := time.Now()
@@ -326,7 +326,7 @@ func TargetsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Hand
 	}
 }
 
-// PathsHandler calculates loop-free paths between entry and target (REQ-029).
+// PathsHandler calculates loop-free paths between entry and target (ALG-REQ-001, migrated from REQ-029).
 func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestStart := time.Now()
@@ -346,7 +346,7 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 			return
 		}
 
-		// Parse and validate hops (default 6, range 2-9 per REQ-029)
+		// Parse and validate hops (default 6, range 2-9 per ALG-REQ-001)
 		maxHops := 6
 		if hopsStr != "" {
 			n, err := strconv.Atoi(hopsStr)
@@ -359,14 +359,14 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 
 		log.Printf("[%s] api: /api/paths?from=%s&to=%s&hops=%d request", requestStart.Format("15:04:05.000"), fromID, toID, maxHops)
 
-		// REQ-032: fetch the entry point's TTB so we can subtract it from each path's TTA
+		// ALG-REQ-010 (migrated from REQ-032): fetch the entry point's TTB so we can subtract it from each path's TTA
 		entryTTB, err := nebula.QueryAssetTTB(pool, cfg, fromID)
 		if err != nil {
 			log.Printf("[%s] api: QueryAssetTTB failed: %v", time.Now().Format("15:04:05.000"), err)
 			entryTTB = 0
 		}
 
-		// REQ-029: calculate paths
+		// ALG-REQ-001 (migrated from REQ-029): calculate paths
 		paths, err := nebula.QueryPaths(pool, cfg, fromID, toID, maxHops)
 		if err != nil {
 			log.Printf("[%s] api: QueryPaths failed: %v", time.Now().Format("15:04:05.000"), err)

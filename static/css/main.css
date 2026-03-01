@@ -5,7 +5,7 @@
 
 /* ============================================
    GLOBAL RESET & BASE STYLES
-   UI-REQ-100: Dark theme, high contrast
+   UI-REQ-300: Dark theme, high contrast
    ============================================ */
 * {
     margin: 0;
@@ -14,7 +14,7 @@
 }
 
 :root {
-    /* Dark Theme Color Palette (UI-REQ-100) */
+    /* Dark Theme Color Palette (UI-REQ-300) */
     --color-bg-primary: #0a0e1a;
     --color-bg-secondary: #141824;
     --color-bg-elevated: #1a1f2e;
@@ -33,7 +33,7 @@
     --color-warning: #f59e0b;
     --color-danger: #ef4444;
 
-    /* Node Type Colors (UI-REQ-203) */
+    /* Node Type Colors (UI-REQ-201) */
     --color-node-server: #5a9d5a;
     --color-node-workstation: #4a9d9c;
     --color-node-network: #5a7fbf;
@@ -41,7 +41,7 @@
     --color-node-database: #f59e0b;
     --color-node-default: #6b7280;
 
-    /* Priority Colors (UI-REQ-204) */
+    /* Priority Colors (UI-REQ-201) */
     --color-priority-1: #ef4444;
     --color-priority-2: #f59e0b;
     --color-priority-3: #eab308;
@@ -113,7 +113,7 @@ body {
     align-items: center;
 }
 
-/* Left Sidebar (UI-REQ-110) */
+/* Left Sidebar (UI-REQ-120) */
 .sidebar {
     position: fixed;
     top: var(--topbar-height);

@@ -464,11 +464,11 @@ YIELD
 	return connections, nil
 }
 
-// ============================================================
-// Path Inspector queries (REQ-029, REQ-030, REQ-031)
-// ============================================================
+// ======================================================================================================
+// Path Inspector queries (ALG-REQ-001, ALG-REQ-002, ALG-REQ-003; migrated from REQ-029–031)
+// ======================================================================================================
 
-// QueryEntryPoints fetches all assets where is_entrance == true (REQ-030).
+// QueryEntryPoints fetches all assets where is_entrance == true (ALG-REQ-002, migrated from REQ-030).
 // Uses pure nGQL LOOKUP per REQ-243.
 func QueryEntryPoints(pool *nebula.ConnectionPool, cfg *config.Config) ([]map[string]interface{}, error) {
 	session, err := openSession(pool, cfg)
@@ -512,7 +512,7 @@ YIELD id(vertex) AS vid, Asset.Asset_ID AS asset_id, Asset.Asset_Name AS asset_n
 	return entries, nil
 }
 
-// QueryTargets fetches all assets where is_target == true (REQ-031).
+// QueryTargets fetches all assets where is_target == true (ALG-REQ-003, migrated from REQ-031).
 // Uses pure nGQL LOOKUP per REQ-243.
 func QueryTargets(pool *nebula.ConnectionPool, cfg *config.Config) ([]map[string]interface{}, error) {
 	session, err := openSession(pool, cfg)
@@ -556,7 +556,7 @@ YIELD id(vertex) AS vid, Asset.Asset_ID AS asset_id, Asset.Asset_Name AS asset_n
 	return targets, nil
 }
 
-// QueryPaths calculates all loop-free directed paths between two assets (REQ-029).
+// QueryPaths calculates all loop-free directed paths between two assets (ALG-REQ-001, migrated from REQ-029).
 // MATCH is used because variable-length path traversal with loop detection
 // (ALL/single predicate) and per-path aggregation has no practical nGQL/GO
 // equivalent (REQ-244 justification).
@@ -567,7 +567,7 @@ func QueryPaths(pool *nebula.ConnectionPool, cfg *config.Config, entryID, target
 	}
 	defer session.Release()
 
-	// REQ-029 query — parameterised entry, target, and hop limit
+	// ALG-REQ-001 query — parameterised entry, target, and hop limit
 	query := fmt.Sprintf(`MATCH p = (a:Asset)-[e:connects_to*..%d]->(b:Asset)
 WHERE a.Asset.Asset_ID == "%s" AND b.Asset.Asset_ID == "%s"
   AND ALL(n IN nodes(p) WHERE single(m IN nodes(p) WHERE m == n))
@@ -614,7 +614,7 @@ ORDER BY TTA;`, maxHops, entryID, targetID)
 }
 
 // QueryAssetTTB fetches the TTB value for a single asset by Asset_ID.
-// Used by the path calculator to subtract the entry point's TTB (REQ-032).
+// Used by the path calculator to subtract the entry point's TTB (ALG-REQ-010, migrated from REQ-032).
 // Uses pure nGQL LOOKUP per REQ-243.
 func QueryAssetTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetID string) (int, error) {
 	session, err := openSession(pool, cfg)

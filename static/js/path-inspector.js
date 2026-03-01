@@ -57,7 +57,7 @@ function closePathInspector() {
     clearPathHighlights();
 }
 
-// Run path calculation (UI-REQ-207 §3)
+// Run path calculation (UI-REQ-207 §4)
 async function runPathCalculation() {
     const fromId = document.getElementById('path-from').value;
     const toId = document.getElementById('path-to').value;
@@ -87,7 +87,7 @@ async function runPathCalculation() {
         statusEl.textContent = `Found ${data.total} path(s)`;
         resultsSection.style.display = 'block';
 
-        // Render results table (UI-REQ-208)
+        // Render results table (UI-REQ-207 §5)
         resultsBody.innerHTML = data.paths.map(path => `
             <tr class="path-row" onclick="highlightPath('${path.hosts}')">
                 <td>${path.path_id}</td>
