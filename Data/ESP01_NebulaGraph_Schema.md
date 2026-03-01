@@ -159,12 +159,13 @@ Technique ID is the same as in MITRE.
 #### Used for
 Keeps Merkle root - "hash of hashes" to indicate that something has changed in the modelled IT infrastructure, to force TTB recalculation (individual assets have their own hashes to determine TTB staleness).
 ### Tag properties
-| Field            | Type     | Null | Default    | Comment                                   |
-|------------------|----------|------|------------|-------------------------------------------|
-| state_id         | string   | NO   | ""         | So far going to be only one like "SYS001" |
-| merkle_root      | int64    | YES  | 0          | hash of hashes                            |
-| last_recalc_time | datetime | YES  | datetime() | When was it last time calculated          |
-| total_assets     | int32    | YES  | 0          | Number of assets in teh model             |
+| Field            | Type     | Null | Default    | Comment                                            |
+|------------------|----------|------|------------|----------------------------------------------------|
+| state_id         | string   | NO   | ""         | So far going to be only one like "SYS001"          |
+| merkle_root      | int64    | YES  | 0          | hash of hashes                                     |
+| last_recalc_time | datetime | YES  | datetime() | When was it last time calculated                   |
+| total_assets     | int32    | YES  | 0          | Number of assets in the model                      |
+| stale_count      | int32    | YES  | 0          | Number of changed (stale hash) assets in the model |
 
 
 ## ED: Edges (12 Types)
