@@ -30,7 +30,7 @@ This specification is referenced by **REQ-123** in the main Requirements.md (SRS
 | Document                             | Version | Relationship                                                           |
 |--------------------------------------|---------|------------------------------------------------------------------------|
 | Requirements.md  (SRS)               | v1.11   | The document defining main functional requirements for PoC application |
-| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.6    | Defines database schema (ESP01)                                        |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.7    | Defines database schema (ESP01)                                        |
 | AlgoSpecs.md (ALGO)                  | v1.0    | Defines requirements to algorithms regarding attack path calculations  |
 
 

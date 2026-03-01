@@ -1,6 +1,6 @@
 # ESP01 NebulaGraph 3.8 Schema - Complete Documentation
-**Version:** 1.6  
-**Created:** February 27, 2026  
+**Version:** 1.7  
+**Created:** March 01, 2026  
 **Prepared by:** Konstantin Smirnov
 **Space:** ESP01 (IT Infrastructure / MITRE ATT&CK Model)  
 **Source:** Full NebulaGraph Studio console, author's comments
@@ -27,10 +27,11 @@ vid_type = FIXED_STRING(64)
 | VID Type         | FIXED_STRING(64) |
 | Comment          | (empty)          |
 
-## TA: Tags (8 Types)
+## TA: Tags (9 Types)
 MITRE ATT&CK tactics, techniques, subtechniques, mitigations
 IT Infrastructure assets, asset types, OS types
 MITRE Tactic/Technique pairs and their patterns
+SystemState tag to keep Merkle has of the modelled IT Infrastructure
 
 Every tag description follows this pattern:
 * `Used for` - what this tag is used for
@@ -41,18 +42,20 @@ Every tag description follows this pattern:
 #### Used for
 Represents an asset in IT Infrastructure
 #### Tag properties
-| Field             | Type   | Null | Default | Comment                 |
-|-------------------|--------|------|---------|-------------------------|
-| Asset_ID          | string | NO   | _EMPTY_ | like A0001              |
-| Asset_Name        | string | NO   | _EMPTY_ | like CRM-SRV-01         |
-| Asset_Description | string | YES  | _EMPTY_ | like primary CRM server |
-| Asset_Note        | string | YES  | _EMPTY_ | any useful information  |
-| Asset_Version     | string | YES  | 1.0     | _EMPTY_                 |
-| is_entrance       | bool   | NO   | false   | entry point?            |
-| is_target         | bool   | NO   | false   | attack target?          |
-| priority          | int16  | YES  | 4       | lower = more critical   |
-| has_vulnerability | bool   | YES  | false   | critical vuln present?  |
-| TTB               | int32  | YES  | 10      | Time To Bypass          |
+| Field             | Type   | Null | Default | Comment                                |
+|-------------------|--------|------|---------|----------------------------------------|
+| Asset_ID          | string | NO   | _EMPTY_ | like A0001                             |
+| Asset_Name        | string | NO   | _EMPTY_ | like CRM-SRV-01                        |
+| Asset_Description | string | YES  | _EMPTY_ | like primary CRM server                |
+| Asset_Note        | string | YES  | _EMPTY_ | any useful information                 |
+| Asset_Version     | string | YES  | 1.0     | _EMPTY_                                |
+| is_entrance       | bool   | NO   | false   | entry point?                           |
+| is_target         | bool   | NO   | false   | attack target?                         |
+| priority          | int16  | YES  | 4       | lower = more critical                  |
+| has_vulnerability | bool   | YES  | false   | critical vuln present?                 |
+| TTB               | int32  | YES  | 10      | Time To Bypass                         |
+| hash              | string | YES  |         | hash represents the state of the Asset |
+| hash_valid        | bool   | YES  | false   | false if the hash is stale             |
 
 #### Notes
 Asset IDs and VIDs (here and for all tags ID for a tag is its VID as well), are in a format like "A00001". The specific index format can be later substituted for GUID, or longer string. This format is chose for simplicity and clarity.
@@ -151,6 +154,17 @@ Represents Mitre Technique/Subtechnique
 #### Notes
 Technique and subtechnique are represented by the same type of tag, subtechnique has an extra relationship to its parent.
 Technique ID is the same as in MITRE.
+
+### TA009: SystemState
+#### Used for
+Keeps Merkle root - "hash of hashes" to indicate that something has changed in the modelled IT infrastructure, to force TTB recalculation (individual assets have their own hashes to determine TTB staleness).
+### Tag properties
+| Field            | Type     | Null | Default    | Comment                                   |
+|------------------|----------|------|------------|-------------------------------------------|
+| state_id         | string   | NO   | ""         | So far going to be only one like "SYS001" |
+| merkle_root      | int64    | YES  | 0          | hash of hashes                            |
+| last_recalc_time | datetime | YES  | datetime() | When was it last time calculated          |
+| total_assets     | int32    | YES  | 0          | Number of assets in teh model             |
 
 
 ## ED: Edges (12 Types)
@@ -325,7 +339,8 @@ Edges are defined externally by a separate application. None of teh fields are u
 
 
 
-| Version | Date         | Changes                               | Author             |
-|---------|--------------|---------------------------------------|--------------------|
-| 1.0     | Feb 16, 2026 | Initial version                       | Konstantin Smirnov |
-| 1.6     | Feb 27, 2026 | Added runs_on, patterns_to edge types | Konstantin Smirnov |
+| Version | Date         | Changes                                                          | Author             |
+|---------|--------------|------------------------------------------------------------------|--------------------|
+| 1.0     | Feb 16, 2026 | Initial version                                                  | Konstantin Smirnov |
+| 1.6     | Feb 27, 2026 | Added runs_on, patterns_to edge types                            | Konstantin Smirnov |
+| 1.7     | Mar 01, 2026 | Added hash, hash_valid properties to Asset tag, System_State tag |                    |
