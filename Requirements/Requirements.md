@@ -1,8 +1,8 @@
 # Software Requirements Specification (SRS)
 ## ESP Proof Of Concept system
 
-**Version:** 1.11  
-**Date:** March 1, 2026  
+**Version:** 1.12  
+**Date:** March 2, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
 **Document code:** SRS
@@ -21,9 +21,9 @@ This document describes the complete set of requirements for Version 1.0 of ESP 
 
 | Document                             | Version | Relationship                                                                                                    |
 |--------------------------------------|---------|-----------------------------------------------------------------------------------------------------------------|
-| UI-Requirements.md  (UIR)            | v1.11   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                |
+| UI-Requirements.md  (UIR)            | v1.12   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                |
 | ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.7    | Defines database schema (ESP01)                                                                                 |
-| AlgoSpecs.md (ALGO)                  | v1.0    | Defines requirements to algorithms regarding attack path calculations ((REQ-029 through REQ-032 migrated there) |
+| AlgoSpecs.md (ALGO)                  | v1.1    | Defines requirements to algorithms regarding attack path calculations ((REQ-029 through REQ-032 migrated there) |
 
 ### 1.4 Intended Audience
 - Software developers and architects
@@ -291,7 +291,7 @@ Note: a candidate for future change - a separate query that will deduplicate end
 
 **REQ-032:** TTA Calculation Rule — migrated to AlgoSpec.md, ALG-REQ-010.
 
->Design note: REQ-029 through REQ-032 have been migrated to AlgoSpec.md (v1.0) as part of the requirement document refactoring. The full algorithmic specification, nGQL queries, response formats, and computation rules now live in that document. The API endpoint summary in Appendix C below is retained for quick reference.
+>Design note: REQ-029 through REQ-032 have been migrated to AlgoSpec.md (v1.1) as part of the requirement document refactoring. The full algorithmic specification, nGQL queries, response formats, and computation rules now live in that document. The API endpoint summary in Appendix C below is retained for quick reference.
 
 #### 3.1.3A Mitigations API
 
@@ -387,6 +387,44 @@ Response: HTTP 200 on success with `{ "status": "ok" }`. HTTP 500 on database er
 **REQ-039:** Maturity values received from API requests SHALL be validated as integers in the set `{25, 50, 80, 100}`. Values outside this set SHALL result in an HTTP 400 response. The schema permits 0–100 (int16), but the UI enforces fixed levels per UI-REQ-254.
 
 >Design note: The backend validates against the fixed set `{25, 50, 80, 100}` rather than the full 0–100 range, because the Mitigations Editor is the only write path for this field. If a future bulk-import or API consumer needs the full range, this validation can be relaxed.
+
+
+#### 3.1.3B Hash and TTB Recalculation API
+
+**REQ-040:** Recalculate TTB Endpoint. The APP layer SHALL provide an API endpoint (`POST /api/recalculate-ttb`) that triggers bulk TTB recalculation for all assets with stale hashes. The endpoint implements the algorithm specified in ALG-REQ-045 (ALGO). No request body is required. Response format:
+
+```json
+{
+  "recalculated": 12,
+  "unchanged": 51,
+  "total": 63,
+  "merkle_root": "8837429571023847561"
+}
+```
+
+Response: HTTP 200 on success. HTTP 500 on database error with `{ "error": "..." }`.
+
+>Design note 1: This endpoint may take longer than typical read endpoints due to the multi-step recalculation flow. The 5-second performance bound (CNST003) applies; however, for the PoC dataset (~63 assets) the expected execution time is well under 1 second.
+>Design note 2: An hourglass or somesuch icon may be displayed while waiting. An hourglass might be a separate requirement. Ideally, that might be a progress bar, yet at the moment it is not clear, how to estimate the duration.
+
+**REQ-041:** System State Endpoint. The APP layer SHALL provide an API endpoint (`GET /api/system-state`) that returns the current SystemState from the `"SYS001"` vertex (SCHEMA TA009). The endpoint implements ALG-REQ-048 (ALGO). Response format:
+
+```json
+{
+  "state_id": "SYS001",
+  "merkle_root": "8837429571023847561",
+  "last_recalc_time": "2026-03-02T01:05:00",
+  "total_assets": 63,
+  "stale_count": 3
+}
+```
+
+Response: HTTP 200 on success. HTTP 500 on database error.
+
+>Design note: The `stale_count` field is consumed by UI-REQ-112 to display a badge on the Recalculate TTBs button. The VIS layer SHALL fetch this endpoint on page load and after each mitigation edit operation.
+
+**REQ-042:** Hash Invalidation on Mitigation Write. When the UPSERT (REQ-035) or DELETE (REQ-036) mitigation operation succeeds, the APP layer SHALL additionally execute the invalidation statements specified in ALG-REQ-043: set `hash_valid = false` on the affected Asset vertex and increment `stale_count` on the SystemState vertex. Invalidation failures SHALL be logged but SHALL NOT cause the mitigation operation to return an error.
+
 
 
 
@@ -511,21 +549,23 @@ https://github.com/94d44027/ESP-data/blob/main/Data/ESP01_NebulaGraph_Schema.md
 
 ### Appendix C: API Endpoint Summary
 
-| Endpoint                            | Method | Implements | Purpose                                               | Response format                               |
-|-------------------------------------|--------|------------|-------------------------------------------------------|-----------------------------------------------|
-| `/api/graph`                        | GET    | REQ-020    | Graph nodes + edges for Cytoscape.js                  | `{ nodes, edges }`                            |
-| `/api/assets`                       | GET    | REQ-021    | Asset list for sidebar entity browser                 | `{ assets, total, filtered }`                 |
-| `/api/asset/{id}`                   | GET    | REQ-022    | Single asset detail for inspector panel               | `{ asset_id, ... }`                           |
-| `/api/neighbors/{id}`               | GET    | REQ-023    | Immediate neighbors of an asset                       | `[ { neighbor_id, direction } ]`              |
-| `/api/asset-types`                  | GET    | REQ-024    | Distinct asset types for filter UI                    | `[ { type_id, type_name } ]`                  |
-| `/api/edges/{sourceId}/{targetId}`  | GET    | REQ-026    | All connections between two assets for edge inspector | `{ source, target, connections, total }`      |
-| `/api/paths?from=&to=&hops=`        | GET    | ALG-REQ-001 | Path calculation with TTA metric                     | `{ paths, entry_point, target, hops, total }` |
-| `/api/entry-points`                 | GET    | ALG-REQ-002 | Entry point assets for Path Inspector dropdown       | `[ { asset_id, asset_name } ]`                |
-| `/api/targets`                      | GET    | ALG-REQ-003 | Target assets for Path Inspector dropdown            | `[ { asset_id, asset_name } ]`                |
-| `/api/mitigations`                  | GET    | REQ-033    | All MITRE mitigations for dropdown                    | `{ mitigations, total }`                      |
-| `/api/asset/{id}/mitigations`       | GET    | REQ-034    | Mitigations applied to an asset                       | `{ asset_id, mitigations, total } `           |
-| `/api/asset/{id}/mitigations `      | PUT    | REQ-035    | Add/update applied mitigation (UPSERT)                | `{ status }`                                  |
-| `/api/asset/{id}/mitigations/{mid}` | DELETE | REQ-036    | Remove applied mitigation                             | `{ status }`                                  |
+| Endpoint                            | Method | Implements  | Purpose                                               | Response format                                    |
+|-------------------------------------|--------|-------------|-------------------------------------------------------|----------------------------------------------------|
+| `/api/graph`                        | GET    | REQ-020     | Graph nodes + edges for Cytoscape.js                  | `{ nodes, edges }`                                 |
+| `/api/assets`                       | GET    | REQ-021     | Asset list for sidebar entity browser                 | `{ assets, total, filtered }`                      |
+| `/api/asset/{id}`                   | GET    | REQ-022     | Single asset detail for inspector panel               | `{ asset_id, ... }`                                |
+| `/api/neighbors/{id}`               | GET    | REQ-023     | Immediate neighbors of an asset                       | `[ { neighbor_id, direction } ]`                   |
+| `/api/asset-types`                  | GET    | REQ-024     | Distinct asset types for filter UI                    | `[ { type_id, type_name } ]`                       |
+| `/api/edges/{sourceId}/{targetId}`  | GET    | REQ-026     | All connections between two assets for edge inspector | `{ source, target, connections, total }`           |
+| `/api/paths?from=&to=&hops=`        | GET    | ALG-REQ-001 | Path calculation with TTA metric                      | `{ paths, entry_point, target, hops, total }`      |
+| `/api/entry-points`                 | GET    | ALG-REQ-002 | Entry point assets for Path Inspector dropdown        | `[ { asset_id, asset_name } ]`                     |
+| `/api/targets`                      | GET    | ALG-REQ-003 | Target assets for Path Inspector dropdown             | `[ { asset_id, asset_name } ]`                     |
+| `/api/mitigations`                  | GET    | REQ-033     | All MITRE mitigations for dropdown                    | `{ mitigations, total }`                           |
+| `/api/asset/{id}/mitigations`       | GET    | REQ-034     | Mitigations applied to an asset                       | `{ asset_id, mitigations, total } `                |
+| `/api/asset/{id}/mitigations `      | PUT    | REQ-035     | Add/update applied mitigation (UPSERT)                | `{ status }`                                       |
+| `/api/asset/{id}/mitigations/{mid}` | DELETE | REQ-036     | Remove applied mitigation                             | `{ status }`                                       |
+| `/api/recalculate-ttb`              | POST   | REQ-040     | Bulk TTB recalculation                                | `{ recalculated, unchanged, total, merkle_root }`  |
+| `/api/system-state`                 | GET    | REQ-041     | SystemState for UI badge                              | `{ state_id, merkle_root, last_recalc_time, ... }` |
 
 ### Appendix D: Algorithm Specification
 AlgoSpec.md — Path calculation and TTA/TTB algorithm requirements (ALG-REQ-001 through ALG-REQ-033)
@@ -554,7 +594,8 @@ Each requirement shall be considered complete when:
 | 1.7     | Feb 25, 2026 | KSmirnov | REQ-033–036 added (mitigations CRUD endpoints); REQ-038–039 added (mitigation validation); §1.4 updated (mitigations moved from Out of Scope to In Scope); REQ-122 range updated; Appendix C updated |
 | 1.8     | Feb 25, 2026 | KSmirnov | REQ-033–036, REQ-038–039 implemented (backend Go handlers, nGQL queries, model types); REQ-122 confirmed (all endpoints return/accept JSON); implementation note added to §1.4                       |
 | 1.10    | Feb 28, 2026 | KSmirnov | REQ-022 and REQ-023 are updated for the new Asset Inspector look. Version skipped to 1.10 to keep in sync with UI-Requirements.                                                                      |
-| 1.11    | Mar 1, 2026  | KSmirnov | REQ-029–032 migrated to AlgoSpec.md (ALG-REQ-001–010). Stubs retained in §3.1.3. Appendix C updated with ALG-REQ refs. Appendix D added (AlgoSpec); old D→E, E→F. §1.2 updated with companion docs. |
+| 1.11    | Mar 1, 2026  | KSmirnov | REQ-029–032 migrated to AlgoSpec.md (ALG-REQ-001–010). Stubs retained in §3.1.3. Appendix C updated with ALG-REQ refs. Appendix D added (AlgoSpec); old D→E, E→F. §1.2 updated with companion docs.  |
+| 1.12    | Mar 2, 2026  | KSmirnov | REQ-040–042 added (recalculate TTB endpoint, system state endpoint, hash invalidation on mitigation write). §3.1.3B added. Appendix C updated.                                                       |
 ---
 
 

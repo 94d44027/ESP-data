@@ -1,6 +1,6 @@
 # ESP01 NebulaGraph 3.8 Schema - Complete Documentation
 **Version:** 1.7  
-**Created:** March 01, 2026  
+**Created:** March 02, 2026  
 **Prepared by:** Konstantin Smirnov
 **Space:** ESP01 (IT Infrastructure / MITRE ATT&CK Model)  
 **Source:** Full NebulaGraph Studio console, author's comments
@@ -340,8 +340,8 @@ Edges are defined externally by a separate application. None of teh fields are u
 
 
 
-| Version | Date         | Changes                                                          | Author             |
-|---------|--------------|------------------------------------------------------------------|--------------------|
-| 1.0     | Feb 16, 2026 | Initial version                                                  | Konstantin Smirnov |
-| 1.6     | Feb 27, 2026 | Added runs_on, patterns_to edge types                            | Konstantin Smirnov |
-| 1.7     | Mar 01, 2026 | Added hash, hash_valid properties to Asset tag, System_State tag |                    |
+| Version | Date         | Changes                                                                                                            | Author             |
+|---------|--------------|--------------------------------------------------------------------------------------------------------------------|--------------------|
+| 1.0     | Feb 16, 2026 | Initial version                                                                                                    | Konstantin Smirnov |
+| 1.6     | Feb 27, 2026 | Added runs_on, patterns_to edge types                                                                              | Konstantin Smirnov |
+| 1.7     | Mar 01, 2026 | TA001: added hash (string) and hash_valid (bool) properties. TA009 added (SystemState tag). SYS001 vertex created. | AI + K.Smirnov     |

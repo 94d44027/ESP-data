@@ -1,8 +1,8 @@
 # UI Requirements Specification (UIS)
 ## ESP PoC - Visual Layer
 
-**Version:** 1.11  
-**Date:** March 1, 2026  
+**Version:** 1.12  
+**Date:** March 2, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
 **Reference:** Derived from demo UI screenshots and more
@@ -16,7 +16,7 @@ This document specifies the user interface requirements for the ESP PoC Visual L
 
 ### 1.1 Document Scope
 
-This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.11) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
+This specification is referenced by **REQ-123** in the main Requirements.md (SRS v1.12) and provides detailed UI/UX requirements for the VIS layer. The implementation may span multiple HTML files or use a single-page application architecture as needed for functionality.
 
 ### 1.2 Design Philosophy
 
@@ -29,9 +29,9 @@ This specification is referenced by **REQ-123** in the main Requirements.md (SRS
 
 | Document                             | Version | Relationship                                                           |
 |--------------------------------------|---------|------------------------------------------------------------------------|
-| Requirements.md  (SRS)               | v1.11   | The document defining main functional requirements for PoC application |
+| Requirements.md  (SRS)               | v1.12   | The document defining main functional requirements for PoC application |
 | ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.7    | Defines database schema (ESP01)                                        |
-| AlgoSpecs.md (ALGO)                  | v1.0    | Defines requirements to algorithms regarding attack path calculations  |
+| AlgoSpecs.md (ALGO)                  | v1.1    | Defines requirements to algorithms regarding attack path calculations  |
 
 
 ---
@@ -103,6 +103,57 @@ The top bar SHALL contain:
 - `Escape` to clear and unfocus
 - Arrow keys to navigate suggestions
 - `Enter` to select/zoom to highlighted node
+
+
+### UI-REQ-112: Recalculate TTBs Button
+
+**Location:** Top bar, right section — between the Path Inspector button (⛓) and the Refresh button.
+
+**Appearance:**
+- Icon: Calculator icon (🔄 with small "T" overlay, or `⟳` with subscript) — implementation may use an `refresh.svg` icon in `assets/icons/` sized properly
+- Size: Consistent with other top bar icon buttons (20-24px icon, same padding)
+- Tooltip: "Recalculate TTBs"
+
+**Badge:**
+- When `stale_count > 0` (fetched from `GET /api/system-state`, REQ-041), a small red/orange badge SHALL appear on the button showing the stale count number
+- Badge style: circular, 14-16px diameter, positioned at top-right corner of the button, white text on red/orange background (`#e74c3c` or `#f39c12`)
+- When `stale_count == 0`, the badge is hidden
+
+**Behaviour:**
+1. **On click:** Send `POST /api/recalculate-ttb` (REQ-040)
+2. **During request:** Button shows a spinning indicator or becomes disabled to prevent double-clicks
+3. **On success:** Display a brief toast notification (bottom-center, 3 seconds, auto-dismiss):
+    - Text: "Recalculated TTB for {recalculated} asset(s). {unchanged} unchanged."
+    - Style: Dark card with green left border (`#10b981`)
+4. **On error:** Display a brief toast notification:
+    - Text: "TTB recalculation failed"
+    - Style: Dark card with red left border (`#e74c3c`)
+    - Error details logged to `console.error`
+5. **After response (success or error):** Re-fetch `GET /api/system-state` to update the badge count
+
+**State refresh triggers:**
+The VIS layer SHALL fetch `GET /api/system-state` and update the badge:
+- On page load (after graph data is loaded)
+- After each successful mitigation UPSERT (UI-REQ-256 step 4)
+- After each successful mitigation DELETE (UI-REQ-257 step 3)
+- After successful TTB recalculation (this button, step 5)
+
+### UI-REQ-113: Stale Path Warning
+
+**Location:** Path Inspector results table (UI-REQ-207 §5), TTA column.
+
+**Trigger:** When the path calculation response includes a non-empty `recalculated_assets` array (per ALG-REQ-046).
+
+**Appearance:**
+- A small info icon (ℹ️ or ⚠️) appears next to the TTA value in the table header or as a note below the results table
+- Tooltip on hover: "TTB was recalculated for {N} asset(s) during this path calculation: {asset_list}"
+
+**Behaviour:**
+- The warning is informational only — no user action is required
+- The recalculated assets are listed in the tooltip so the user can identify which nodes were updated
+- If `recalculated_assets` is empty or absent, no warning is shown
+
+
 
 ---
 
@@ -1155,7 +1206,7 @@ All files still served from `/opt/asset-viz/static/` as currently configured.
 
 ### UI-REQ-402: API Endpoints Required
 
-The following API endpoints are defined in Requirements.md (SRS v1.11) and AlgoSpec.md (v1.0). Path-related endpoints (formerly REQ-029–031) are now specified in AlgoSpec.md. See also Appendix C of Requirements.md for the full endpoint summary.
+The following API endpoints are defined in Requirements.md (SRS v1.12) and AlgoSpec.md (v1.1). Path-related endpoints (formerly REQ-029–031) are now specified in AlgoSpec.md. See also Appendix C of Requirements.md for the full endpoint summary.
 
 | Endpoint                                   | SRS Req | Purpose                                               | Used by UI-REQ       |
 |--------------------------------------------|---------|-------------------------------------------------------|----------------------|
@@ -1398,4 +1449,5 @@ The UI implementation SHALL be considered complete when:
 | 1.8     | Feb 25, 2026 | UI-REQ-210 §5 updated (Edit Mitigations button); UI-REQ-250–258 added (Mitigations Editor modal); UI-REQ-401 updated (mitigation-editor.js); UI-REQ-402 updated (4 new endpoints); §16 updated; Appendix B updated; REQ-UI-241 deleted.                                               | AI + K.Smirnov  |
 | 1.9     | Feb 26, 2026 | UI-REQ-210 §5 amended: button moved to Inspector header, emoji replaced with SVG icon (shield.svg); UI-REQ-250 trigger updated; UI-REQ-401 updated (mitigation-editor.css, shield.svg); implementation confirmed for UI-REQ-250–258. The version with the working mitigations editor. | AI + K.Smirnov  |
 | 1.10    | Feb 28, 2026 | Changed UI-REQ-210 to reflect the new look of Asset Inspector, updated UI-REQ-212 (Edge inspector title - to be reviwed later).                                                                                                                                                       | AI + K. Smirnov |
-| 1.11    | Mar 1, 2026  | Refactoring: REQ-029/030/031 references updated to ALG-REQ-001/002/003 (AlgoSpec.md). Updated §1.1 SRS version ref, UI-REQ-207 inline refs, UI-REQ-402 table, Appendix B mapping.                                                                                                    | AI + K. Smirnov |
+| 1.11    | Mar 1, 2026  | Refactoring: REQ-029/030/031 references updated to ALG-REQ-001/002/003 (AlgoSpec.md). Updated §1.1 SRS version ref, UI-REQ-207 inline refs, UI-REQ-402 table, Appendix B mapping.                                                                                                     | AI + K. Smirnov |
+| 1.12    | Mar 2, 2026  | UI-REQ-112 added (Recalculate TTBs button with stale-count badge). UI-REQ-113 added (stale path warning in Path Inspector). UI-REQ-110 amended (new button in right section). Appendix B updated.                                                                                     | AI + K. Smirnov |  
