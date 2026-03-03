@@ -178,3 +178,99 @@
     font-weight: 600;
     white-space: nowrap;
 }
+
+
+/* ============================================
+   Recalculate TTBs button + stale badge (UI-REQ-112)
+   ============================================ */
+.btn-recalc {
+    position: relative;
+}
+
+.btn-recalc img {
+    opacity: 0.85;
+    transition: opacity var(--transition-fast);
+}
+
+.btn-recalc:hover img {
+    opacity: 1;
+}
+
+.btn-recalc.btn-loading img {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.stale-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background-color: #e74c3c;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    pointer-events: none;
+}
+
+/* ============================================
+   Toast notifications (UI-REQ-112 sec 3, sec 4)
+   ============================================ */
+.esp-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    padding: 12px 24px;
+    border-radius: 8px;
+    background-color: var(--color-bg-tertiary, #2a2a2a);
+    color: var(--color-text-primary, #e0e0e0);
+    font-size: 13px;
+    font-weight: 500;
+    border-left: 4px solid #10b981;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 300ms ease, transform 300ms ease;
+    z-index: 10000;
+    pointer-events: none;
+}
+
+.esp-toast-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.esp-toast-error {
+    border-left-color: #e74c3c;
+}
+
+/* ============================================
+   Path recalculation warning (UI-REQ-113)
+   ============================================ */
+.path-recalc-warning {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    margin-top: 8px;
+    border-radius: 6px;
+    background-color: rgba(243, 156, 18, 0.12);
+    border: 1px solid rgba(243, 156, 18, 0.3);
+    font-size: 12px;
+    color: #f39c12;
+    cursor: help;
+}
+
+.recalc-warning-text {
+    flex: 1;
+}

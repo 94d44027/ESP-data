@@ -306,6 +306,9 @@ const MitEditor = {
                 rows[idx].classList.add('mit-flash-success');
                 setTimeout(() => rows[idx].classList.remove('mit-flash-success'), 600);
             }
+
+            // REQ-042: refresh system state badge after mitigation change
+            refreshSystemState();
         } catch (err) {
             console.error('Upsert mitigation failed:', err);
             // Brief red flash, stay in edit mode
@@ -345,6 +348,9 @@ const MitEditor = {
             this.appliedMitigations.splice(idx, 1);
             this.selectedRowIdx = null;
             this.renderTable();
+
+            // REQ-042: refresh system state badge after mitigation removal
+            refreshSystemState();
         } catch (err) {
             console.error('Delete mitigation failed:', err);
         }

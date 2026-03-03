@@ -8,4 +8,5 @@ const AppState = {
     activeFilters: new Set(),    // Active type filters
     searchTerm: '',              // Search filter
     allAssets: [],               // All assets from API
+    staleCount: 0,               // Assets with stale hashes (from SystemState)
 };

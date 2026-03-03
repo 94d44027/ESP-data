@@ -539,3 +539,86 @@ func BuildAssetMitigationsResponse(assetID string, items []map[string]interface{
 		Total:       len(mitigations),
 	}
 }
+
+// ============================================================
+// SystemState response (REQ-041, ALG-REQ-048)
+// ============================================================
+
+// SystemStateResponse wraps the SystemState vertex data for JSON response.
+type SystemStateResponse struct {
+	StateID        string `json:"state_id"`
+	MerkleRoot     string `json:"merkle_root"`
+	LastRecalcTime string `json:"last_recalc_time"`
+	TotalAssets    int    `json:"total_assets"`
+	StaleCount     int    `json:"stale_count"`
+}
+
+// BuildSystemStateResponse converts the raw query map into the typed response.
+func BuildSystemStateResponse(data map[string]interface{}) SystemStateResponse {
+	mr, _ := data["merkle_root"].(int64)
+	return SystemStateResponse{
+		StateID:        mapStr(data, "state_id"),
+		MerkleRoot:     fmt.Sprintf("%d", mr),
+		LastRecalcTime: mapStr(data, "last_recalc_time"),
+		TotalAssets:    mapInt(data, "total_assets"),
+		StaleCount:     mapInt(data, "stale_count"),
+	}
+}
+
+// ============================================================
+// Recalculate TTB response (REQ-040, ALG-REQ-045)
+// ============================================================
+
+// RecalculateResponse wraps the result of bulk TTB recalculation.
+type RecalculateResponse struct {
+	Recalculated int    `json:"recalculated"`
+	Unchanged    int    `json:"unchanged"`
+	Total        int    `json:"total"`
+	MerkleRoot   string `json:"merkle_root"`
+}
+
+// ============================================================
+// Path response with recalculation info (ALG-REQ-046)
+// ============================================================
+
+// PathsResponseWithRecalc extends PathsResponse with recalculated asset info.
+type PathsResponseWithRecalc struct {
+	Paths              []PathItem `json:"paths"`
+	EntryPoint         string     `json:"entry_point"`
+	Target             string     `json:"target"`
+	Hops               int        `json:"hops"`
+	Total              int        `json:"total"`
+	RecalculatedAssets []string   `json:"recalculated_assets"`
+}
+
+// BuildPathsResponseWithRecalc converts raw query maps into a response that
+// includes the list of assets recalculated during path calculation (ALG-REQ-046).
+func BuildPathsResponseWithRecalc(items []map[string]interface{}, entryID, targetID string, maxHops, entryTTB int, recalculated []string) PathsResponseWithRecalc {
+	paths := make([]PathItem, 0, len(items))
+	for i, item := range items {
+		rawTTA := mapInt(item, "tta")
+		adjustedTTA := rawTTA - entryTTB
+		if adjustedTTA < 0 {
+			adjustedTTA = 0
+		}
+
+		paths = append(paths, PathItem{
+			PathID: fmt.Sprintf("P%05d", i+1),
+			Hosts:  mapStr(item, "hosts"),
+			TTA:    adjustedTTA,
+		})
+	}
+
+	if recalculated == nil {
+		recalculated = []string{}
+	}
+
+	return PathsResponseWithRecalc{
+		Paths:              paths,
+		EntryPoint:         entryID,
+		Target:             targetID,
+		Hops:               maxHops,
+		Total:              len(paths),
+		RecalculatedAssets: recalculated,
+	}
+}

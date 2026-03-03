@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -326,17 +327,16 @@ func TargetsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Hand
 	}
 }
 
-// PathsHandler calculates loop-free paths between entry and target (ALG-REQ-001, migrated from REQ-029).
+// PathsHandler calculates loop-free paths with path-scoped TTB recalculation
+// (ALG-REQ-001, ALG-REQ-046).
 func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestStart := time.Now()
 
-		// Parse query parameters
 		fromID := r.URL.Query().Get("from")
 		toID := r.URL.Query().Get("to")
 		hopsStr := r.URL.Query().Get("hops")
 
-		// REQ-025: validate both asset IDs
 		if !validAssetID.MatchString(fromID) {
 			http.Error(w, fmt.Sprintf("Invalid entry point ID: %q", fromID), http.StatusBadRequest)
 			return
@@ -346,7 +346,6 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 			return
 		}
 
-		// Parse and validate hops (default 6, range 2-9 per ALG-REQ-001)
 		maxHops := 6
 		if hopsStr != "" {
 			n, err := strconv.Atoi(hopsStr)
@@ -357,16 +356,10 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 			maxHops = n
 		}
 
-		log.Printf("[%s] api: /api/paths?from=%s&to=%s&hops=%d request", requestStart.Format("15:04:05.000"), fromID, toID, maxHops)
+		log.Printf("[%s] api: /api/paths?from=%s&to=%s&hops=%d request",
+			requestStart.Format("15:04:05.000"), fromID, toID, maxHops)
 
-		// ALG-REQ-010 (migrated from REQ-032): fetch the entry point's TTB so we can subtract it from each path's TTA
-		entryTTB, err := nebula.QueryAssetTTB(pool, cfg, fromID)
-		if err != nil {
-			log.Printf("[%s] api: QueryAssetTTB failed: %v", time.Now().Format("15:04:05.000"), err)
-			entryTTB = 0
-		}
-
-		// ALG-REQ-001 (migrated from REQ-029): calculate paths
+		// Step 1: Find paths (ALG-REQ-001)
 		paths, err := nebula.QueryPaths(pool, cfg, fromID, toID, maxHops)
 		if err != nil {
 			log.Printf("[%s] api: QueryPaths failed: %v", time.Now().Format("15:04:05.000"), err)
@@ -374,7 +367,96 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 			return
 		}
 
-		response := graph.BuildPathsResponse(paths, fromID, toID, maxHops, entryTTB)
+		// Step 2: Extract unique asset IDs from all paths (ALG-REQ-046 step 2)
+		assetIDSet := make(map[string]bool)
+		for _, p := range paths {
+			hosts, _ := p["hosts"].(string)
+			for _, id := range strings.Split(hosts, " -> ") {
+				trimmed := strings.TrimSpace(id)
+				if trimmed != "" {
+					assetIDSet[trimmed] = true
+				}
+			}
+		}
+		uniqueIDs := make([]string, 0, len(assetIDSet))
+		for id := range assetIDSet {
+			uniqueIDs = append(uniqueIDs, id)
+		}
+
+		// Step 3-4: Check hash validity and recalculate stale subset (ALG-REQ-046)
+		var recalculatedAssets []string
+		ttbs := make(map[string]int)
+
+		if len(uniqueIDs) > 0 {
+			validity, fetchedTTBs, err := nebula.QueryAssetHashValidity(pool, cfg, uniqueIDs)
+			if err != nil {
+				log.Printf("[%s] api: QueryAssetHashValidity failed: %v",
+					time.Now().Format("15:04:05.000"), err)
+			} else {
+				ttbs = fetchedTTBs
+
+				var staleIDs []string
+				for _, id := range uniqueIDs {
+					if !validity[id] {
+						staleIDs = append(staleIDs, id)
+					}
+				}
+
+				if len(staleIDs) > 0 {
+					log.Printf("[%s] api: %d path member(s) have stale hashes, recalculating",
+						requestStart.Format("15:04:05.000"), len(staleIDs))
+
+					staleHashes, err := nebula.QueryScopedStaleHashes(pool, cfg, staleIDs)
+					if err != nil {
+						log.Printf("[%s] api: QueryScopedStaleHashes failed: %v",
+							time.Now().Format("15:04:05.000"), err)
+					} else {
+						for _, asset := range staleHashes {
+							hashStr := fmt.Sprintf("%d", asset.ComputedHash)
+							newTTB := asset.CurrentTTB + rand.Intn(10) + 1
+							if err := nebula.UpdateAssetTTBAndHash(pool, cfg, asset.AssetID, newTTB, hashStr); err != nil {
+								log.Printf("[%s] api: UpdateAssetTTBAndHash failed for %s: %v",
+									time.Now().Format("15:04:05.000"), asset.AssetID, err)
+								continue
+							}
+							ttbs[asset.AssetID] = newTTB
+							recalculatedAssets = append(recalculatedAssets, asset.AssetID)
+							log.Printf("[%s] api: path-scoped recalc %s: TTB %d -> %d",
+								time.Now().Format("15:04:05.000"), asset.AssetID, asset.CurrentTTB, newTTB)
+						}
+					}
+				}
+			}
+		}
+
+		// Step 5: Recompute TTA with fresh TTB values if recalculation occurred (ALG-REQ-046 step 5)
+		if len(recalculatedAssets) > 0 {
+			for i, p := range paths {
+				hosts, _ := p["hosts"].(string)
+				ids := strings.Split(hosts, " -> ")
+				tta := 0
+				for j, rawID := range ids {
+					id := strings.TrimSpace(rawID)
+					if j == 0 {
+						continue // skip entry point per ALG-REQ-010
+					}
+					if ttb, ok := ttbs[id]; ok {
+						tta += ttb
+					} else {
+						tta += 10 // default per schema TA001
+					}
+				}
+				paths[i]["tta"] = tta
+			}
+		}
+
+		// Build response
+		entryTTB := 0
+		if len(recalculatedAssets) == 0 {
+			entryTTB, _ = nebula.QueryAssetTTB(pool, cfg, fromID)
+		}
+
+		response := graph.BuildPathsResponseWithRecalc(paths, fromID, toID, maxHops, entryTTB, recalculatedAssets)
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -382,8 +464,9 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 		}
 
 		requestDuration := time.Since(requestStart)
-		log.Printf("[%s] api: returned %d paths for %s -> %s in %.3f seconds",
-			time.Now().Format("15:04:05.000"), len(paths), fromID, toID, requestDuration.Seconds())
+		log.Printf("[%s] api: returned %d paths for %s -> %s in %.3f seconds (recalculated: %d)",
+			time.Now().Format("15:04:05.000"), len(paths), fromID, toID,
+			requestDuration.Seconds(), len(recalculatedAssets))
 	}
 }
 
@@ -496,6 +579,9 @@ func handleUpsertAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Conf
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	// REQ-042: invalidate asset hash after mitigation change (ALG-REQ-043)
+	nebula.InvalidateAssetHash(pool, cfg, assetID)
+
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 
 	requestDuration := time.Since(requestStart)
@@ -533,6 +619,9 @@ func handleDeleteAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Conf
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	// REQ-042: invalidate asset hash after mitigation removal (ALG-REQ-043)
+	nebula.InvalidateAssetHash(pool, cfg, assetID)
+
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 
 	requestDuration := time.Since(requestStart)
@@ -584,4 +673,102 @@ func extractMitigationID(urlPath string, segmentIndex int) (string, error) {
 	}
 
 	return mitigationID, nil
+}
+
+// ============================================================
+// Hash and TTB recalculation handlers (REQ-040, REQ-041)
+// ============================================================
+
+// RecalculateTTBHandler triggers bulk TTB recalculation for stale assets (REQ-040, ALG-REQ-045).
+func RecalculateTTBHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		requestStart := time.Now()
+		log.Printf("[%s] api: POST /api/recalculate-ttb request", requestStart.Format("15:04:05.000"))
+
+		staleAssets, err := nebula.QueryStaleHashes(pool, cfg)
+		if err != nil {
+			log.Printf("[%s] api: QueryStaleHashes failed: %v", time.Now().Format("15:04:05.000"), err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to compute hashes"})
+			return
+		}
+
+		recalculated := 0
+		for _, asset := range staleAssets {
+			hashStr := fmt.Sprintf("%d", asset.ComputedHash)
+			if hashStr == asset.StoredHash {
+				if err := nebula.UpdateAssetTTBAndHash(pool, cfg, asset.AssetID, asset.CurrentTTB, hashStr); err != nil {
+					log.Printf("[%s] api: UpdateAssetTTBAndHash (unchanged) failed for %s: %v",
+						time.Now().Format("15:04:05.000"), asset.AssetID, err)
+				}
+				continue
+			}
+
+			newTTB := asset.CurrentTTB + rand.Intn(10) + 1
+			if err := nebula.UpdateAssetTTBAndHash(pool, cfg, asset.AssetID, newTTB, hashStr); err != nil {
+				log.Printf("[%s] api: UpdateAssetTTBAndHash failed for %s: %v",
+					time.Now().Format("15:04:05.000"), asset.AssetID, err)
+				continue
+			}
+			recalculated++
+			log.Printf("[%s] api: recalculated TTB for %s: %d -> %d",
+				time.Now().Format("15:04:05.000"), asset.AssetID, asset.CurrentTTB, newTTB)
+		}
+
+		merkleRoot, totalAssets, err := nebula.ComputeMerkleRoot(pool, cfg)
+		if err != nil {
+			log.Printf("[%s] api: ComputeMerkleRoot failed: %v", time.Now().Format("15:04:05.000"), err)
+		}
+		if err := nebula.UpdateSystemState(pool, cfg, merkleRoot, totalAssets); err != nil {
+			log.Printf("[%s] api: UpdateSystemState failed: %v", time.Now().Format("15:04:05.000"), err)
+		}
+
+		response := graph.RecalculateResponse{
+			Recalculated: recalculated,
+			Unchanged:    len(staleAssets) - recalculated,
+			Total:        totalAssets,
+			MerkleRoot:   fmt.Sprintf("%d", merkleRoot),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
+		}
+
+		requestDuration := time.Since(requestStart)
+		log.Printf("[%s] api: recalculated %d/%d assets in %.3f seconds",
+			time.Now().Format("15:04:05.000"), recalculated, len(staleAssets), requestDuration.Seconds())
+	}
+}
+
+// SystemStateHandler returns the current SystemState (REQ-041, ALG-REQ-048).
+func SystemStateHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		requestStart := time.Now()
+		log.Printf("[%s] api: GET /api/system-state request", requestStart.Format("15:04:05.000"))
+
+		data, err := nebula.QuerySystemState(pool, cfg)
+		if err != nil {
+			log.Printf("[%s] api: QuerySystemState failed: %v", time.Now().Format("15:04:05.000"), err)
+			http.Error(w, "Failed to query system state", http.StatusInternalServerError)
+			return
+		}
+
+		response := graph.BuildSystemStateResponse(data)
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
+		}
+
+		requestDuration := time.Since(requestStart)
+		log.Printf("[%s] api: returned system state in %.3f seconds",
+			time.Now().Format("15:04:05.000"), requestDuration.Seconds())
+	}
 }

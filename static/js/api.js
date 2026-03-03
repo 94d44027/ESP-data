@@ -1,5 +1,5 @@
 // ========================================================================
-// API CLIENT (REQ-020 through REQ-036, ALG-REQ-001 through ALG-REQ-003)
+// API CLIENT (REQ-020 through REQ-042, ALG-REQ-001 through ALG-REQ-048)
 // ========================================================================
 const API = {
     // REQ-020: Fetch graph data for visualization
@@ -49,24 +49,38 @@ const API = {
         return await response.json();
     },
 
-    // ALG-REQ-002 (migrated from REQ-030): Fetch entry points for Path Inspector dropdown
+    // ALG-REQ-002: Fetch entry points for Path Inspector dropdown
     async fetchEntryPoints() {
         const response = await fetch('/api/entry-points');
         if (!response.ok) throw new Error('Failed to fetch entry points');
         return await response.json();
     },
 
-    // ALG-REQ-003 (migrated from REQ-031): Fetch targets for Path Inspector dropdown
+    // ALG-REQ-003: Fetch targets for Path Inspector dropdown
     async fetchTargets() {
         const response = await fetch('/api/targets');
         if (!response.ok) throw new Error('Failed to fetch targets');
         return await response.json();
     },
 
-    // ALG-REQ-001 (migrated from REQ-029): Calculate paths between entry and target
+    // ALG-REQ-001: Calculate paths between entry and target
     async fetchPaths(fromId, toId, hops = 6) {
         const response = await fetch(`/api/paths?from=${fromId}&to=${toId}&hops=${hops}`);
         if (!response.ok) throw new Error('Failed to calculate paths');
+        return await response.json();
+    },
+
+    // REQ-041: Fetch system state for stale badge (ALG-REQ-048)
+    async fetchSystemState() {
+        const response = await fetch('/api/system-state');
+        if (!response.ok) throw new Error('Failed to fetch system state');
+        return await response.json();
+    },
+
+    // REQ-040: Trigger bulk TTB recalculation (ALG-REQ-045)
+    async recalculateTTB() {
+        const response = await fetch('/api/recalculate-ttb', { method: 'POST' });
+        if (!response.ok) throw new Error('Failed to recalculate TTB');
         return await response.json();
     }
 };

@@ -51,6 +51,12 @@ func main() {
 	// REQ-033: All MITRE mitigations for editor dropdown
 	http.HandleFunc("/api/mitigations", api.MitigationsListHandler(pool, cfg))
 
+	// REQ-040: Bulk TTB recalculation
+	http.HandleFunc("/api/recalculate-ttb", api.RecalculateTTBHandler(pool, cfg))
+
+	// REQ-041: SystemState for UI badge
+	http.HandleFunc("/api/system-state", api.SystemStateHandler(pool, cfg))
+
 	// Serve static files (HTML, CSS, JS) from /static directory
 	// This serves the VIS layer (REQ-123, UI-Requirements.MD)
 	http.Handle("/", http.FileServer(http.Dir("static")))
@@ -73,6 +79,8 @@ func main() {
 	log.Printf("  GET /api/asset/{id}/mitigations    - Asset mitigations (REQ-034)")
 	log.Printf("  PUT /api/asset/{id}/mitigations    - Upsert mitigation (REQ-035)")
 	log.Printf("  DELETE /api/asset/{id}/mitigations/{mid} - Delete mitigation (REQ-036)")
+	log.Printf("  POST /api/recalculate-ttb              - Bulk TTB recalculation (REQ-040)")
+	log.Printf("  GET /api/system-state                   - System state (REQ-041)")
 	log.Printf("Static files served from ./static/")
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
