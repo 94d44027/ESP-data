@@ -1,6 +1,6 @@
 # ESP01 NebulaGraph 3.8 Schema - Complete Documentation
-**Version:** 1.7  
-**Created:** March 02, 2026  
+**Version:** 1.8  
+**Created:** March 04, 2026  
 **Prepared by:** Konstantin Smirnov
 **Space:** ESP01 (IT Infrastructure / MITRE ATT&CK Model)  
 **Source:** Full NebulaGraph Studio console, author's comments
@@ -27,7 +27,7 @@ vid_type = FIXED_STRING(64)
 | VID Type         | FIXED_STRING(64) |
 | Comment          | (empty)          |
 
-## TA: Tags (9 Types)
+## TA: Tags
 MITRE ATT&CK tactics, techniques, subtechniques, mitigations
 IT Infrastructure assets, asset types, OS types
 MITRE Tactic/Technique pairs and their patterns
@@ -168,7 +168,31 @@ Keeps Merkle root - "hash of hashes" to indicate that something has changed in t
 | stale_count      | int32    | YES  | 0          | Number of changed (stale hash) assets in the model |
 
 
-## ED: Edges (12 Types)
+### TA010: TacticChain
+
+#### Used for
+Represents an ordered tactic chain that defines which MITRE ATT&CK tactics are executed on an asset depending on its position in an attack path (entry point, intermediate, or target). Each chain vertex is connected to its constituent tMitreTactic vertices via `chain_includes` edges (ED013), with edge rank encoding execution order.
+
+#### Tag properties
+| Field       | Type   | Null | Default | Comment                                      |
+|-------------|--------|------|---------|----------------------------------------------|
+| chain_id    | string | NO   | _EMPTY_ | Same as VID, e.g. "CHAIN_ENTRANCE"           |
+| chain_name  | string | NO   | _EMPTY_ | Human-readable name, e.g. "Entrance Chain"   |
+| description | string | YES  | _EMPTY_ | Purpose of this chain                        |
+
+#### Notes
+Three TacticChain vertices exist in the initial dataset. The chain_id matches the VID for consistency. Future versions may add additional chain types (e.g. "pivot point" for assets that serve as stepping stones between network segments).
+
+#### CREATE TAG statement
+```nGQL
+CREATE TAG IF NOT EXISTS TacticChain(
+  chain_id string NOT NULL DEFAULT "",
+  chain_name string NOT NULL DEFAULT "",
+  description string DEFAULT ""
+);
+```
+
+## ED: Edges
 Relationships for network topology, asset types, OS, how mitigation applied to assets, and relationships between tactics, techniques, subtechniques, and mitigations.
 
 Every edge description follows this pattern:
@@ -317,6 +341,26 @@ This is to show the relationship between Tactic/Tecqnique (or subtechnique) and 
 #### Notes
 Edges are defined externally by a separate application. None of teh fields are used at the moment.
 
+### ED013: chain_includes
+
+#### Used for
+This edge links a TacticChain to its constituent tMitreTactic vertices, representing which tactics belong to the chain and in what order. (TacticChain --chain_includes--> tMitreTactic)
+
+#### Edge properties
+No properties (pure structural edge). Execution order is encoded in the edge rank.
+
+#### Edge Uniqueness and Rank
+The edge rank (`@rank`) encodes the sequential position of the tactic within the chain: rank 0 = first tactic, rank 1 = second, etc. This follows the same rank convention as `connects_to` (ED006). Since a given chain will not include the same tactic twice, each `(chain_vid, tactic_vid)` pair has a unique rank.
+
+#### CREATE EDGE statement
+```nGQL
+CREATE EDGE IF NOT EXISTS chain_includes();
+```
+
+#### Notes
+No edge index is required for the initial dataset (3 chains × ~8 tactics = 25 edges). If additional chain types are added in the future, an index may be considered.
+
+
 
 
 ## IN: Indexes (10 Total)
@@ -345,3 +389,4 @@ Edges are defined externally by a separate application. None of teh fields are u
 | 1.0     | Feb 16, 2026 | Initial version                                                                                                    | Konstantin Smirnov |
 | 1.6     | Feb 27, 2026 | Added runs_on, patterns_to edge types                                                                              | Konstantin Smirnov |
 | 1.7     | Mar 01, 2026 | TA001: added hash (string) and hash_valid (bool) properties. TA009 added (SystemState tag). SYS001 vertex created. | AI + K.Smirnov     |
+| 1.8     | Mar 4, 2026  | TA010 added (TacticChain tag). ED013 added (chain_includes edge). 3 vertices + 25 edges loaded.                    | AI + K.Smirnov     |
