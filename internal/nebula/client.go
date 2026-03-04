@@ -3,6 +3,7 @@ package nebula
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -557,29 +558,23 @@ YIELD id(vertex) AS vid, Asset.Asset_ID AS asset_id, Asset.Asset_Name AS asset_n
 	return targets, nil
 }
 
-// QueryPaths calculates all loop-free directed paths between two assets (ALG-REQ-001, migrated from REQ-029).
-// MATCH is used because variable-length path traversal with loop detection
-// (ALL/single predicate) and per-path aggregation has no practical nGQL/GO
-// equivalent (REQ-244 justification).
-func QueryPaths(pool *nebula.ConnectionPool, cfg *config.Config, entryID, targetID string, maxHops int) ([]map[string]interface{}, error) {
+// QueryPaths executes the path discovery query (ALG-REQ-001 v1.3).
+// Returns per-path ordered ID lists and stored TTB values.
+// The APP layer builds host strings and computes position-aware TTA.
+func QueryPaths(pool *nebula.ConnectionPool, cfg *config.Config, entryID, targetID string, maxHops int) ([]PathResult, error) {
 	session, err := openSession(pool, cfg)
 	if err != nil {
 		return nil, err
 	}
 	defer session.Release()
 
-	// ALG-REQ-001 query — parameterised entry, target, and hop limit
 	query := fmt.Sprintf(`MATCH p = (a:Asset)-[e:connects_to*..%d]->(b:Asset)
 WHERE a.Asset.Asset_ID == "%s" AND b.Asset.Asset_ID == "%s"
   AND ALL(n IN nodes(p) WHERE single(m IN nodes(p) WHERE m == n))
-WITH nodes(p) as Nodes2, p as p
-WITH reduce(s = "", n IN Nodes2 | s + n.Asset.Asset_ID + " -> ") as Result1, p as p
-WITH Result1 as Result1, left(Result1, length(Result1)-length(" -> ")) as Result2, p as p
-WITH nodes(p) as Nodes2, Result2 as Result2
-UNWIND Nodes2 as r
-WITH r, Result2
-RETURN Result2, SUM(r.Asset.TTB) as TTA
-ORDER BY TTA;`, maxHops, entryID, targetID)
+WITH nodes(p) AS pathNodes
+WITH [n IN pathNodes | n.Asset.Asset_ID] AS ids,
+     [n IN pathNodes | COALESCE(n.Asset.TTB, 10)] AS ttbs
+RETURN ids, ttbs;`, maxHops, entryID, targetID)
 
 	queryStart := time.Now()
 	log.Printf("[%s] nebula: QueryPaths executing MATCH query (%s -> %s, max %d hops)",
@@ -587,7 +582,8 @@ ORDER BY TTA;`, maxHops, entryID, targetID)
 
 	resultSet, err := session.Execute(query)
 	queryDuration := time.Since(queryStart)
-	log.Printf("[%s] nebula: QueryPaths completed in %.3f seconds", time.Now().Format("15:04:05.000"), queryDuration.Seconds())
+	log.Printf("[%s] nebula: QueryPaths completed in %.3f seconds",
+		time.Now().Format("15:04:05.000"), queryDuration.Seconds())
 
 	if err != nil {
 		return nil, fmt.Errorf("query execution failed: %w", err)
@@ -596,7 +592,7 @@ ORDER BY TTA;`, maxHops, entryID, targetID)
 		return nil, fmt.Errorf("query failed: %s", resultSet.GetErrorMsg())
 	}
 
-	paths := make([]map[string]interface{}, 0, resultSet.GetRowSize())
+	paths := make([]PathResult, 0, resultSet.GetRowSize())
 	for i := 0; i < resultSet.GetRowSize(); i++ {
 		record, err := resultSet.GetRowValuesByIndex(i)
 		if err != nil {
@@ -604,10 +600,19 @@ ORDER BY TTA;`, maxHops, entryID, targetID)
 			continue
 		}
 
-		paths = append(paths, map[string]interface{}{
-			"hosts": safeString(record, 0),
-			"tta":   safeInt(record, 1, 0),
-		})
+		ids, err := extractStringList(record, 0)
+		if err != nil {
+			log.Printf("nebula: skipping row %d ids: %v", i, err)
+			continue
+		}
+
+		ttbs, err := extractIntList(record, 1)
+		if err != nil {
+			log.Printf("nebula: skipping row %d ttbs: %v", i, err)
+			continue
+		}
+
+		paths = append(paths, PathResult{IDs: ids, TTBs: ttbs})
 	}
 
 	log.Printf("nebula: QueryPaths returned %d paths for %s -> %s", len(paths), entryID, targetID)
@@ -830,6 +835,87 @@ type StaleAssetHash struct {
 	CurrentTTB   int
 	StoredHash   string
 	ComputedHash int64
+}
+
+// PathResult holds one discovered path's ordered node IDs and their stored TTBs.
+// Returned by QueryPaths (ALG-REQ-001 v1.3).
+type PathResult struct {
+	IDs  []string // ordered Asset_IDs: [entry, ..intermediates.., target]
+	TTBs []int    // stored TTB per node (Regular_chain values)
+}
+
+// ChainVIDForPosition returns the TacticChain vertex ID for a node's
+// position in the attack path (ALG-REQ-051).
+func ChainVIDForPosition(index, pathLength int) string {
+	switch {
+	case index == 0:
+		return "CHAIN_ENTRANCE"
+	case index == pathLength-1:
+		return "CHAIN_TARGET"
+	default:
+		return "CHAIN_INTERMEDIATE"
+	}
+}
+
+// chainTacticCount returns the number of tactics in a chain.
+// Hardcoded for the stub (ALG-REQ-044 v1.3); will be replaced
+// by a GrDB query when the real TTB formula is implemented.
+var chainTacticCount = map[string]int{
+	"CHAIN_ENTRANCE":     8,
+	"CHAIN_INTERMEDIATE": 7,
+	"CHAIN_TARGET":       10,
+}
+
+// ComputeTTBStub calculates a stub TTB value (ALG-REQ-044 v1.3).
+// new_TTB = current_TTB + random(1,10) + chain_tactic_count(chainVID)
+func ComputeTTBStub(currentTTB int, chainVID string) int {
+	count, ok := chainTacticCount[chainVID]
+	if !ok {
+		count = 7 // default to intermediate
+	}
+	return currentTTB + rand.Intn(10) + 1 + count
+}
+
+// extractStringList extracts a list of strings from a ResultSet column.
+func extractStringList(record *nebula.Record, idx int) ([]string, error) {
+	val, err := record.GetValueByIndex(idx)
+	if err != nil {
+		return nil, err
+	}
+	list, err := val.AsList()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]string, 0, len(list))
+	for _, v := range list {
+		s, err := v.AsString()
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, s)
+	}
+	return result, nil
+}
+
+// extractIntList extracts a list of ints from a ResultSet column.
+func extractIntList(record *nebula.Record, idx int) ([]int, error) {
+	val, err := record.GetValueByIndex(idx)
+	if err != nil {
+		return nil, err
+	}
+	list, err := val.AsList()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]int, 0, len(list))
+	for _, v := range list {
+		n, err := v.AsInt()
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, int(n))
+	}
+	return result, nil
 }
 
 // safeInt64 extracts an int64 from a ResultSet value, returning 0 on error.

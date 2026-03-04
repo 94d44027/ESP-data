@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -327,8 +328,8 @@ func TargetsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Hand
 	}
 }
 
-// PathsHandler calculates loop-free paths with path-scoped TTB recalculation
-// (ALG-REQ-001, ALG-REQ-046).
+// PathsHandler calculates loop-free paths with position-aware TTB
+// (ALG-REQ-001, ALG-REQ-010, ALG-REQ-046 v1.3).
 func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestStart := time.Now()
@@ -359,8 +360,8 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 		log.Printf("[%s] api: /api/paths?from=%s&to=%s&hops=%d request",
 			requestStart.Format("15:04:05.000"), fromID, toID, maxHops)
 
-		// Step 1: Find paths (ALG-REQ-001)
-		paths, err := nebula.QueryPaths(pool, cfg, fromID, toID, maxHops)
+		// Step 1: Find paths — returns per-node IDs and stored TTBs (ALG-REQ-001 v1.3)
+		pathResults, err := nebula.QueryPaths(pool, cfg, fromID, toID, maxHops)
 		if err != nil {
 			log.Printf("[%s] api: QueryPaths failed: %v", time.Now().Format("15:04:05.000"), err)
 			http.Error(w, "Failed to calculate paths", http.StatusInternalServerError)
@@ -369,13 +370,9 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 
 		// Step 2: Extract unique asset IDs from all paths (ALG-REQ-046 step 2)
 		assetIDSet := make(map[string]bool)
-		for _, p := range paths {
-			hosts, _ := p["hosts"].(string)
-			for _, id := range strings.Split(hosts, " -> ") {
-				trimmed := strings.TrimSpace(id)
-				if trimmed != "" {
-					assetIDSet[trimmed] = true
-				}
+		for _, p := range pathResults {
+			for _, id := range p.IDs {
+				assetIDSet[id] = true
 			}
 		}
 		uniqueIDs := make([]string, 0, len(assetIDSet))
@@ -383,9 +380,9 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 			uniqueIDs = append(uniqueIDs, id)
 		}
 
-		// Step 3-4: Check hash validity and recalculate stale subset (ALG-REQ-046)
+		// Step 3-4: Check hash validity and recalculate stale intermediates (ALG-REQ-046)
 		var recalculatedAssets []string
-		ttbs := make(map[string]int)
+		freshTTBs := make(map[string]int) // asset_id -> latest TTB (Regular_chain)
 
 		if len(uniqueIDs) > 0 {
 			validity, fetchedTTBs, err := nebula.QueryAssetHashValidity(pool, cfg, uniqueIDs)
@@ -393,17 +390,18 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 				log.Printf("[%s] api: QueryAssetHashValidity failed: %v",
 					time.Now().Format("15:04:05.000"), err)
 			} else {
-				ttbs = fetchedTTBs
+				freshTTBs = fetchedTTBs
 
+				// Collect stale IDs — exclude entry and target (they get ephemeral TTB)
 				var staleIDs []string
 				for _, id := range uniqueIDs {
-					if !validity[id] {
+					if !validity[id] && id != fromID && id != toID {
 						staleIDs = append(staleIDs, id)
 					}
 				}
 
 				if len(staleIDs) > 0 {
-					log.Printf("[%s] api: %d path member(s) have stale hashes, recalculating",
+					log.Printf("[%s] api: %d intermediate(s) have stale hashes, recalculating",
 						requestStart.Format("15:04:05.000"), len(staleIDs))
 
 					staleHashes, err := nebula.QueryScopedStaleHashes(pool, cfg, staleIDs)
@@ -413,13 +411,14 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 					} else {
 						for _, asset := range staleHashes {
 							hashStr := fmt.Sprintf("%d", asset.ComputedHash)
-							newTTB := asset.CurrentTTB + rand.Intn(10) + 1
+							// ALG-REQ-044 v1.3: stub with CHAIN_INTERMEDIATE for intermediates
+							newTTB := nebula.ComputeTTBStub(asset.CurrentTTB, "CHAIN_INTERMEDIATE")
 							if err := nebula.UpdateAssetTTBAndHash(pool, cfg, asset.AssetID, newTTB, hashStr); err != nil {
 								log.Printf("[%s] api: UpdateAssetTTBAndHash failed for %s: %v",
 									time.Now().Format("15:04:05.000"), asset.AssetID, err)
 								continue
 							}
-							ttbs[asset.AssetID] = newTTB
+							freshTTBs[asset.AssetID] = newTTB
 							recalculatedAssets = append(recalculatedAssets, asset.AssetID)
 							log.Printf("[%s] api: path-scoped recalc %s: TTB %d -> %d",
 								time.Now().Format("15:04:05.000"), asset.AssetID, asset.CurrentTTB, newTTB)
@@ -429,34 +428,74 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 			}
 		}
 
-		// Step 5: Recompute TTA with fresh TTB values if recalculation occurred (ALG-REQ-046 step 5)
-		if len(recalculatedAssets) > 0 {
-			for i, p := range paths {
-				hosts, _ := p["hosts"].(string)
-				ids := strings.Split(hosts, " -> ")
-				tta := 0
-				for j, rawID := range ids {
-					id := strings.TrimSpace(rawID)
-					if j == 0 {
-						continue // skip entry point per ALG-REQ-010
-					}
-					if ttb, ok := ttbs[id]; ok {
+		// Step 5-6: Compute entry and target TTB with position-specific chains (ALG-REQ-046 v1.3)
+		// These are ephemeral — NOT written to the database.
+		entryCurrentTTB := 10
+		if ttb, ok := freshTTBs[fromID]; ok {
+			entryCurrentTTB = ttb
+		}
+		entryTTB := nebula.ComputeTTBStub(entryCurrentTTB, "CHAIN_ENTRANCE")
+
+		targetCurrentTTB := 10
+		if ttb, ok := freshTTBs[toID]; ok {
+			targetCurrentTTB = ttb
+		}
+		targetTTB := nebula.ComputeTTBStub(targetCurrentTTB, "CHAIN_TARGET")
+
+		log.Printf("[%s] api: position-aware TTB — entry %s=%d, target %s=%d",
+			time.Now().Format("15:04:05.000"), fromID, entryTTB, toID, targetTTB)
+
+		// Step 7: Compute TTA per path (ALG-REQ-010 v1.3)
+		pathItems := make([]graph.PathItem, 0, len(pathResults))
+		for i, p := range pathResults {
+			hosts := strings.Join(p.IDs, " -> ")
+			tta := 0
+			for j, id := range p.IDs {
+				switch {
+				case j == 0:
+					tta += entryTTB
+				case j == len(p.IDs)-1:
+					tta += targetTTB
+				default:
+					if ttb, ok := freshTTBs[id]; ok {
 						tta += ttb
+					} else if j < len(p.TTBs) {
+						tta += p.TTBs[j]
 					} else {
-						tta += 10 // default per schema TA001
+						tta += 10
 					}
 				}
-				paths[i]["tta"] = tta
 			}
+			pathItems = append(pathItems, graph.PathItem{
+				PathID: fmt.Sprintf("P%05d", i+1),
+				Hosts:  hosts,
+				TTA:    tta,
+			})
 		}
 
-		// Build response
-		entryTTB := 0
-		if len(recalculatedAssets) == 0 {
-			entryTTB, _ = nebula.QueryAssetTTB(pool, cfg, fromID)
+		// Sort by TTA ascending (ALG-REQ-001: response ordered by TTA)
+		sort.Slice(pathItems, func(i, j int) bool {
+			return pathItems[i].TTA < pathItems[j].TTA
+		})
+
+		// Re-assign path IDs after sorting
+		for i := range pathItems {
+			pathItems[i].PathID = fmt.Sprintf("P%05d", i+1)
 		}
 
-		response := graph.BuildPathsResponseWithRecalc(paths, fromID, toID, maxHops, entryTTB, recalculatedAssets)
+		// Step 8: Build response (ALG-REQ-046 step 8)
+		if recalculatedAssets == nil {
+			recalculatedAssets = []string{}
+		}
+
+		response := graph.PathsResponseWithRecalc{
+			Paths:              pathItems,
+			EntryPoint:         fromID,
+			Target:             toID,
+			Hops:               maxHops,
+			Total:              len(pathItems),
+			RecalculatedAssets: recalculatedAssets,
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -465,7 +504,7 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 
 		requestDuration := time.Since(requestStart)
 		log.Printf("[%s] api: returned %d paths for %s -> %s in %.3f seconds (recalculated: %d)",
-			time.Now().Format("15:04:05.000"), len(paths), fromID, toID,
+			time.Now().Format("15:04:05.000"), len(pathItems), fromID, toID,
 			requestDuration.Seconds(), len(recalculatedAssets))
 	}
 }

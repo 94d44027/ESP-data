@@ -591,8 +591,9 @@ type PathsResponseWithRecalc struct {
 	RecalculatedAssets []string   `json:"recalculated_assets"`
 }
 
-// BuildPathsResponseWithRecalc converts raw query maps into a response that
-// includes the list of assets recalculated during path calculation (ALG-REQ-046).
+// BuildPathsResponseWithRecalc converts raw query maps into a response.
+// DEPRECATED: PathsHandler (v1.3) constructs PathsResponseWithRecalc directly.
+// Retained for backward compatibility with RecalculateTTBHandler.
 func BuildPathsResponseWithRecalc(items []map[string]interface{}, entryID, targetID string, maxHops, entryTTB int, recalculated []string) PathsResponseWithRecalc {
 	paths := make([]PathItem, 0, len(items))
 	for i, item := range items {
