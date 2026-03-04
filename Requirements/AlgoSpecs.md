@@ -159,9 +159,9 @@ Given a path `[N₀, N₁, N₂, ..., Nₖ]` where `N₀` is the entry point and
     TTA = TTB(N₀, Cₑ) + Σ TTB(Nᵢ, Cᵣ) for i = 1 to k-1 + TTB(Nₖ, Cₜ)
 
 where:
-- `Cₑ` = `Entrance_chain` from `chains.json` (ALG-REQ-050)
-- `Cᵣ` = `Regular_chain` from `chains.json` (ALG-REQ-050)
-- `Cₜ` = `Target_chain` from `chains.json` (ALG-REQ-050)
+- `Cₑ` = `CHAIN_ENTRANCE` vertex in GrDB (ALG-REQ-050)
+- `Cᵣ` = `CHAIN_INTERMEDIATE` vertex in GrDB (ALG-REQ-050)
+- `Cₜ` = `CHAIN_TARGET` vertex in GrDB (ALG-REQ-050)
 - `TTB(N, C)` = Time To Bypass for asset N computed using tactic chain C (ALG-REQ-052)
 
 For intermediate nodes (N₁ through Nₖ₋₁), the stored `Asset.TTB` property is used directly (it represents the Regular_chain value). For the entry point (N₀) and target (Nₖ), TTB is computed on-the-fly using their respective tactic chains (ALG-REQ-053).
