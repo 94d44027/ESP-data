@@ -1,11 +1,11 @@
 # Algorithm Requirements Specification (ALGO)
 ## ESP PoC — TTA/TTB Path Calculation and related things
 
-**Version:** 1.1  
-**Date:** March 2, 2026  
+**Version:** 1.2  
+**Date:** March 4, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI  
 **Project:** ESP PoC for Nebula Graph  
-**Reference:** Derived from Requirements.md (SRS v1.10), UI-Requirements.md (v1.10), ESP01_NebulaGraph_Schema.md
+**Reference:** Derived from SRS, UIS, SCHEMA
 **Document code:** ALGO 
 
 ---
@@ -46,16 +46,20 @@ All requirements in this document use the prefix `ALG-REQ-` followed by a three-
 
 ## 2. Definitions
 
-| Term               | Definition                                                                                                                                  |
-|--------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
-| **TTA**            | Time To Attack — the cumulative time from initial access to the beginning of actions on objective, computed as the sum of TTB along a path  |
-| **TTB**            | Time To Bypass — the time interval to traverse (bypass) a single host; stored as `Asset.TTB` (int32, default 10)                            |
-| **Path**           | An ordered sequence of Asset nodes connected by directed `connects_to` edges, from an entry point to a target, with no repeated nodes       |
-| **Hop**            | A single `connects_to` edge traversal between two adjacent nodes in a path                                                                  |
-| **Entry Point**    | An Asset where `is_entrance == true`; represents the attacker's starting position                                                           |
-| **Target**         | An Asset where `is_target == true`; represents the objective the attacker aims to reach                                                     |
-| **Path ID**        | Ephemeral sequential identifier (e.g. P00001) assigned to each calculated path within a single session; not persisted in the database        |
-| **Mitigation**     | A MITRE ATT&CK mitigation (`tMitreMitigation`) linked to an Asset via `applied_to` edge, potentially modifying the effective TTB            |
+| Term               | Definition                                                                                                                                                                                                                     |
+|--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **TTA**            | Time To Attack — the cumulative time from initial access to the beginning of actions on objective, computed as the sum of TTB along a path                                                                                     |
+| **TTB**            | Time To Bypass — the time interval to traverse (bypass) a single host; stored as `Asset.TTB` (int32, default 10)                                                                                                               |
+| **TTT**            | Time to execuTe a Technique - time interval required to execute a technioue/subtechniqe on a particular node, considering mitigations applied                                                                                  |
+| **Path**           | An ordered sequence of Asset nodes connected by directed `connects_to` edges, from an entry point to a target, with no repeated nodes                                                                                          |
+| **Hop**            | A single `connects_to` edge traversal between two adjacent nodes in a path                                                                                                                                                     |
+| **Entry Point**    | An Asset where `is_entrance == true`; represents the attacker's starting position                                                                                                                                              |
+| **Target**         | An Asset where `is_target == true`; represents the objective the attacker aims to reach                                                                                                                                        |
+| **Path ID**        | Ephemeral sequential identifier (e.g. P00001) assigned to each calculated path within a single session; not persisted in the database                                                                                          |
+| **Mitigation**     | A MITRE ATT&CK mitigation (`tMitreMitigation`) linked to an Asset via `applied_to` edge, potentially modifying the effective TTB                                                                                               |
+| **Tactic Chain**   | An ordered list of MITRE ATT&CK tactic IDs that an attacker executes on a node, determined by the node's position in the attack path. Defined in `chains.json` (ALG-REQ-050).                                                  |
+| **Chain Position** | The role of an asset within a specific attack path: **Entrance** (first node, N₀), **Intermediate** (middle nodes, N₁..Nₖ₋₁), or **Target** (last node, Nₖ). A single asset may hold different positions in different paths.   |
+
 
 ---
 
@@ -67,27 +71,27 @@ The APP layer SHALL provide an API endpoint (`GET /api/paths?from={entryId}&to={
 
 - A server-generated sequential path ID (format `P` + zero-padded 5-digit number, e.g. `"P00001"`)
 - The ordered host chain as a string of Asset_IDs separated by `->`
-- The TTA value: sum of TTB properties of all Asset nodes in the path excluding the first (entry point) node
+- The TTA value computed per ALG-REQ-010 (position-aware sum of TTB values)
 
 The response SHALL be ordered by TTA ascending. Both `from` and `to` parameters SHALL be validated per REQ-025 (SRS). The `hops` parameter SHALL be validated as an integer in range 2–9; if omitted, default to 6.
 
-Justification for MATCH syntax (per REQ-244 in SRS): variable-length path traversal with loop detection (`ALL(n IN nodes(p) WHERE single(m IN nodes(p) WHERE m == n))`) and aggregation along path nodes has no practical nGQL/GO equivalent. The underlying query:
+Justification for MATCH syntax (per REQ-244 in SRS): variable-length path traversal with loop detection and per-node property extraction has no practical nGQL/GO equivalent. The underlying query returns **path topology and per-node stored TTB values** (not a pre-summed TTA). Final TTA is computed by the APP layer using position-aware TTB (ALG-REQ-010, ALG-REQ-051).
 
-```
+```nGQL
 MATCH p = (a:Asset)-[e:connects_to*..{maxHops}]->(b:Asset)
 WHERE a.Asset.Asset_ID == "{entryId}" AND b.Asset.Asset_ID == "{targetId}"
   AND ALL(n IN nodes(p) WHERE single(m IN nodes(p) WHERE m == n))
-WITH nodes(p) as Nodes2, p as p
-WITH reduce(s = "", n IN Nodes2 | s + n.Asset.Asset_ID + " -> ") as Result1, p as p
-WITH Result1 as Result1, left(Result1, length(Result1)-length(" -> ")) as Result2, p as p
-WITH nodes(p) as Nodes2, Result2 as Result2
-UNWIND Nodes2 as r
-WITH r, Result2
-RETURN Result2, SUM(r.Asset.TTB) as TTA
-ORDER BY TTA;
+WITH nodes(p) AS pathNodes
+WITH [n IN pathNodes | n.Asset.Asset_ID] AS ids,
+     [n IN pathNodes | COALESCE(n.Asset.TTB, 10)] AS ttbs
+RETURN ids, ttbs;
 ```
 
->Note: The path IDs are generated by the APP layer (Go code) sequentially per response — they are ephemeral and not persisted. A different run with different mitigations may produce a different ordering, so P00001 may refer to a different path. Candidate for the future change.
+>Note 1: The query returns an ordered list of Asset_IDs (`ids`) and their stored TTB values (`ttbs`) per path. The stored TTB represents the Regular_chain (intermediate-position) value. The APP layer substitutes position-specific TTB values for the entry point (index 0) and target (last index) before summing.
+
+>Note 2: The previous version of this query computed `SUM(r.Asset.TTB)` and the `A -> B -> C` host chain string in the GrDB. Both have been moved to the APP layer: TTA computation now requires position-aware TTB substitution, and host chain formatting is a presentation concern that does not belong in the database query. The APP layer SHALL construct the host chain string by joining the `ids` array with `" -> "` as separator (e.g. `strings.Join(ids, " -> ")` in Go).
+
+>Note 3: Path IDs are generated by the APP layer (Go code) sequentially per response — they are ephemeral and not persisted.
 
 Response format:
 
@@ -97,12 +101,12 @@ Response format:
     {
       "path_id": "P00001",
       "hosts": "A00013 -> A00014 -> A00012 -> A00011",
-      "tta": 244
+      "tta": 274
     },
     {
       "path_id": "P00002",
       "hosts": "A00013 -> A00014 -> A00007 -> A00011",
-      "tta": 246
+      "tta": 286
     }
   ],
   "entry_point": "A00013",
@@ -112,7 +116,9 @@ Response format:
 }
 ```
 
-**Migrated from:** REQ-029 (SRS v1.10)
+**Migrated from:** REQ-029 (SRS v1.10)  
+**Amended in:** v1.2 — query returns per-node data; APP computes position-aware TTA.
+
 
 ### ALG-REQ-002: Entry Points List Endpoint
 
@@ -144,19 +150,34 @@ YIELD id(vertex) AS vid, Asset.Asset_ID AS asset_id, Asset.Asset_Name AS asset_n
 
 ### ALG-REQ-010: TTA Calculation Rule
 
-TTA for a given path SHALL be computed as the sum of TTB property values of all Asset nodes in the path **excluding the first node** (the entry point). The entry point is excluded because it represents the attacker's starting position, not a host that needs to be bypassed.
-
-If any TTB value is `NULL` for a node in the path, the default value of **10** (per schema TA001 default) SHALL be used.
+TTA for a given path SHALL be computed as a position-aware sum of TTB values for all nodes in the path. Each node's TTB is computed using the tactic chain corresponding to its position (ALG-REQ-051).
 
 **Formal definition:**
 
-Given a path `[N₀, N₁, N₂, ..., Nₖ]` where `N₀` is the entry point:
+Given a path `[N₀, N₁, N₂, ..., Nₖ]` where `N₀` is the entry point and `Nₖ` is the target:
 
-    TTA = Σ TTB(Nᵢ) for i = 1 to k
+    TTA = TTB(N₀, Cₑ) + Σ TTB(Nᵢ, Cᵣ) for i = 1 to k-1 + TTB(Nₖ, Cₜ)
 
-where `TTB(Nᵢ)` = `Asset.TTB` if not NULL, else 10.
+where:
+- `Cₑ` = `Entrance_chain` from `chains.json` (ALG-REQ-050)
+- `Cᵣ` = `Regular_chain` from `chains.json` (ALG-REQ-050)
+- `Cₜ` = `Target_chain` from `chains.json` (ALG-REQ-050)
+- `TTB(N, C)` = Time To Bypass for asset N computed using tactic chain C (ALG-REQ-052)
 
-**Migrated from:** REQ-032 (SRS v1.10)
+For intermediate nodes (N₁ through Nₖ₋₁), the stored `Asset.TTB` property is used directly (it represents the Regular_chain value). For the entry point (N₀) and target (Nₖ), TTB is computed on-the-fly using their respective tactic chains (ALG-REQ-053).
+
+If any stored TTB value is `NULL` for an intermediate node, the default value of **10** (per schema TA001 default) SHALL be used.
+
+**Special case — 2-node path** `[N₀, Nₖ]` (direct connection, 1 hop):
+
+    TTA = TTB(N₀, Cₑ) + TTB(Nₖ, Cₜ)
+
+No intermediate nodes contribute. Both TTB values are computed on-the-fly.
+
+>Design note (v1.2): The entry point is now **included** in TTA. In v1.1, the entry point was excluded on the rationale that it represents the attacker's starting position. With position-aware tactic chains, the entry point incurs the cost of Initial Access (TA0001), which takes measurable time. Excluding it would undercount TTA.
+
+**Migrated from:** REQ-032 (SRS v1.10)  
+**Amended in:** v1.2 — position-aware formula; entry point included.
 
 ### ALG-REQ-011: Path ID Generation
 
@@ -262,15 +283,27 @@ Both statements SHALL be executed after the primary `UPSERT EDGE` or `DELETE EDG
 
 ### ALG-REQ-044: TTB Computation Stub
 
-Until the full TTB computation algorithm is implemented (see ALG-REQ-020/021 placeholders), TTB SHALL be recalculated using a stub procedure:
+Until the full TTB computation algorithm is implemented (see ALG-REQ-020/021 placeholders and ALG-REQ-052), TTB SHALL be recalculated using a stub procedure that accepts a tactic chain parameter:
 
 ```
-new_TTB = current_TTB + random_integer(1, 10)
+new_TTB = current_TTB + random_integer(1, 10) + len(tactic_chain)
 ```
 
-where `random_integer(1, 10)` produces a uniformly distributed integer in the range [1, 10] inclusive.
+where `random_integer(1, 10)` produces a uniformly distributed integer in the range [1, 10] inclusive, and `len(tactic_chain)` is the number of tactics in the provided chain.
 
-The stub is implemented in the APP layer (Go code). The purpose is to verify the end-to-end hash invalidation and recalculation pipeline without requiring the full mitigation-aware TTB formula.
+The `len(tactic_chain)` term ensures that TTB values differ by position even while using the stub: Entrance_chain (8 tactics) produces a different offset than Regular_chain (7 tactics) or Target_chain (10 tactics).
+
+The stub is implemented in the APP layer (Go code). The function signature SHALL accept the tactic chain:
+
+```go
+func computeTTBStub(currentTTB int, tacticChain []string) int
+```
+
+The purpose is to verify the end-to-end hash invalidation, position-aware recalculation pipeline, and TTA summation without requiring the full mitigation-aware TTB formula.
+
+>Design note: The `len(tactic_chain)` addition is a minimal change to make the stub position-sensitive. It will be replaced entirely when the real TTB formula (ALG-REQ-052) is implemented.
+
+**Amended in:** v1.2 — stub accepts tactic chain parameter.
 
 ### ALG-REQ-045: Bulk TTB Recalculation
 
@@ -279,6 +312,8 @@ The APP layer SHALL provide an API endpoint (`POST /api/recalculate-ttb`) that p
 1. Execute the hash computation query (ALG-REQ-042) to obtain all stale assets with their computed hashes
 2. For each stale asset where `computed_hash != stored_hash` (or `stored_hash` is empty):
    a. Compute new TTB using the stub procedure (ALG-REQ-044)
+>**Clarification (v1.2):** Bulk TTB recalculation computes TTB using the `Regular_chain` tactic chain for all assets. This is because `Asset.TTB` stored in the database always represents the intermediate-position TTB value. Entry-point and target-position TTB values are ephemeral and computed on-the-fly during path calculation only (ALG-REQ-053).
+
    b. Write back to the database:
       ```nGQL
       UPDATE VERTEX ON Asset "{assetId}"
@@ -308,19 +343,35 @@ The APP layer SHALL provide an API endpoint (`POST /api/recalculate-ttb`) that p
 
 When computing TTA via the path calculation endpoint (ALG-REQ-001), the APP layer SHALL perform the following optimised recalculation flow:
 
-1. **Find paths**: Execute the existing path discovery query (ALG-REQ-001) to obtain all loop-free directed paths. This returns the topology (host chains) and the current TTA values.
-2. **Extract path members**: Parse the host chains from all returned paths and extract the unique set of Asset_IDs that participate in any path.
-3. **Check hash validity**: For the path member subset only (re[presented by example `"A00013","A00014","A00012","A00011"`, fetch hash validity:
+1. **Find paths**: Execute the path discovery query (ALG-REQ-001) to obtain all loop-free directed paths. The query returns ordered node ID lists and their stored (intermediate-position) TTB values.
+
+2. **Extract path members**: Parse the returned paths and extract the unique set of Asset_IDs that participate in any path.
+
+3. **Check hash validity**: For the path member subset only, fetch hash validity:
    ```nGQL
    FETCH PROP ON Asset "A00013","A00014","A00012","A00011"
    YIELD Asset.Asset_ID AS asset_id,
          Asset.hash_valid AS hash_valid,
          Asset.TTB AS ttb;
    ```
-4. **Recalculate stale subset**: If any path member has `hash_valid == false`, run the hash computation query (ALG-REQ-042) scoped to those assets only (by replacing `WHERE a.Asset.hash_valid == false` with `WHERE a.Asset.Asset_ID IN ["{id1}", "{id2}", ...]`), compute new TTB (ALG-REQ-044), and write back the updated values.
-5. **Recompute TTA**: Using the now-fresh TTB values, recompute TTA for each path as per ALG-REQ-010 (`TTA = Σ TTB(Nᵢ) for i = 1 to k`). The path topology from step 1 is reused — no second graph traversal is needed. 
->Design note: the first node in the path - the concept needs to be verified once again - which is the entrance point, and which is the first node on the  path.
-6. **Return results**: The response format matches ALG-REQ-001, with an additional field indicating whether recalculation occurred:
+
+4. **Recalculate stale intermediates**: If any path member (excluding entry and target) has `hash_valid == false`, run the hash computation query (ALG-REQ-042) scoped to those assets only, compute new TTB using the stub with `Regular_chain` (ALG-REQ-044), and write back the updated values:
+   ```nGQL
+   UPDATE VERTEX ON Asset "{assetId}"
+   SET TTB = {newTTB}, hash = "{computedHash}", hash_valid = true;
+   ```
+
+5. **Compute entry-point TTB**: Compute `TTB(N₀, Entrance_chain)` for the entry point asset using the stub (ALG-REQ-044) with the `Entrance_chain` tactic chain. This value is held **in-memory only** — it is NOT written to `Asset.TTB`.
+
+6. **Compute target TTB**: Compute `TTB(Nₖ, Target_chain)` for the target asset using the stub (ALG-REQ-044) with the `Target_chain` tactic chain. This value is held **in-memory only** — it is NOT written to `Asset.TTB`.
+
+7. **Compute TTA per path**: For each discovered path `[N₀, N₁, ..., Nₖ]`:
+   ```
+   TTA = ttb_entry + Σ stored_TTB(Nᵢ) for i=1..k-1 + ttb_target
+   ```
+   where `stored_TTB(Nᵢ)` is the now-fresh `Asset.TTB` from step 4 (or unchanged if hash was valid), and `ttb_entry`/`ttb_target` are the in-memory values from steps 5-6.
+
+8. **Return results**: The response format matches ALG-REQ-001, with an additional field indicating whether recalculation occurred:
    ```json
    {
      "paths": [...],
@@ -332,10 +383,18 @@ When computing TTA via the path calculation endpoint (ALG-REQ-001), the APP laye
    }
    ```
 
->Design note 1: On large datasets, the path member subset will be much smaller than the total asset count. For example, with 10,000 assets and paths touching ~30 unique nodes, only those ~30 are checked and potentially recalculated — an O(P×H) operation instead of O(N).
+>Design note 1: Steps 5-6 are always executed (regardless of hash validity) because the stored `Asset.TTB` represents the Regular_chain value, not the entry/target value. The cost is exactly 2 TTB computations per path-set — negligible even at scale.
 
->Design note 2: If recalculation occurs during path calculation, the affected assets' hashes are updated (hash_valid = true), so subsequent path calculations involving the same assets will not trigger redundant recalculation.
->Design note 3: For the future use - some kind of locking mechanism should be put in place for the future multi-user version of the system to avoid concurrent editing and asset hash invalidation. Possible the "project" i.e. IT Infrastructure model and its mitigations can be locked (check in) for a particular user, while still kept read-only for the rest of the authorised users.
+>Design note 2: The entry and target assets are the same across all paths in a single API call (the `from` and `to` parameters). Therefore steps 5-6 run once per call, not once per path.
+
+>Design note 3: On large datasets, the intermediate recalculation (step 4) is scoped to stale path members only — an O(P×H) operation instead of O(N). Steps 5-6 add O(1) constant overhead.
+
+>Design note 4: No hash invalidation is needed when the Path Inspector is closed. `Asset.TTB` in the database always stores the Regular_chain value; entry/target TTBs are never persisted. The database state is never "contaminated" by position-specific calculations.
+
+>Design note 5: For the future — a locking mechanism should be put in place for the multi-user version. The "project" (IT Infrastructure model and its mitigations) can be locked (checked in) for a particular user while kept read-only for other authorised users.
+
+**Amended in:** v1.2 — steps 5-7 added for position-aware TTB; step 4 scoped to intermediates only; design note 4 added regarding hash invariance.
+
 
 ### ALG-REQ-047: Merkle Root Computation
 
@@ -382,6 +441,115 @@ Response format:
 
 This endpoint is consumed by the UI to display the stale-asset badge on the Recalculate TTBs button (UI-REQ-112).
 
+## 4B. Position-Aware TTB Computation
+
+### ALG-REQ-050: Tactic Chain Definition
+
+The system SHALL load tactic chain definitions from a configuration file (`chains.json`) at APP startup. The file defines three tactic chains, each being an ordered list of MITRE ATT&CK tactic IDs:
+
+```json
+{
+  "Entrance_chain": [
+    "TA0001","TA0002","TA0003","TA0004",
+    "TA0005","TA0006","TA0007","TA0008"
+  ],
+  "Regular_chain": [
+    "TA0002","TA0003","TA0004","TA0005",
+    "TA0006","TA0007","TA0008"
+  ],
+  "Target_chain": [
+    "TA0002","TA0003","TA0004","TA0005",
+    "TA0006","TA0007","TA0008","TA0011",
+    "TA0009","TA0040"
+  ]
+}
+```
+
+**Semantics:**
+
+| Chain | Position | Distinctive Tactics | Rationale |
+|-------|----------|---------------------|-----------|
+| `Entrance_chain` | Entry point (N₀) | Includes **TA0001** (Initial Access) | The attacker must first gain access to the entry point |
+| `Regular_chain` | Intermediate (N₁..Nₖ₋₁) | TA0002–TA0008 only | The attacker traverses intermediates via Lateral Movement (TA0008); no initial access or post-exploitation needed |
+| `Target_chain` | Target (Nₖ) | Adds **TA0011** (C2), **TA0009** (Collection), **TA0040** (Impact) | The attacker performs actions on objective at the target |
+
+The file SHALL be loaded once at startup and cached in memory. If the file is missing or malformed, the APP layer SHALL log an error and fall back to hardcoded default chains matching the values above.
+
+>Design note: `chains.json` is a configuration artifact, not a database entity. Tactic chains are static across all path calculations within a session. If they need to change, the APP is restarted with an updated file. Future versions may store chains in the database for dynamic updates.
+
+### ALG-REQ-051: Chain Position Assignment Rule
+
+When computing TTA for a set of discovered paths between entry point `E` and target `T`, the APP layer SHALL assign chain positions as follows:
+
+Given a path `[N₀, N₁, N₂, ..., Nₖ]`:
+- `N₀` (always equal to `E`) → **Entrance** → uses `Entrance_chain`
+- `Nₖ` (always equal to `T`) → **Target** → uses `Target_chain`
+- All other nodes `N₁..Nₖ₋₁` → **Intermediate** → uses `Regular_chain`
+
+Position assignment is determined solely by the node's index in the specific path, **not** by the asset's `is_entrance` or `is_target` properties. The same physical asset may be an intermediate node in one path and an entry point in another (across different API calls with different `from`/`to` parameters).
+
+>Design note: The `is_entrance` and `is_target` asset properties (TA001) define which assets are *eligible* to serve as entry points or targets (used to populate dropdowns in UI-REQ-207). Chain position assignment (this requirement) defines the asset's *role* within a specific calculated path. These are distinct concepts.
+
+### ALG-REQ-052: Position-Aware TTB Query Template
+
+When the full TTB computation replaces the stub (ALG-REQ-044), the TTB for a given `(asset, tactic_chain)` pair SHALL be computed by querying the MITRE subgraph in the database. The query identifies which techniques (under the given tactics) apply to the asset, and which of those techniques are mitigated.
+
+The reference MATCH query template:
+
+```nGQL
+MATCH (tech:tMitreTechnique)-[:part_of]->(tac:tMitreTactic)
+WHERE tac.tMitreTactic.Tactic_ID IN {tactic_chain}
+OPTIONAL MATCH (mit:tMitreMitigation)-[:mitigates]->(tech)
+OPTIONAL MATCH (mit)-[app:applied_to]->(a:Asset)
+WHERE a.Asset.Asset_ID == "{assetId}"
+RETURN
+  tech.tMitreTechnique.Technique_ID AS tech_id,
+  tech.tMitreTechnique.execution_min AS exec_min,
+  tech.tMitreTechnique.execution_max AS exec_max,
+  tech.tMitreTechnique.priority AS tech_priority,
+  tech.tMitreTechnique.rcelpe AS vuln_applicable,
+  mit.tMitreMitigation.Mitigation_ID AS mit_id,
+  app.Maturity AS maturity,
+  app.Active AS active;
+```
+
+Where `{tactic_chain}` is substituted with the appropriate chain (e.g. `["TA0001","TA0002","TA0003","TA0004","TA0005","TA0006","TA0007","TA0008"]` for Entrance_chain) and `{assetId}` is the target asset's ID.
+
+Justification for MATCH syntax (per REQ-244 in SRS): traversing tMitreTechnique → tMitreTactic with a filtered tactic list, then optionally joining through mitigates → applied_to to check asset-specific mitigation status, requires multi-hop OPTIONAL MATCH with property retrieval on intermediate edges — this is significantly cleaner with MATCH than with chained GO/FETCH statements.
+
+The query returns one row per technique under the given tactics, with `NULL` values for `mit_id`/`maturity`/`active` when a technique has no mitigation applied to this specific asset. The APP layer (or a future GrDB-side `reduce()`) uses these rows to compute TTB according to the formula defined in ALG-REQ-020/021 (placeholders).
+
+>Design note 1: This query is the foundation for the real TTB formula. The stub (ALG-REQ-044) does not use this query — it uses a simple arithmetic formula. Once ALG-REQ-020/021 are defined, this query replaces the stub.
+
+>Design note 2: The `rcelpe` field on tMitreTechnique (TA008) indicates whether a technique can exploit a critical vulnerability. When the asset has `has_vulnerability == true`, techniques with `rcelpe == true` may receive reduced execution time in the TTB formula (future ALG-REQ-020).
+
+>Design note 3: For the PoC dataset, the MITRE subgraph contains ~200 techniques. The `IN` filter on tactic IDs reduces this to a subset per chain. The OPTIONAL MATCH for asset-specific mitigations is further scoped. Expected execution time is well under 1 second.
+
+### ALG-REQ-053: TTB Caching Strategy
+
+The system SHALL use a split caching strategy for TTB values based on chain position:
+
+**Intermediate-position TTB (persisted):**
+- Stored in `Asset.TTB` (TA001) in the database
+- Computed using `Regular_chain` (ALG-REQ-050)
+- Protected by the hash/staleness system (ALG-REQ-040–043)
+- Recalculated only when `hash_valid == false` (i.e. when the asset's intrinsic defenses change)
+- Written back to the database after recalculation
+
+**Entry-position and Target-position TTB (ephemeral):**
+- Computed on-the-fly during path calculation (ALG-REQ-046, steps 5-6)
+- Computed using `Entrance_chain` or `Target_chain` respectively (ALG-REQ-050)
+- Held in APP-layer memory only — **never written to `Asset.TTB`**
+- Discarded after the API response is returned
+- Always recomputed on each path calculation request (no hash check)
+
+**Rationale:**
+- Intermediate is the most common position (most nodes in most paths) — caching yields the greatest benefit
+- Entry and target are exactly 2 nodes per path-set — the cost of always recomputing them is negligible
+- Not persisting entry/target TTB avoids contaminating `Asset.TTB` with position-specific values
+- No hash invalidation is needed when the Path Inspector is closed or when the user switches to a different entry/target pair
+
+**Optional future optimisation:** The APP layer MAY implement an in-memory LRU cache keyed by `(asset_id, chain_position, hash)`. If the asset's stored hash has not changed since the last computation, the cached entry/target TTB can be reused without re-querying. This is an implementation-level optimisation, not a requirement.
 
 
 ## 5. Mitigation Impact on TTA
@@ -442,13 +610,17 @@ The `hops` parameter SHALL be validated as an integer in the range 2–9. Values
 
 The following capabilities are anticipated but out of scope for v1.0:
 
-- [ ] Mitigation-aware TTA calculation (ALG-REQ-020 through ALG-REQ-022)
+- [x] ~~Mitigation-aware TTA calculation (ALG-REQ-020 through ALG-REQ-022)~~ — partially addressed: tactic chain framework in place (ALG-REQ-050–053); TTB formula itself still pending (ALG-REQ-020/021)
 - [ ] Path probability scoring (likelihood-weighted TTA)
 - [ ] Risk-weighted paths (incorporating asset priority)
 - [ ] Multi-target analysis (single entry point, multiple targets)
 - [ ] Mitigation impact simulation ("what-if" recalculation)
 - [ ] Path comparison (before/after mitigation changes)
-- [ ] TTB recalculation based on vulnerability presence (`has_vulnerability`)
+- [x] ~~TTB recalculation based on vulnerability presence (`has_vulnerability`)~~ — addressed in ALG-REQ-052 via `rcelpe` technique filter
+- [ ] Full TTB formula implementation (ALG-REQ-020/021) using ALG-REQ-052 query results
+- [ ] Dynamic tactic chain configuration via database instead of `chains.json`
+- [ ] APP-layer TTB cache for entry/target positions (ALG-REQ-053 optional optimisation)
+
 
 ---
 
@@ -478,7 +650,10 @@ The following capabilities are anticipated but out of scope for v1.0:
 | ALG-REQ-046 | —       | (path-scoped, within ALG-REQ-001 flow) |
 | ALG-REQ-047 | —       | (computation rule)                     |
 | ALG-REQ-048 | REQ-041 | `GET /api/system-state`                |
-
+| ALG-REQ-050 | —       | (definition, loaded from chains.json)  |
+| ALG-REQ-051 | —       | (computation rule)                     |
+| ALG-REQ-052 | —       | (query template, future ALG-REQ-020)   |
+| ALG-REQ-053 | —       | (caching strategy)                     |
 
 ### 8.2 ALG-REQ to UI-Requirements
 
@@ -494,16 +669,19 @@ The following capabilities are anticipated but out of scope for v1.0:
 
 ### 8.3 ALG-REQ to Schema
 
-| ALG-REQ     | Schema Reference                         | Context                                          |
-|-------------|------------------------------------------|--------------------------------------------------|
-| ALG-REQ-001 | ED005 (connects_to)                      | Path traversal follows connects_to edges         |
-| ALG-REQ-010 | TA001 (Asset.TTB)                        | TTB property used for TTA summation              |
-| ALG-REQ-020 | ED001 (applied_to), TA005                | Mitigation impact via applied_to edge properties |
-| ALG-REQ-040 | TA001 (Asset.hash, hash_valid)           | Hash properties on Asset tag                     |
-| ALG-REQ-042 | TA001, ED001, ED006, ED011, TA004, TA002 | All hash input sources                           |
-| ALG-REQ-043 | TA001, TA009                             | Invalidation writes to Asset + SystemState       |
-| ALG-REQ-047 | TA009 (SystemState.merkle_root)          | Merkle root stored in SystemState                |
-
+| ALG-REQ     | Schema Reference                         | Context                                                   |
+|-------------|------------------------------------------|-----------------------------------------------------------|
+| ALG-REQ-001 | ED005 (connects_to)                      | Path traversal follows connects_to edges                  |
+| ALG-REQ-010 | TA001 (Asset.TTB)                        | TTB property used for TTA summation                       |
+| ALG-REQ-020 | ED001 (applied_to), TA005                | Mitigation impact via applied_to edge properties          |
+| ALG-REQ-040 | TA001 (Asset.hash, hash_valid)           | Hash properties on Asset tag                              |
+| ALG-REQ-042 | TA001, ED001, ED006, ED011, TA004, TA002 | All hash input sources                                    |
+| ALG-REQ-043 | TA001, TA009                             | Invalidation writes to Asset + SystemState                |
+| ALG-REQ-047 | TA009 (SystemState.merkle_root)          | Merkle root stored in SystemState                         |
+| ALG-REQ-050 | TA007 (tMitreTactic.Tactic_ID)           | Tactic IDs in chains reference tMitreTactic vertices      |
+| ALG-REQ-051 | TA001 (Asset.is_entrance, is_target)     | Distinguishes eligibility (property) from position (path) |
+| ALG-REQ-052 | TA008, TA007, TA005, ED010, ED009, ED001 | Full MITRE subgraph traversal for TTB computation         |
+| ALG-REQ-053 | TA001 (Asset.TTB, hash, hash_valid)      | Caching uses existing hash infrastructure                 |
 ---
 
 ## Change Log
@@ -512,6 +690,7 @@ The following capabilities are anticipated but out of scope for v1.0:
 |---------|-------------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 1.0     | Mar 1, 2026 | KSmirnov | Initial version. Migrated REQ-029–032 from SRS v1.10. Added structure for mitigation impact and edge cases.                                                                                                                                                                                |
 | 1.1     | Mar 2, 2026 | KSmirnov | Added §4A: ALG-REQ-040–048 (asset state hashing, hash computation, invalidation, bulk/path-scoped TTB recalculation, Merkle root, SystemState endpoint). Cross-reference matrices updated (two ALG-REQ sections added to distinguish between older migrated and newly created requirements |
+| 1.2     | Mar 4, 2026 | KSmirnov | Added §4B: ALG-REQ-050–053 (tactic chains, position assignment, TTB query template, caching strategy). Amended ALG-REQ-001 (per-node query), ALG-REQ-010 (position-aware TTA formula), ALG-REQ-044 (stub accepts chain), ALG-REQ-045 (Regular_chain clarification), ALG-REQ-046 (entry/target computation steps). Cross-reference matrices updated. |
 
 ---
 
