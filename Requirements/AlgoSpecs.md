@@ -1,7 +1,7 @@
 # Algorithm Requirements Specification (ALGO)
 ## ESP PoC — TTA/TTB Path Calculation and related things
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Date:** March 4, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI  
 **Project:** ESP PoC for Nebula Graph  
@@ -36,7 +36,7 @@ This specification does **not** cover:
 |--------------------------------------|---------|-------------------------------------------------------------------------------------------------------------------------------|
 | Requirements.md (SRS)                | v1.12   | Parent document. Stubs REQ-029–032 reference this spec. API summary in Appendix C links here.                                 |
 | UI-Requirements.md  (UIR)            | v1.12   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                              |
-| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.7    | Defines Asset.TTB property (TA001), connects_to edges (ED005), applied_to edges (ED001) and other elements of database schema |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.8    | Defines Asset.TTB property (TA001), connects_to edges (ED005), applied_to edges (ED001) and other elements of database schema |
 
 ### 1.4 Requirement ID Convention
 
@@ -283,27 +283,29 @@ Both statements SHALL be executed after the primary `UPSERT EDGE` or `DELETE EDG
 
 ### ALG-REQ-044: TTB Computation Stub
 
-Until the full TTB computation algorithm is implemented (see ALG-REQ-020/021 placeholders and ALG-REQ-052), TTB SHALL be recalculated using a stub procedure that accepts a tactic chain parameter:
+Until the full TTB computation algorithm is implemented (see ALG-REQ-020/021 placeholders and ALG-REQ-052), TTB SHALL be recalculated using a stub procedure that accepts a chain VID parameter identifying the asset's position in the attack path:
 
+``` text
+new_TTB = current_TTB + random_integer(1, 10) + chain_tactic_count(chainVID)
 ```
-new_TTB = current_TTB + random_integer(1, 10) + len(tactic_chain)
-```
+where `random_integer(1, 10)` produces a uniformly distributed integer in the range inclusive, and `chain_tactic_count(chainVID)` is the number of chain_includes edges from the given TacticChain vertex (SCHEMA TA010, ED013).
 
-where `random_integer(1, 10)` produces a uniformly distributed integer in the range [1, 10] inclusive, and `len(tactic_chain)` is the number of tactics in the provided chain.
 
-The `len(tactic_chain)` term ensures that TTB values differ by position even while using the stub: Entrance_chain (8 tactics) produces a different offset than Regular_chain (7 tactics) or Target_chain (10 tactics).
+The `chain_tactic_count` term ensures that TTB values differ by position even while using the stub: `CHAIN_ENTRANCE` (8 tactics) produces a different offset than `CHAIN_INTERMEDIATE` (7 tactics) or `CHAIN_TARGET` (10 tactics). The APP layer MAY hardcode these counts for the stub or query them from the GrDB.
 
-The stub is implemented in the APP layer (Go code). The function signature SHALL accept the tactic chain:
+The stub is implemented in the APP layer (Go code). The function signature SHALL accept the chain VID:
 
 ```go
-func computeTTBStub(currentTTB int, tacticChain []string) int
+func computeTTBStub(currentTTB int, chainVID string) int
 ```
 
 The purpose is to verify the end-to-end hash invalidation, position-aware recalculation pipeline, and TTA summation without requiring the full mitigation-aware TTB formula.
 
->Design note: The `len(tactic_chain)` addition is a minimal change to make the stub position-sensitive. It will be replaced entirely when the real TTB formula (ALG-REQ-052) is implemented.
+>Design note: The chain_tactic_count addition is a minimal change to make the stub position-sensitive. It will be replaced entirely when the real TTB formula (ALG-REQ-052) is implemented. At that point the stub is superseded by the full MITRE subgraph traversal query starting from the same chain VID.
 
-**Amended in:** v1.2 — stub accepts tactic chain parameter.
+Amended in: v1.2 — stub accepts tactic chain parameter. v1.3 — parameter changed from tacticChain []string to chainVID string; count derived from GrDB chain_includes edges.
+
+
 
 ### ALG-REQ-045: Bulk TTB Recalculation
 
@@ -445,64 +447,87 @@ This endpoint is consumed by the UI to display the stale-asset badge on the Reca
 
 ### ALG-REQ-050: Tactic Chain Definition
 
-The system SHALL load tactic chain definitions from a configuration file (`chains.json`) at APP startup. The file defines three tactic chains, each being an ordered list of MITRE ATT&CK tactic IDs:
+The system SHALL define tactic chains as graph objects in the GrDB, using `TacticChain` vertices (SCHEMA TA010) connected to `tMitreTactic` vertices via `chain_includes` edges (SCHEMA ED013). Each chain represents an ordered sequence of MITRE ATT&CK tactics that an attacker executes on a node depending on its position in the attack path.
 
-```json
-{
-  "Entrance_chain": [
-    "TA0001","TA0002","TA0003","TA0004",
-    "TA0005","TA0006","TA0007","TA0008"
-  ],
-  "Regular_chain": [
-    "TA0002","TA0003","TA0004","TA0005",
-    "TA0006","TA0007","TA0008"
-  ],
-  "Target_chain": [
-    "TA0002","TA0003","TA0004","TA0005",
-    "TA0006","TA0007","TA0008","TA0011",
-    "TA0009","TA0040"
-  ]
-}
-```
+**Chain vertices:**
+
+| VID                    | chain_name     | Description                                                      |
+|------------------------|----------------|------------------------------------------------------------------|
+| `"CHAIN_ENTRANCE"`     | Entrance Chain | Tactics executed on the entry point (includes Initial Access)    |
+| `"CHAIN_INTERMEDIATE"` | Regular Chain  | Tactics executed on intermediate nodes                           |
+| `"CHAIN_TARGET"`       | Target Chain   | Tactics executed on the target (includes C2, Collection, Impact) |
+
+**Tactic ordering** is encoded in the `chain_includes` edge rank (`@rank`). Rank 0 = first tactic in the chain, rank 1 = second, etc.
 
 **Semantics:**
 
-| Chain | Position | Distinctive Tactics | Rationale |
-|-------|----------|---------------------|-----------|
-| `Entrance_chain` | Entry point (N₀) | Includes **TA0001** (Initial Access) | The attacker must first gain access to the entry point |
-| `Regular_chain` | Intermediate (N₁..Nₖ₋₁) | TA0002–TA0008 only | The attacker traverses intermediates via Lateral Movement (TA0008); no initial access or post-exploitation needed |
-| `Target_chain` | Target (Nₖ) | Adds **TA0011** (C2), **TA0009** (Collection), **TA0040** (Impact) | The attacker performs actions on objective at the target |
+| Chain                | Position                | Distinctive Tactics                                                | Rationale                                                                                                         |
+|----------------------|-------------------------|--------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `CHAIN_ENTRANCE`     | Entry point (N₀)        | Includes **TA0001** (Initial Access)                               | The attacker must first gain access to the entry point                                                            |
+| `CHAIN_INTERMEDIATE` | Intermediate (N₁..Nₖ₋₁) | TA0002–TA0008 only                                                 | The attacker traverses intermediates via Lateral Movement (TA0008); no initial access or post-exploitation needed |
+| `CHAIN_TARGET`       | Target (Nₖ)             | Adds **TA0011** (C2), **TA0009** (Collection), **TA0040** (Impact) | The attacker performs actions on objective at the target                                                          |
 
-The file SHALL be loaded once at startup and cached in memory. If the file is missing or malformed, the APP layer SHALL log an error and fall back to hardcoded default chains matching the values above.
+The chain data is loaded into the GrDB during initial deployment (see SCHEMA data load section). The APP layer reads chain definitions by traversing `chain_includes` edges — no external configuration file is required.
 
->Design note: `chains.json` is a configuration artifact, not a database entity. Tactic chains are static across all path calculations within a session. If they need to change, the APP is restarted with an updated file. Future versions may store chains in the database for dynamic updates.
+>Design note 1: `chains.json` is superseded by this requirement. It may be retained as a seed data / documentation artifact but is no longer loaded at APP runtime.
+
+>Design note 2: Storing chains in the GrDB enables pure graph-traversal TTB computation (ALG-REQ-052) — the query starts from a chain vertex and follows edges through the MITRE subgraph without the APP layer needing to pass tactic lists as parameters. This moves computation closer to the data.
+
+>Design note 3: Adding a new chain type (e.g. for a future "pivot point" position) requires only inserting a new TacticChain vertex and its chain_includes edges — no code changes. Chain definitions are queryable and editable via nGQL.
+
+**Amended in:** v1.3 — chains moved from JSON config to GrDB graph objects.
+
+>Note: The chances that this will be changing often are low.
+
 
 ### ALG-REQ-051: Chain Position Assignment Rule
 
 When computing TTA for a set of discovered paths between entry point `E` and target `T`, the APP layer SHALL assign chain positions as follows:
 
 Given a path `[N₀, N₁, N₂, ..., Nₖ]`:
-- `N₀` (always equal to `E`) → **Entrance** → uses `Entrance_chain`
-- `Nₖ` (always equal to `T`) → **Target** → uses `Target_chain`
-- All other nodes `N₁..Nₖ₋₁` → **Intermediate** → uses `Regular_chain`
+- `N₀` (always equal to `E`) → **Entrance** → chain VID `"CHAIN_ENTRANCE"`
+- `Nₖ` (always equal to `T`) → **Target** → chain VID `"CHAIN_TARGET"`
+- All other nodes `N₁..Nₖ₋₁` → **Intermediate** → chain VID `"CHAIN_INTERMEDIATE"`
 
 Position assignment is determined solely by the node's index in the specific path, **not** by the asset's `is_entrance` or `is_target` properties. The same physical asset may be an intermediate node in one path and an entry point in another (across different API calls with different `from`/`to` parameters).
 
+The APP layer maps positions to chain VIDs using a simple lookup:
+
+```go
+func chainVIDForPosition(index, pathLength int) string {
+    switch {
+    case index == 0:
+        return "CHAIN_ENTRANCE"
+    case index == pathLength-1:
+        return "CHAIN_TARGET"
+    default:
+        return "CHAIN_INTERMEDIATE"
+    }
+}
+```
+
 >Design note: The `is_entrance` and `is_target` asset properties (TA001) define which assets are *eligible* to serve as entry points or targets (used to populate dropdowns in UI-REQ-207). Chain position assignment (this requirement) defines the asset's *role* within a specific calculated path. These are distinct concepts.
+
+**Amended in:** v1.3 — position now maps to chain VIDs in GrDB.
+
 
 ### ALG-REQ-052: Position-Aware TTB Query Template
 
-When the full TTB computation replaces the stub (ALG-REQ-044), the TTB for a given `(asset, tactic_chain)` pair SHALL be computed by querying the MITRE subgraph in the database. The query identifies which techniques (under the given tactics) apply to the asset, and which of those techniques are mitigated.
+When the full TTB computation replaces the stub (ALG-REQ-044), the TTB for a given `(asset, chain_position)` pair SHALL be computed by traversing from the appropriate `TacticChain` vertex through the MITRE subgraph in the database. The query follows the path: chain → tactics (via `chain_includes`) → techniques (via `part_of`) → mitigations (via `mitigates`) → asset-specific application (via `applied_to`).
 
-The reference MATCH query template:
+The reference MATCH query:
 
 ```nGQL
-MATCH (tech:tMitreTechnique)-[:part_of]->(tac:tMitreTactic)
-WHERE tac.tMitreTactic.Tactic_ID IN {tactic_chain}
+MATCH (chain:TacticChain)-[s:chain_includes]->(tac:tMitreTactic)
+  <-[:part_of]-(tech:tMitreTechnique)
+WHERE id(chain) == "{chainVid}"
 OPTIONAL MATCH (mit:tMitreMitigation)-[:mitigates]->(tech)
 OPTIONAL MATCH (mit)-[app:applied_to]->(a:Asset)
-WHERE a.Asset.Asset_ID == "{assetId}"
+WITH tac, s, tech, mit, app, a, rank(s) AS tactic_order
+WHERE a IS NULL OR a.Asset.Asset_ID == "{assetId}"
 RETURN
+  tac.tMitreTactic.Tactic_ID AS tactic_id,
+  tactic_order,
   tech.tMitreTechnique.Technique_ID AS tech_id,
   tech.tMitreTechnique.execution_min AS exec_min,
   tech.tMitreTechnique.execution_max AS exec_max,
@@ -510,20 +535,32 @@ RETURN
   tech.tMitreTechnique.rcelpe AS vuln_applicable,
   mit.tMitreMitigation.Mitigation_ID AS mit_id,
   app.Maturity AS maturity,
-  app.Active AS active;
+  app.Active AS active
+ORDER BY tactic_order, tech_id;
 ```
 
-Where `{tactic_chain}` is substituted with the appropriate chain (e.g. `["TA0001","TA0002","TA0003","TA0004","TA0005","TA0006","TA0007","TA0008"]` for Entrance_chain) and `{assetId}` is the target asset's ID.
+Where `{chainVid}` is one of `"CHAIN_ENTRANCE"`, `"CHAIN_INTERMEDIATE"`, or `"CHAIN_TARGET"` (per ALG-REQ-051), and `{assetId}` is the asset being evaluated.
 
-Justification for MATCH syntax (per REQ-244 in SRS): traversing tMitreTechnique → tMitreTactic with a filtered tactic list, then optionally joining through mitigates → applied_to to check asset-specific mitigation status, requires multi-hop OPTIONAL MATCH with property retrieval on intermediate edges — this is significantly cleaner with MATCH than with chained GO/FETCH statements.
+Justification for MATCH syntax (per REQ-244 in SRS): traversing TacticChain → tMitreTactic → tMitreTechnique with tactic ordering via edge rank, then optionally joining through mitigates → applied_to to check asset-specific mitigation status, requires multi-hop OPTIONAL MATCH with property retrieval on intermediate edges. This has no practical nGQL/GO equivalent.
 
-The query returns one row per technique under the given tactics, with `NULL` values for `mit_id`/`maturity`/`active` when a technique has no mitigation applied to this specific asset. The APP layer (or a future GrDB-side `reduce()`) uses these rows to compute TTB according to the formula defined in ALG-REQ-020/021 (placeholders).
+**nGQL notes:**
 
->Design note 1: This query is the foundation for the real TTB formula. The stub (ALG-REQ-044) does not use this query — it uses a simple arithmetic formula. Once ALG-REQ-020/021 are defined, this query replaces the stub.
+1. `WHERE` cannot follow `OPTIONAL MATCH` in NebulaGraph. The asset filter is applied after collecting all variables through `WITH`, using the pattern `WHERE a IS NULL OR a.Asset.Asset_ID == "{assetId}"`. This preserves OPTIONAL MATCH semantics: unmitigated techniques (where `a` is NULL) are kept; mitigations applied to *other* assets are filtered out.
+
+2. `rank(s)` cannot be used directly in `ORDER BY`. It is piped through `WITH ... rank(s) AS tactic_order` and then referenced by alias.
+
+3. The query returns one row per (technique, mitigation) pair under the given chain's tactics. Rows where `mit_id` / `maturity` / `active` are NULL indicate unmitigated techniques. The APP layer uses these rows to compute TTB according to the formula defined in ALG-REQ-020/021 (placeholders).
+
+>Design note 1: This query is the foundation for the real TTB formula. The stub (ALG-REQ-044) does not use this query — it uses a simple arithmetic formula with the chain VID as parameter. Once ALG-REQ-020/021 are defined, this query replaces the stub.
 
 >Design note 2: The `rcelpe` field on tMitreTechnique (TA008) indicates whether a technique can exploit a critical vulnerability. When the asset has `has_vulnerability == true`, techniques with `rcelpe == true` may receive reduced execution time in the TTB formula (future ALG-REQ-020).
 
->Design note 3: For the PoC dataset, the MITRE subgraph contains ~200 techniques. The `IN` filter on tactic IDs reduces this to a subset per chain. The OPTIONAL MATCH for asset-specific mitigations is further scoped. Expected execution time is well under 1 second.
+>Design note 3: The `tactic_order` column (from edge rank) preserves the sequential order of tactics in the chain. While the current TTB stub does not use ordering, the future state-machine traversal through `tMitreState` / `patterns_to` will rely on it.
+
+>Design note 4: For the PoC dataset (~200 techniques, ~43 mitigations), the chain filter narrows the technique set to the relevant subset per position. Expected execution time is well under 1 second.
+
+**Amended in:** v1.3 — query traverses from chain vertex in GrDB; corrected nGQL syntax (WHERE/OPTIONAL MATCH, rank() aliasing).
+
 
 ### ALG-REQ-053: TTB Caching Strategy
 
@@ -639,21 +676,21 @@ The following capabilities are anticipated but out of scope for v1.0:
 
 ### 8.1b ALG-REQ to SRS (Requirements.md)
 
-| ALG-REQ     | SRS Ref | API Endpoint                           |
-|-------------|---------|----------------------------------------|
-| ALG-REQ-040 | —       | (definition, not endpoint)             |
-| ALG-REQ-041 | —       | (definition, not endpoint)             |
-| ALG-REQ-042 | —       | (algorithm, not endpoint)              |
-| ALG-REQ-043 | REQ-042 | (invalidation side-effect)             |
-| ALG-REQ-044 | —       | (computation rule)                     |
-| ALG-REQ-045 | REQ-040 | `POST /api/recalculate-ttb`            |
-| ALG-REQ-046 | —       | (path-scoped, within ALG-REQ-001 flow) |
-| ALG-REQ-047 | —       | (computation rule)                     |
-| ALG-REQ-048 | REQ-041 | `GET /api/system-state`                |
-| ALG-REQ-050 | —       | (definition, loaded from chains.json)  |
-| ALG-REQ-051 | —       | (computation rule)                     |
-| ALG-REQ-052 | —       | (query template, future ALG-REQ-020)   |
-| ALG-REQ-053 | —       | (caching strategy)                     |
+| ALG-REQ     | SRS Ref | API Endpoint                                |
+|-------------|---------|---------------------------------------------|
+| ALG-REQ-040 | —       | (definition, not endpoint)                  |
+| ALG-REQ-041 | —       | (definition, not endpoint)                  |
+| ALG-REQ-042 | —       | (algorithm, not endpoint)                   |
+| ALG-REQ-043 | REQ-042 | (invalidation side-effect)                  |
+| ALG-REQ-044 | —       | (computation rule)                          |
+| ALG-REQ-045 | REQ-040 | `POST /api/recalculate-ttb`                 |
+| ALG-REQ-046 | —       | (path-scoped, within ALG-REQ-001 flow)      |
+| ALG-REQ-047 | —       | (computation rule)                          |
+| ALG-REQ-048 | REQ-041 | `GET /api/system-state`                     |
+| ALG-REQ-050 | —       | (definition, stored in GrDB as TacticChain) |
+| ALG-REQ-051 | —       | (computation rule)                          |
+| ALG-REQ-052 | —       | (query template, future ALG-REQ-020)        |
+| ALG-REQ-053 | —       | (caching strategy)                          |
 
 ### 8.2 ALG-REQ to UI-Requirements
 
@@ -669,19 +706,19 @@ The following capabilities are anticipated but out of scope for v1.0:
 
 ### 8.3 ALG-REQ to Schema
 
-| ALG-REQ     | Schema Reference                         | Context                                                   |
-|-------------|------------------------------------------|-----------------------------------------------------------|
-| ALG-REQ-001 | ED005 (connects_to)                      | Path traversal follows connects_to edges                  |
-| ALG-REQ-010 | TA001 (Asset.TTB)                        | TTB property used for TTA summation                       |
-| ALG-REQ-020 | ED001 (applied_to), TA005                | Mitigation impact via applied_to edge properties          |
-| ALG-REQ-040 | TA001 (Asset.hash, hash_valid)           | Hash properties on Asset tag                              |
-| ALG-REQ-042 | TA001, ED001, ED006, ED011, TA004, TA002 | All hash input sources                                    |
-| ALG-REQ-043 | TA001, TA009                             | Invalidation writes to Asset + SystemState                |
-| ALG-REQ-047 | TA009 (SystemState.merkle_root)          | Merkle root stored in SystemState                         |
-| ALG-REQ-050 | TA007 (tMitreTactic.Tactic_ID)           | Tactic IDs in chains reference tMitreTactic vertices      |
-| ALG-REQ-051 | TA001 (Asset.is_entrance, is_target)     | Distinguishes eligibility (property) from position (path) |
-| ALG-REQ-052 | TA008, TA007, TA005, ED010, ED009, ED001 | Full MITRE subgraph traversal for TTB computation         |
-| ALG-REQ-053 | TA001 (Asset.TTB, hash, hash_valid)      | Caching uses existing hash infrastructure                 |
+| ALG-REQ     | Schema Reference                                               | Context                                                   |
+|-------------|----------------------------------------------------------------|-----------------------------------------------------------|
+| ALG-REQ-001 | ED005 (connects_to)                                            | Path traversal follows connects_to edges                  |
+| ALG-REQ-010 | TA001 (Asset.TTB)                                              | TTB property used for TTA summation                       |
+| ALG-REQ-020 | ED001 (applied_to), TA005                                      | Mitigation impact via applied_to edge properties          |
+| ALG-REQ-040 | TA001 (Asset.hash, hash_valid)                                 | Hash properties on Asset tag                              |
+| ALG-REQ-042 | TA001, ED001, ED006, ED011, TA004, TA002                       | All hash input sources                                    |
+| ALG-REQ-043 | TA001, TA009                                                   | Invalidation writes to Asset + SystemState                |
+| ALG-REQ-047 | TA009 (SystemState.merkle_root)                                | Merkle root stored in SystemState                         |
+| ALG-REQ-050 | **TA010** (TacticChain), **ED013** (chain_includes), TA007     | Chain vertices + edges reference tMitreTactic vertices    |
+| ALG-REQ-051 | TA001 (Asset.is_entrance, is_target)                           | Distinguishes eligibility (property) from position (path) |
+| ALG-REQ-052 | **TA010**, **ED013**, TA008, TA007, TA005, ED010, ED009, ED001 | Full chain → MITRE subgraph traversal for TTB             |
+| ALG-REQ-053 | TA001 (Asset.TTB, hash, hash_valid)                            | Caching uses existing hash infrastructure                 |
 ---
 
 ## Change Log
@@ -691,7 +728,7 @@ The following capabilities are anticipated but out of scope for v1.0:
 | 1.0     | Mar 1, 2026 | KSmirnov | Initial version. Migrated REQ-029–032 from SRS v1.10. Added structure for mitigation impact and edge cases.                                                                                                                                                                                |
 | 1.1     | Mar 2, 2026 | KSmirnov | Added §4A: ALG-REQ-040–048 (asset state hashing, hash computation, invalidation, bulk/path-scoped TTB recalculation, Merkle root, SystemState endpoint). Cross-reference matrices updated (two ALG-REQ sections added to distinguish between older migrated and newly created requirements |
 | 1.2     | Mar 4, 2026 | KSmirnov | Added §4B: ALG-REQ-050–053 (tactic chains, position assignment, TTB query template, caching strategy). Amended ALG-REQ-001 (per-node query), ALG-REQ-010 (position-aware TTA formula), ALG-REQ-044 (stub accepts chain), ALG-REQ-045 (Regular_chain clarification), ALG-REQ-046 (entry/target computation steps). Cross-reference matrices updated. |
-
+| 1.3     | Mar 4, 2026 | KSmirnov | Moved tactic chains from chains.json to GrDB graph objects (TA010 TacticChain, ED013 chain_includes). Rewrote ALG-REQ-050 (chain definition), ALG-REQ-052 (TTB query — corrected nGQL syntax). Amended ALG-REQ-051 (VID mapping), ALG-REQ-044 (chain VID parameter). Cross-references updated for new schema elements. |
 ---
 
 **End of Document**

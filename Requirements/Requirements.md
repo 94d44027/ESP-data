@@ -22,8 +22,8 @@ This document describes the complete set of requirements for Version 1.0 of ESP 
 | Document                             | Version | Relationship                                                                                                    |
 |--------------------------------------|---------|-----------------------------------------------------------------------------------------------------------------|
 | UI-Requirements.md  (UIR)            | v1.12   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                |
-| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.7    | Defines database schema (ESP01)                                                                                 |
-| AlgoSpecs.md (ALGO)                  | v1.1    | Defines requirements to algorithms regarding attack path calculations ((REQ-029 through REQ-032 migrated there) |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.8    | Defines database schema (ESP01)                                                                                 |
+| AlgoSpecs.md (ALGO)                  | v1.3    | Defines requirements to algorithms regarding attack path calculations ((REQ-029 through REQ-032 migrated there) |
 
 ### 1.4 Intended Audience
 - Software developers and architects
