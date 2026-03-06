@@ -201,9 +201,9 @@ Represents the platform from MITRE ATT&CK to be an umbrella category for OS_Type
 | Field                | Type   | Null | Default | Comment                                                               |
 |----------------------|--------|------|---------|-----------------------------------------------------------------------|
 | platform_id          | string | NO   | _EMPTY_ | Same as VID, e.g. "PLTF001"                                           |
-| platfiorm_name       | string | NO   | _EMPTY_ | Human-readable name, e.g. "macOS"                                     |
+| platform_name        | string | NO   | _EMPTY_ | Human-readable name, e.g. "macOS"                                     |
 | platform_description | string | YES  | _EMPTY_ | Human-readable description, e.g. "macOS of any version"               |
-| comment              | string | YES  | _EMPTY_ | Any otehr meaningful information like "New versions, no Power stuff." |
+| comment              | string | YES  | _EMPTY_ | Any other meaningful information like "New versions, no Power stuff." |
 
 #### Notes
 
@@ -272,6 +272,11 @@ No properties (pure relationship edge).
 
 > Note 1: has cardinality many-to-many (a technique/subtechnique can be executed on multiple platforms; a platform is subject to many techniques/subtechniques). 
 > Note 2: subtechniques not necessarily inherit relations to platforms from their parent techniques. May have different sets of `can_be_executed_on` relationships. 
+
+#### CREATE EDGE statement
+```nGQL
+CREATE EDGE IF NOT EXISTS can_be_executed_on();
+```
 
 ### ED004: defines_state
 #### Used for 
@@ -401,43 +406,49 @@ CREATE EDGE IF NOT EXISTS chain_includes();
 #### Notes
 No edge index is required for the initial dataset (3 chains × ~8 tactics = 25 edges). If additional chain types are added in the future, an index may be considered.
 
-### ED0014: represents
-#### USed for
+### ED014: represents
+#### Used for
 This is to show relationship from OS_Type to MitrePlatform. (OS_Type --represents--> MitrePlatform).
 One OS_Type can represent exactly one MitrePlatform in most cases (e.g., “Windows 11” → PLTF010), but some OS types could conceivably map to multiple platforms.
 
 #### Edge properties
 No properties (pure structural edge).
 
+#### CREATE EDGE statement
+```nGQL
+CREATE EDGE IF NOT EXISTS represents();
+```
 
 
 
+## IN: Indexes
+### Tag Indexes
+| Index Name             | On Tag          | Columns                    |
+|------------------------|-----------------|----------------------------|
+| MTactic_Index          | tMitreTactic    | ["Tactic_ID"]              |
+| TecniqueIndex          | tMitreTechnique | ["Technique_ID"]           |
+| idx_asset_any          | Asset           | ["Asset_ID", "Asset_Name"] |
+| idx_asset_type_any     | Asset_Type      | []                         |
+| idx_os_type_any        | OS_Type         | []                         |
+| idx_segment_any        | Network_Segment | []                         |
+| state_id_index         | tMitreState     | ["state_id"]               |
+| idx_mitre_platform_any | MitrePlatform   | []                         |
 
-## IN: Indexes (10 Total)
-### Tag Indexes (7)
-| Index Name         | On Tag          | Columns                    |
-|--------------------|-----------------|----------------------------|
-| MTactic_Index      | tMitreTactic    | ["Tactic_ID"]              |
-| TecniqueIndex      | tMitreTechnique | ["Technique_ID"]           |
-| idx_asset_any      | Asset           | ["Asset_ID", "Asset_Name"] |
-| idx_asset_type_any | Asset_Type      | []                         |
-| idx_os_type_any    | OS_Type         | []                         |
-| idx_segment_any    | Network_Segment | []                         |
-| state_id_index     | tMitreState     | ["state_id"]               |
-
-### Edge Indexes (3)
-| Index Name      | On Edge          | Columns |
-|-----------------|------------------|---------|
-| ConnectsToIndex | connects_to      | []      |
-| PartOfIndex     | part_of          | []      |
-| SubtechIndex    | has_subtechnique | []      |
+### Edge Indexes
+| Index Name      | On Edge            | Columns |
+|-----------------|--------------------|---------|
+| ConnectsToIndex | connects_to        | []      |
+| PartOfIndex     | part_of            | []      |
+| SubtechIndex    | has_subtechnique   | []      |
+| idx_can_exec_on | can_be_executed_on | []      |
+| idx_represents  | represents         | []      |
 
 
 
-| Version | Date         | Changes                                                                                                            | Author             |
-|---------|--------------|--------------------------------------------------------------------------------------------------------------------|--------------------|
-| 1.0     | Feb 16, 2026 | Initial version                                                                                                    | Konstantin Smirnov |
-| 1.6     | Feb 27, 2026 | Added runs_on, patterns_to edge types                                                                              | Konstantin Smirnov |
-| 1.7     | Mar 01, 2026 | TA001: added hash (string) and hash_valid (bool) properties. TA009 added (SystemState tag). SYS001 vertex created. | AI + K.Smirnov     |
-| 1.8     | Mar 4, 2026  | TA010 added (TacticChain tag). ED013 added (chain_includes edge). 3 vertices + 25 edges loaded.                    | AI + K.Smirnov     |
-| 1.9     | Mar 6, 2026  | TA011 added (MitrePlatform tag), ED003 has been edited.                                                            | AI + K.Smirnov     |
+| Version | Date         | Changes                                                                                                                             | Author             |
+|---------|--------------|-------------------------------------------------------------------------------------------------------------------------------------|--------------------|
+| 1.0     | Feb 16, 2026 | Initial version                                                                                                                     | Konstantin Smirnov |
+| 1.6     | Feb 27, 2026 | Added runs_on, patterns_to edge types                                                                                               | Konstantin Smirnov |
+| 1.7     | Mar 01, 2026 | TA001: added hash (string) and hash_valid (bool) properties. TA009 added (SystemState tag). SYS001 vertex created.                  | AI + K.Smirnov     |
+| 1.8     | Mar 4, 2026  | TA010 added (TacticChain tag). ED013 added (chain_includes edge). 3 vertices + 25 edges loaded.                                     | AI + K.Smirnov     |
+| 1.9     | Mar 6, 2026  | TA011 added (MitrePlatform tag), ED003 has been edited. New indexes (idx_mitre_platform_any, idx_can_exec_on, idx_represents) added | AI + K.Smirnov     |
