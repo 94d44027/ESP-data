@@ -445,10 +445,10 @@ CREATE EDGE IF NOT EXISTS represents();
 
 
 
-| Version | Date         | Changes                                                                                                                             | Author             |
-|---------|--------------|-------------------------------------------------------------------------------------------------------------------------------------|--------------------|
-| 1.0     | Feb 16, 2026 | Initial version                                                                                                                     | Konstantin Smirnov |
-| 1.6     | Feb 27, 2026 | Added runs_on, patterns_to edge types                                                                                               | Konstantin Smirnov |
-| 1.7     | Mar 01, 2026 | TA001: added hash (string) and hash_valid (bool) properties. TA009 added (SystemState tag). SYS001 vertex created.                  | AI + K.Smirnov     |
-| 1.8     | Mar 4, 2026  | TA010 added (TacticChain tag). ED013 added (chain_includes edge). 3 vertices + 25 edges loaded.                                     | AI + K.Smirnov     |
-| 1.9     | Mar 6, 2026  | TA011 added (MitrePlatform tag), ED003 has been edited. New indexes (idx_mitre_platform_any, idx_can_exec_on, idx_represents) added | AI + K.Smirnov     |
+| Version | Date         | Changes                                                                                                                                          | Author             |
+|---------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------------|--------------------|
+| 1.0     | Feb 16, 2026 | Initial version                                                                                                                                  | Konstantin Smirnov |
+| 1.6     | Feb 27, 2026 | Added runs_on, patterns_to edge types                                                                                                            | Konstantin Smirnov |
+| 1.7     | Mar 01, 2026 | TA001: added hash (string) and hash_valid (bool) properties. TA009 added (SystemState tag). SYS001 vertex created.                               | AI + K.Smirnov     |
+| 1.8     | Mar 4, 2026  | TA010 added (TacticChain tag). ED013 added (chain_includes edge). 3 vertices + 25 edges loaded.                                                  | AI + K.Smirnov     |
+| 1.9     | Mar 6, 2026  | TA011 added (MitrePlatform tag), ED003 has been edited, ED014 added. New indexes (idx_mitre_platform_any, idx_can_exec_on, idx_represents) added | AI + K.Smirnov     |
