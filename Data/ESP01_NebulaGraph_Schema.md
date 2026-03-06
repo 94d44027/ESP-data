@@ -1,6 +1,6 @@
 # ESP01 NebulaGraph 3.8 Schema - Complete Documentation
-**Version:** 1.8  
-**Created:** March 04, 2026  
+**Version:** 1.9  
+**Created:** March 06, 2026  
 **Prepared by:** Konstantin Smirnov
 **Space:** ESP01 (IT Infrastructure / MITRE ATT&CK Model)  
 **Source:** Full NebulaGraph Studio console, author's comments
@@ -192,6 +192,44 @@ CREATE TAG IF NOT EXISTS TacticChain(
 );
 ```
 
+### TA011: MitrePlatform
+
+#### Used for
+Represents the platform from MITRE ATT&CK to be an umbrella category for OS_Type (TAG004). There may be multiple versions of Windows, for instance, but they will be under the same MitrePlatform category to determine, which techniques may be executed in them (and in teh future) which Mitigations and which Detects and other controls can be applied.
+
+#### Tag properties
+| Field                | Type   | Null | Default | Comment                                                               |
+|----------------------|--------|------|---------|-----------------------------------------------------------------------|
+| platform_id          | string | NO   | _EMPTY_ | Same as VID, e.g. "PLTF001"                                           |
+| platfiorm_name       | string | NO   | _EMPTY_ | Human-readable name, e.g. "macOS"                                     |
+| platform_description | string | YES  | _EMPTY_ | Human-readable description, e.g. "macOS of any version"               |
+| comment              | string | YES  | _EMPTY_ | Any otehr meaningful information like "New versions, no Power stuff." |
+
+#### Notes
+
+As of now teh following platforms exist:
+- Containers
+- ESXi
+- IaaS
+- Identity Provider
+- Linux
+- Network Devices
+- Office Suite
+- PRE
+- SaaS
+- Windows
+- macOS
+
+#### CREATE TAG statement
+```nGQL
+CREATE tag IF NOT EXISTS MitrePlatform (
+   platform_id string NOT NULL COMMENT "Same as VID, e.g. PLTF001", 
+   platform_name string NOT NULL COMMENT "Human-readable name, e.g. macOS", 
+   platform_description string NULL COMMENT "Human-readable description, e.g. macOS of any version", 
+   comment string NULL COMMENT "Any other meaniungful information.")  
+   COMMENT = "Represents the platform from MITRE ATT&CK to be an umbrella category for OS_Type"
+```
+
 ## ED: Edges
 Relationships for network topology, asset types, OS, how mitigation applied to assets, and relationships between tactics, techniques, subtechniques, and mitigations.
 
@@ -228,15 +266,18 @@ None of the fields are used so far.
 
 ### ED003: can_be_executed_on
 #### Used for
-So far is not used.
+Used to establish a relationship between Mitre Technique and Mitre Platform (if a technique/subtechnique can be executed on a platform,  tMitreTechnique --can_be_executed_on--> MitrePlatform). Is used to link Asset's relation, CMDB-like OS_Type to MitrePlatform to tMiterMitigation, answering teh question - if this Mitre technque/subtechnique can be executed on this particular asset.
 #### Edge properties
-No properties.
+No properties (pure relationship edge).
+
+> Note 1: has cardinality many-to-many (a technique/subtechnique can be executed on multiple platforms; a platform is subject to many techniques/subtechniques). 
+> Note 2: subtechniques not necessarily inherit relations to platforms from their parent techniques. May have different sets of `can_be_executed_on` relationships. 
 
 ### ED004: defines_state
 #### Used for 
 This relationship is used to link MITRE tactic (tMitreTactic) and MITRE technique/subtechnique (tMitreTechnique) to a state (pattern) that they both form for automating the transitions between one Tactic/Technique to another Tactic/Technique.
 #### Edge properties
-No properties.
+No properties (pure relationship edge).
 
 
 ### ED005: has_subtechnique
@@ -360,6 +401,15 @@ CREATE EDGE IF NOT EXISTS chain_includes();
 #### Notes
 No edge index is required for the initial dataset (3 chains × ~8 tactics = 25 edges). If additional chain types are added in the future, an index may be considered.
 
+### ED0014: represents
+#### USed for
+This is to show relationship from OS_Type to MitrePlatform. (OS_Type --represents--> MitrePlatform).
+One OS_Type can represent exactly one MitrePlatform in most cases (e.g., “Windows 11” → PLTF010), but some OS types could conceivably map to multiple platforms.
+
+#### Edge properties
+No properties (pure structural edge).
+
+
 
 
 
@@ -390,3 +440,4 @@ No edge index is required for the initial dataset (3 chains × ~8 tactics = 25 e
 | 1.6     | Feb 27, 2026 | Added runs_on, patterns_to edge types                                                                              | Konstantin Smirnov |
 | 1.7     | Mar 01, 2026 | TA001: added hash (string) and hash_valid (bool) properties. TA009 added (SystemState tag). SYS001 vertex created. | AI + K.Smirnov     |
 | 1.8     | Mar 4, 2026  | TA010 added (TacticChain tag). ED013 added (chain_includes edge). 3 vertices + 25 edges loaded.                    | AI + K.Smirnov     |
+| 1.9     | Mar 6, 2026  | TA011 added (MitrePlatform tag), ED003 has been edited.                                                            | AI + K.Smirnov     |
