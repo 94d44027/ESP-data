@@ -931,6 +931,14 @@ The following capabilities are anticipated but out of scope for v1.0:
 | ALG-REQ-051 | —       | (computation rule)                          |
 | ALG-REQ-052 | —       | (query template, future ALG-REQ-020)        |
 | ALG-REQ-053 | —       | (caching strategy)                          |
+| ALG-REQ-060 | —       | (computation rule, internal to TTB)         |
+| ALG-REQ-061 | —       | (boundary conditions / test spec)           |
+| ALG-REQ-062 | —       | (precondition, OS filtering)                |
+| ALG-REQ-063 | —       | (rule, Active flag handling)                |
+| ALG-REQ-064 | —       | (reference query, internal to TTB)          |
+| ALG-REQ-065 | —       | (output contract, internal to TTB)          |
+| ALG-REQ-066 | —       | (relationship to ALG-REQ-052)               |
+
 
 ### 8.2 ALG-REQ to UI-Requirements
 
