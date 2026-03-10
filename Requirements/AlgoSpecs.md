@@ -1,7 +1,7 @@
 # Algorithm Requirements Specification (ALGO)
 ## ESP PoC — TTA/TTB Path Calculation and related things
 
-**Version:** 1.4  
+**Version:** 1.5  
 **Date:** March 10, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI  
 **Project:** ESP PoC for Nebula Graph  
@@ -46,19 +46,22 @@ All requirements in this document use the prefix `ALG-REQ-` followed by a three-
 
 ## 2. Definitions
 
-| Term               | Definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **TTA**            | Time To Attack — the cumulative time from initial access to the beginning of actions on objective, computed as the sum of TTB along a path                                                                                                                                                                                                                                                                                                                                             |
-| **TTB**            | Time To Bypass — the time interval to traverse (bypass) a single host; stored as `Asset.TTB` (int32, default 10)                                                                                                                                                                                                                                                                                                                                                                       |
-| **TTT**            | Time to execuTe a Technique — time interval (float, in hours) required to execute a technique/subtechnique on a particular asset, considering mitigations applied to that asset and their maturity. TTT is computed per (asset, technique) pair and is consumed by the TTB calculation (ALG-REQ-060). The value ranges from `execution_min` (no mitigations possible or none applied and active) to `execution_max` (all possible mitigations applied and active at maximum maturity). |
-| **Path**           | An ordered sequence of Asset nodes connected by directed `connects_to` edges, from an entry point to a target, with no repeated nodes                                                                                                                                                                                                                                                                                                                                                  |
-| **Hop**            | A single `connects_to` edge traversal between two adjacent nodes in a path                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **Entry Point**    | An Asset where `is_entrance == true`; represents the attacker's starting position                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **Target**         | An Asset where `is_target == true`; represents the objective the attacker aims to reach                                                                                                                                                                                                                                                                                                                                                                                                |
-| **Path ID**        | Ephemeral sequential identifier (e.g. P00001) assigned to each calculated path within a single session; not persisted in the database                                                                                                                                                                                                                                                                                                                                                  |
-| **Mitigation**     | A MITRE ATT&CK mitigation (`tMitreMitigation`) linked to an Asset via `applied_to` edge, potentially modifying the effective TTB                                                                                                                                                                                                                                                                                                                                                       |
-| **Tactic Chain**   | An ordered list of MITRE ATT&CK tactic IDs that an attacker executes on a node, determined by the node's position in the attack path. Defined in `chains.json` (ALG-REQ-050).                                                                                                                                                                                                                                                                                                          |
-| **Chain Position** | The role of an asset within a specific attack path: **Entrance** (first node, N₀), **Intermediate** (middle nodes, N₁..Nₖ₋₁), or **Target** (last node, Nₖ). A single asset may hold different positions in different paths.                                                                                                                                                                                                                                                           |
+| Term                   | Definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+|------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **TTA**                | Time To Attack — the cumulative time from initial access to the beginning of actions on objective, computed as the sum of TTB along a path                                                                                                                                                                                                                                                                                                                                             |
+| **TTB**                | Time To Bypass — the calculated time interval (float, in hours) to traverse (bypass) a single host, computed as the sum of Orientation Time plus, for each tactic in the applicable tactic chain, the Switchover Time and the TTT of the fastest technique. Stored as `Asset.TTB` (TA001) for the intermediate chain position; computed on-the-fly for entrance/target positions (ALG-REQ-053). Supersedes the previous definition (static stored value).                              |
+| **TTT**                | Time to execuTe a Technique — time interval (float, in hours) required to execute a technique/subtechnique on a particular asset, considering mitigations applied to that asset and their maturity. TTT is computed per (asset, technique) pair and is consumed by the TTB calculation (ALG-REQ-060). The value ranges from `execution_min` (no mitigations possible or none applied and active) to `execution_max` (all possible mitigations applied and active at maximum maturity). |
+| **Path**               | An ordered sequence of Asset nodes connected by directed `connects_to` edges, from an entry point to a target, with no repeated nodes                                                                                                                                                                                                                                                                                                                                                  |
+| **Hop**                | A single `connects_to` edge traversal between two adjacent nodes in a path                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Entry Point**        | An Asset where `is_entrance == true`; represents the attacker's starting position                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Target**             | An Asset where `is_target == true`; represents the objective the attacker aims to reach                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Path ID**            | Ephemeral sequential identifier (e.g. P00001) assigned to each calculated path within a single session; not persisted in the database                                                                                                                                                                                                                                                                                                                                                  |
+| **Mitigation**         | A MITRE ATT&CK mitigation (`tMitreMitigation`) linked to an Asset via `applied_to` edge, potentially modifying the effective TTB                                                                                                                                                                                                                                                                                                                                                       |
+| **Tactic Chain**       | An ordered list of MITRE ATT&CK tactic IDs that an attacker executes on a node, determined by the node's position in the attack path. Defined in `chains.json` (ALG-REQ-050).                                                                                                                                                                                                                                                                                                          |
+| **Chain Position**     | The role of an asset within a specific attack path: **Entrance** (first node, N₀), **Intermediate** (middle nodes, N₁..Nₖ₋₁), or **Target** (last node, Nₖ). A single asset may hold different positions in different paths.                                                                                                                                                                                                                                                           |
+| **Orientation Time**   | A configurable parameter (float, default 0.25 hours / 15 minutes) representing the time an attacker spends on initial reconnaissance of a host before executing techniques. Added once per TTB calculation. See ALG-REQ-071.                                                                                                                                                                                                                                                           |
+| **Switchover Time**    | A configurable parameter (float, default 0.1667 hours / 10 minutes) representing the overhead time an attacker incurs when transitioning between tactics on the same host. Added once per tactic iteration in the TTB loop. See ALG-REQ-072.                                                                                                                                                                                                                                           |
+| **Priority Tolerance** | A configurable parameter (int, default 1) defining how many priority levels below the maximum are included when filtering techniques by priority. A value of 0 means only the highest-priority techniques are selected; a value of 1 includes the top two priority levels. See ALG-REQ-075.                                                                                                                                                                                            |
 
 
 ---
@@ -305,7 +308,7 @@ The purpose is to verify the end-to-end hash invalidation, position-aware recalc
 
 Amended in: v1.2 — stub accepts tactic chain parameter. v1.3 — parameter changed from tacticChain []string to chainVID string; count derived from GrDB chain_includes edges.
 
-
+> **Superseded in v1.5:** This stub is replaced by the full TTB calculation algorithm defined in ALG-REQ-070. All references to the stub in ALG-REQ-045 and ALG-REQ-046 SHALL be updated in a subsequent coordinated release to reference ALG-REQ-070 instead. Until that update, the stub remains the active implementation in the Go code, but the algorithm defined in ALG-REQ-070 is the normative specification.
 
 ### ALG-REQ-045: Bulk TTB Recalculation
 
@@ -593,23 +596,17 @@ The system SHALL use a split caching strategy for TTB values based on chain posi
 
 > **Status:** This section is a placeholder for future algorithmic requirements. The requirements below are drafts to be refined as the mitigation-aware path calculation is developed.
 
-### ALG-REQ-020: Mitigation-Aware TTA (Placeholder)
+### ALG-REQ-020: Mitigation-Aware TTA (Superseded)
 
-_Reserved for: How applied mitigations (via `applied_to` edges) modify the effective TTB of an asset when computing TTA._
+_This placeholder is superseded by ALG-REQ-070 (TTB Calculation Algorithm) and its sub-requirements ALG-REQ-071–080 in Section 5B. Mitigations affect TTA through the TTT sub-calculation (ALG-REQ-060) invoked within the TTB loop._
 
-Key questions to address:
-- Does a mitigation increase TTB (making the host harder to bypass)?
-- How does Maturity (25/50/80/100) scale the mitigation effect?
-- How does Active/Disabled status affect the calculation?
-- Are multiple mitigations on the same asset additive, multiplicative, or capped?
+### ALG-REQ-021: Mitigation Maturity Weighting (Superseded)
 
-### ALG-REQ-021: Mitigation Maturity Weighting (Placeholder)
+_This placeholder is superseded by ALG-REQ-060 (TTT Definition and Formula) in Section 5A, which defines how Maturity values (25, 50, 80, 100) are normalised and applied within the TTT interpolation formula._
 
-_Reserved for: The formula or lookup table that maps Maturity values (25, 50, 80, 100) to their effect on TTB._
+### ALG-REQ-022: Recalculation Trigger (Superseded)
 
-### ALG-REQ-022: Recalculation Trigger (Placeholder)
-
-_Reserved for: When and how TTA is recalculated after mitigations are added, modified, or removed._
+_This placeholder is superseded by the existing hash invalidation system (ALG-REQ-040–043) and the bulk/path-scoped recalculation flows (ALG-REQ-045/046). The TTB calculation algorithm (ALG-REQ-070) defines the computation itself; recalculation triggers remain as previously defined._
 
 ---
 
@@ -851,6 +848,385 @@ For the PoC, option **(a)** is recommended for clarity and debuggability. Option
 ---
 
 
+## Section 5B. TTB Calculation — Time To Bypass
+
+### ALG-REQ-070: TTB Calculation Algorithm
+
+TTB (Time To Bypass) for a given `(asset, chain)` pair SHALL be computed by iterating through the tactics in the specified tactic chain and, for each tactic, selecting the fastest applicable technique. The algorithm is a sequential loop that models the attacker's progression through MITRE ATT&CK tactics on a single host.
+
+**Inputs:**
+- `assetId` — VID of the Asset vertex being evaluated
+- `chainVid` — VID of the TacticChain vertex (`"CHAIN_ENTRANCE"`, `"CHAIN_INTERMEDIATE"`, or `"CHAIN_TARGET"` — per ALG-REQ-050/051)
+- `orientationTime` — Orientation Time parameter (ALG-REQ-071)
+- `switchoverTime` — Switchover Time parameter (ALG-REQ-072)
+- `priorityTolerance` — Priority Tolerance parameter (ALG-REQ-075)
+
+**Output:**
+- `TTB` — float, total Time To Bypass in the same units as TTT (hours in the current dataset)
+- `log` — ordered list of `(tactic_id, technique_id, TTT)` tuples representing the attacker's chosen path through the tactic chain (ALG-REQ-079)
+
+**Algorithm (pseudocode):**
+
+```text
+function computeTTB(assetId, chainVid, orientationTime, switchoverTime, priorityTolerance):
+    tactics = getOrderedTactics(chainVid)          // ALG-REQ-050, ordered by chain_includes rank
+    TTB = orientationTime                           // ALG-REQ-071
+    log = []
+    previousTactic = NULL
+    fastestTechnique = NULL
+
+    for i = 0 to len(tactics) - 1:
+        currentTactic = tactics[i]
+
+        // Step 1: Select candidate techniques
+        if i == 0:
+            // First tactic: select all techniques for this tactic applicable to asset's OS
+            candidates = selectFirstTacticTechniques(assetId, currentTactic)    // ALG-REQ-073
+        else:
+            // Subsequent tactics: select via pattern transition from previous state
+            candidates = selectPatternTechniques(previousTactic, fastestTechnique, currentTactic)  // ALG-REQ-076
+            // Apply OS filter to pattern-derived candidates
+            candidates = filterByOS(candidates, assetId)                        // ALG-REQ-062
+
+        // Step 2: Vulnerability filter
+        if asset.has_vulnerability == true:
+            vulnCandidates = filter(candidates, WHERE rcelpe == true)           // ALG-REQ-074
+            if len(vulnCandidates) > 0:
+                candidates = vulnCandidates
+            // If no rcelpe techniques exist, fall through with unfiltered candidates
+        
+        // Step 3: Priority filter
+        candidates = filterByPriority(candidates, priorityTolerance)            // ALG-REQ-075
+
+        // Step 4: Empty set guard
+        if len(candidates) == 0:
+            // ALG-REQ-080: no techniques available for this tactic
+            log.append((currentTactic, NULL, 0))
+            previousTactic = currentTactic
+            fastestTechnique = NULL
+            continue                                // Skip to next tactic
+
+        // Step 5: Compute TTT for each candidate
+        for each tech in candidates:
+            tech.TTT = computeTTT(assetId, tech.id)                             // ALG-REQ-060/064
+
+        // Step 6: Select fastest technique (minimum TTT)
+        fastestTechnique = selectFastest(candidates)                            // ALG-REQ-077
+
+        // Step 7: Accumulate TTB
+        TTB = TTB + switchoverTime + fastestTechnique.TTT                       // ALG-REQ-078
+
+        // Step 8: Log the result
+        log.append((currentTactic, fastestTechnique.id, fastestTechnique.TTT))  // ALG-REQ-079
+
+        previousTactic = currentTactic
+
+    return TTB, log
+```
+
+**Go function signature:**
+
+```go
+func computeTTB(assetId string, chainVid string, params TTBParams) (float64, []TTBLogEntry, error)
+```
+
+where `TTBParams` is a struct containing `OrientationTime`, `SwitchoverTime`, and `PriorityTolerance`.
+
+>Design note 1: The algorithm is implemented in the APP layer (Go code), not as a single GrDB query. The loop structure with conditional branching (vulnerability filter, pattern transitions, empty-set handling) is not expressible in nGQL. Individual steps (technique selection, TTT computation) use nGQL queries.
+
+>Design note 2: The algorithm supersedes the stub defined in ALG-REQ-044. The stub's function signature `computeTTBStub(currentTTB int, chainVID string) int` is replaced by the richer signature above. The return type changes from `int` to `float64` because TTT values are floats (execution_min/execution_max in TA008 are float).
+
+>Design note 3: The `log` output is critical for transparency. It records exactly which technique the attacker would use at each tactic step, enabling the operator to understand the TTB composition and identify which tactics/techniques are the weakest links.
+
+>Design note 4: The algorithm does NOT modify the asset's `has_vulnerability` flag or any graph data. It is a pure read-only computation that produces a TTB value and an audit log.
+
+
+### ALG-REQ-071: Orientation Time Parameter
+
+The TTB calculation SHALL begin by initialising the TTB accumulator with the **Orientation Time** — a configurable parameter representing the time an attacker spends on initial reconnaissance of a host before executing any techniques.
+
+**Default value:** 0.25 hours (15 minutes)  
+**Type:** float  
+**Valid range:** 0.0 – 24.0 hours (0 to 1440 minutes)  
+**Storage:** APP-layer parameter, passed to `computeTTB()`. In the PoC, this SHALL be an editable field in the Path Inspector UI panel.
+
+The Orientation Time is added **once** per TTB calculation (not once per tactic). It represents a fixed overhead regardless of the number of tactics in the chain.
+
+>Design note 1: The value should be stateful — persisted in `static/state.js` or equivalent client-side storage for the PoC. A future version may store it in a dedicated configuration table in the database or a separate relational store.
+
+>Design note 2: This parameter affects ALL TTB calculations equally (entrance, intermediate, target). A future enhancement could differentiate orientation time by chain position (e.g., the attacker may spend more time orienting on initial access vs. lateral movement). For the PoC, a single global value is sufficient.
+
+>Design note 3: Setting Orientation Time to 0 effectively removes the reconnaissance overhead — useful for modelling scenarios where the attacker has prior knowledge of the target environment.
+
+>Design note 4: Further storage decisions may be influenced by architectural changes - i.e. if for various reasons (including making the stateful application) parameters like Orientation Time will be stored in the auxiliary relational database like MariaDB.
+
+
+### ALG-REQ-072: Switchover Time Parameter
+
+>Note For each iteration between techniques in the TTB loop, the system SHALL add a **Switchover Time** — a configurable parameter representing the overhead time an attacker incurs when transitioning between techniques across tactic steps. (The parameter has no relationship to the tactic itself - from that parameter's standpoint it exists only to designate the switchover between techniques/subtechniques, whether they belong to the same tactic or not. We simply add this after each TTT calculation, except this is the last technique). So,this parameter is added only for transitions and not after the last technique. I.e. if we have two tactics TA1 and TA2 with the respectful techniques T001, T002, T003 (for TA1) and T004 and T005 (for TA2),  and  T002 and T005 are the fastest for their respectful tactics the TTB calculation should follow this logic (see ALG-REQ-078 for more details):
+ ``` example
+ TTB = orientation  + TTT(T002) + switchover + TTT(T005)
+```
+>This (switchover between techniques rather than tactics) is done so (theoretically) we will be able to use two techniques per tactic if the need arises. Not now, at any rate.
+
+**Default value:** 0.1667 hours (10 minutes)  
+**Type:** float  
+**Valid range:** 0.0 – 24.0 hours (0 to 1440 minutes)  
+**Storage:** APP-layer parameter, passed to `computeTTB()`. In the PoC, this SHALL be an editable field in the Path Inspector UI panel.
+
+The Switchover Time is added **once per technique** in the chain, except for the last one. For a chain with total `K` techniques/subtechniques, the total switchover contribution is `(K-1) × switchoverTime`.
+
+>Design note 1: Same statefulness requirements as Orientation Time (ALG-REQ-071).
+
+>Design note 2: The Switchover Time models the attacker's overhead when pivoting from one technique to the next, whether they (techniques/subtechniques) have the same parent tactic or not.
+
+>Design note 3: The Switchover Time is added even when the empty-set guard (ALG-REQ-080) triggers. This is a design choice: the attacker still spends time attempting to find a technique, even if none is available. (An alternative design would skip Switchover Time for empty tactics; this can be revisited based on PoC evaluation).
+
+
+### ALG-REQ-073: First-Tactic Technique Selection
+
+For the **first tactic** in the chain (loop iteration `i == 0`), the candidate technique set SHALL be obtained by selecting all techniques/subtechniques that:
+
+1. Belong to the current tactic (via `part_of` edge, SCHEMA ED010)
+2. Are applicable to the asset's operating system platform (via `Asset → runs_on → OS_Type → represents → MitrePlatform ← can_be_executed_on ← tMitreTechnique`, per ALG-REQ-062)
+
+This is the "initial population" of techniques — no pattern-based filtering applies because there is no previous tactic/technique state.
+
+**Reference nGQL query:**
+
+```nGQL
+MATCH (a:Asset)-[:runs_on]->(os:OS_Type)-[:represents]->(p:MitrePlatform)
+      <-[:can_be_executed_on]-(t:tMitreTechnique)-[:part_of]->(tac:tMitreTactic)
+WHERE id(a) == "{assetId}" AND id(tac) == "{tacticId}"
+WITH collect({
+  tid: t.tMitreTechnique.Technique_ID,
+  tname: t.tMitreTechnique.Technique_Name,
+  pri: t.tMitreTechnique.priority,
+  rcelpe: t.tMitreTechnique.rcelpe,
+  plat: p.MitrePlatform.platform_name
+}) AS rows
+UNWIND rows AS r
+RETURN DISTINCT r.tid AS technique_id,
+       r.tname AS technique_name,
+       r.pri AS technique_priority,
+       r.rcelpe AS vuln_applicable
+ORDER BY technique_priority DESC, technique_id;
+```
+
+**Parameters:**
+- `{assetId}` — VID of the Asset vertex (e.g., `"A00014"`)
+- `{tacticId}` — VID of the tMitreTactic vertex (e.g., `"TA0002"`)
+
+**nGQL notes:**
+
+1. The query combines the OS platform filter (ALG-REQ-062) with the tactic membership check (`part_of`) in a single traversal. The `collect() → UNWIND → DISTINCT` pattern deduplicates techniques that match multiple platforms for the same asset (e.g., a technique applicable to both "Windows" and "Linux" when the asset's OS maps to one of them).
+
+2. The query returns `rcelpe` for subsequent vulnerability filtering (ALG-REQ-074) and `priority` for priority filtering (ALG-REQ-075). These filters are applied in the APP layer, not in the query, to keep the query simple and the filter logic explicit.
+
+>Design note 1: This query is functionally similar to Query A from the TTB flow PDF, but simplified: priority filtering is deferred to ALG-REQ-075 rather than embedded in the query. This separation of concerns makes each step independently testable.
+>Design note 2: The filtering mentioned in step 2 may be later turned into a database (GrDB) query. 
+
+
+### ALG-REQ-074: Vulnerability Filtering
+
+After technique selection (ALG-REQ-073 or ALG-REQ-076) and before priority filtering (ALG-REQ-075), the system SHALL apply a **vulnerability filter** when the asset has a known critical vulnerability:
+
+**Rule:**
+- If `Asset.has_vulnerability == true` (SCHEMA TA001):
+   - Filter the candidate set to include **only** techniques where `tMitreTechnique.rcelpe == true` (SCHEMA TA008)
+   - If the filtered set is **non-empty**, it becomes the new candidate set
+   - If the filtered set is **empty** (no vulnerability-exploiting techniques for this tactic), retain the **unfiltered** candidate set — the attacker falls back to non-vulnerability-specific techniques
+- If `Asset.has_vulnerability == false`:
+   - No filtering is applied; the full candidate set proceeds to priority filtering
+
+**Rationale:** An attacker with knowledge of a critical vulnerability will preferentially use techniques that exploit it (`rcelpe == true`), as these are expected to have lower execution times. The fallback to the unfiltered set ensures that the presence of a vulnerability never *removes* attack options — it only *narrows* the preferred set.
+
+>Design note 1: The `rcelpe` field name stands for "recipe" (a technique that has a known "recipe" for exploiting a vulnerability on the host). The field was introduced in TA008 and referenced in ALG-REQ-052 design note 2.
+
+>Design note 2: The vulnerability filter is applied **before** priority filtering. This ordering matters: a high-priority non-vulnerability technique might be filtered out in favour of a lower-priority vulnerability-specific technique. This models the attacker's preference for exploiting known weaknesses even if other, ostensibly more common, techniques exist.
+
+>Design note 3: The has_vulnerability flag is a binary signal — either a critical vulnerability exists or it doesn't. A future enhancement could introduce vulnerability severity levels or specific CVE mappings, but this is out of scope for the PoC.
+
+
+### ALG-REQ-075: Priority Selection and Tolerance
+
+After vulnerability filtering (ALG-REQ-074), the candidate technique set SHALL be filtered by **priority** using the following rule:
+
+1. Determine the **maximum priority** value (`max_pri`) in the current candidate set. Priority values range from 1 (lowest) to 4 (highest) — per SCHEMA TA008.
+2. Retain only techniques where `priority >= max_pri - priorityTolerance`
+
+**Priority Tolerance parameter:**
+- **Default value:** 1
+- **Type:** int
+- **Valid range:** 0 – 3
+- **Storage:** APP-layer parameter, passed to `computeTTB()`. In the PoC, this MAY be an editable field in the Path Inspector UI panel or hardcoded to the default value.
+
+**Effect of tolerance values:**
+
+| Tolerance | Effect                           | Example (if max_pri=4)               |
+|-----------|----------------------------------|--------------------------------------|
+| 0         | Only highest-priority techniques | priority >= 4 (only priority 4)      |
+| 1         | Top two priority levels          | priority >= 3 (priority 3 and 4)     |
+| 2         | Top three priority levels        | priority >= 2 (priority 2, 3, and 4) |
+| 3         | All techniques (no filtering)    | priority >= 1 (all)                  |
+
+**Rationale:** An attacker generally prefers the most commonly used (highest-priority) techniques, but may also consider less common techniques if they offer faster execution. The tolerance parameter controls the trade-off between realism (attacker sticks to known methods) and optimality (attacker considers all options).
+
+>Design note 1: The PDF's Query A uses `WHERE r.pri >= max_pri - 1 AND r.pri >= 1`, which corresponds to tolerance=1 with a floor at priority 1. The `AND r.pri >= 1` guard is implicit in the valid range (priority is int8 with minimum 1 in TA008), so it need not be added explicitly.
+
+>Design note 2: For the PoC, hardcoding tolerance=1 is acceptable. Exposing it as a UI parameter adds flexibility but is not critical for the initial implementation.
+
+
+### ALG-REQ-076: Pattern-Based Technique Selection
+
+For **subsequent tactics** in the chain (loop iteration `i > 0`), the candidate technique set SHALL be obtained via the **pattern transition** mechanism using `tMitreState` vertices and `patterns_to` edges:
+
+**Algorithm:**
+
+1. Construct the state ID from the previous tactic and the fastest technique: `stateId = "{previousTacticId}|{fastestTechniqueId}"` (e.g., `"TA0002|T1059"`)
+2. Find the `tMitreState` vertex with VID matching `stateId` (SCHEMA TA006)
+3. Traverse `patterns_to` edges from `tMitreState` to find destination states (SCHEMA ED012)
+4. From the destination states, extract only those whose tactic component matches `currentTacticId`
+5. Extract the technique IDs from the matching destination states
+
+**Reference nGQL query:**
+
+```nGQL
+MATCH (src_state:tMitreState)-[:patterns_to]->(dst_state:tMitreState)
+WHERE id(src_state) == "{previousTacticId}|{fastestTechniqueId}"
+WITH dst_state.tMitreState.state_id AS dst_id
+WITH dst_id,
+     split(dst_id, "|") AS parts
+WHERE size(parts) == 2 AND parts[0] == "{currentTacticId}"
+WITH parts[1] AS technique_vid
+MATCH (t:tMitreTechnique)
+WHERE id(t) == technique_vid
+RETURN t.tMitreTechnique.Technique_ID AS technique_id,
+       t.tMitreTechnique.Technique_Name AS technique_name,
+       t.tMitreTechnique.priority AS technique_priority,
+       t.tMitreTechnique.rcelpe AS vuln_applicable
+ORDER BY technique_priority DESC, technique_id;
+```
+
+**Parameters:**
+- `{previousTacticId}` — Tactic_ID of the previous tactic (e.g., `"TA0002"`)
+- `{fastestTechniqueId}` — Technique_ID of the fastest technique from the previous tactic (e.g., `"T1059"`)
+- `{currentTacticId}` — Tactic_ID of the current tactic being evaluated (e.g., `"TA0003"`)
+
+**Semantics:** The `tMitreState` graph encodes observed attack patterns — which (tactic, technique) combinations transition to which other combinations. By following `patterns_to` edges, the algorithm respects realistic attack sequencing rather than assuming any technique can follow any other.
+
+After obtaining the pattern-derived candidates, the OS filter (ALG-REQ-062) is applied because pattern transitions do not guarantee OS compatibility.
+
+>Design note 1: The `patterns_to` edges are populated externally (SCHEMA ED012 notes). The quality of the TTB calculation is directly dependent on the completeness and accuracy of these pattern edges. Missing patterns may result in empty candidate sets (handled by ALG-REQ-080).
+
+>Design note 2: The `split()` function in NebulaGraph 3.8 returns a list of strings. The `size(parts) == 2` guard protects against malformed state IDs.
+
+>Design note 3: If `fastestTechnique` from the previous iteration is NULL (because ALG-REQ-080 triggered — no techniques were available), the pattern transition cannot be computed. In this case, the system SHALL fall back to the first-tactic selection method (ALG-REQ-073) for the current tactic. This ensures the loop can continue even after an empty-set tactic.
+
+>Design note 4: The `patterns_to` edge has a `probability` property (SCHEMA ED012) that is not currently used. A future enhancement could weight technique selection by transition probability rather than purely by TTT speed.
+
+
+### ALG-REQ-077: Fastest Technique Selection
+
+After all filtering steps (OS, vulnerability, priority) and TTT computation for each remaining candidate, the system SHALL select the **fastest technique** — the candidate with the **minimum TTT** value.
+
+**Rule:** `fastestTechnique = argmin(TTT)` over the filtered candidate set.
+
+**Tie-breaking:** If multiple techniques share the same minimum TTT value, the system SHALL select the technique with the **highest priority** value. If still tied, the technique with the **lexicographically smallest Technique_ID** SHALL be chosen. This ensures deterministic results.
+
+**The selected fastest technique serves two purposes:**
+1. Its TTT is added to the TTB accumulator (ALG-REQ-078)
+2. Its Technique_ID is used to construct the pattern state for the next tactic iteration (ALG-REQ-076)
+
+>Design note: The "fastest technique" models the attacker's optimal behaviour — a rational attacker will choose the technique that achieves the tactic objective in the least time. This is a worst-case (for the defender) assumption.
+
+
+### ALG-REQ-078: TTB Accumulation Formula
+
+The TTB value SHALL be accumulated across tactic iterations using the following formula:
+
+**Initialisation:**
+
+    TTB = orientationTime
+
+**Per-tactic iteration (for each tactic `k` in the chain where a technique was selected):**
+
+    TTB = TTB + switchoverTime + TTT_k
+
+Where:
+- `switchoverTime` = Switchover Time parameter (ALG-REQ-072)
+- `TTT_k` = TTT of the fastest technique for tactic `k` (ALG-REQ-077)
+
+**Expanded formula for a chain with `K` tactics (all producing techniques):**
+
+    TTB = orientationTime + Σ (switchoverTime + TTT_k) for k = 0..K-1
+        = orientationTime + K × switchoverTime + Σ TTT_k for k = 0..K-1
+
+**For tactics where the empty-set guard triggered (ALG-REQ-080):**
+
+The Switchover Time is **still added** (the attacker spent time attempting), but no TTT is added (no technique was executed):
+
+    TTB = TTB + switchoverTime + 0
+
+**Return type:** float (same units as TTT — hours in the current dataset).
+
+>Design note 1: The old `Asset.TTB` was int32 (SCHEMA TA001, default 10). The new TTB is float. This requires a schema change to `Asset.TTB` type — **however**, this is deferred to a future SCHEMA update to minimise simultaneous changes. In the interim, the APP layer SHALL round the computed float TTB to int32 when storing to `Asset.TTB`. The full-precision float is used in memory for TTA computation.
+
+>Design note 2: For a typical intermediate chain (7 tactics), the minimum possible TTB is: `0.25 + 7 × (0.1667 + 0.1667) ≈ 2.58 hours`. The maximum possible TTB depends on mitigation coverage and execution_max values. This is a significant increase from the previous default TTB of 10 (which had no defined units).
+
+
+
+### ALG-REQ-079: TTB Calculation Log
+
+The TTB calculation SHALL produce an ordered log (audit trail) recording the attacker's simulated progression through the tactic chain. Each entry in the log SHALL contain:
+
+| Field              | Type           | Description                                                                        |
+|--------------------|----------------|------------------------------------------------------------------------------------|
+| `tactic_id`        | string         | Tactic_ID of the chain step (e.g., `"TA0002"`)                                     |
+| `tactic_name`      | string         | Human-readable tactic name                                                         |
+| `technique_id`     | string or null | Technique_ID of the fastest technique selected, or null if empty-set (ALG-REQ-080) |
+| `technique_name`   | string or null | Human-readable technique name, or null                                             |
+| `TTT`              | float          | Computed TTT for the selected technique, or 0.0 if empty-set                       |
+| `candidates_count` | int            | Number of candidate techniques after all filtering, before TTT computation         |
+
+The log is ordered by tactic chain sequence (matching the chain_includes edge ranks).
+
+**Purpose:** The log enables:
+- Debugging TTB calculations during development
+- Understanding which techniques drive the TTB value (weakest links)
+- Future UI visualisation of the attacker's path through tactics on a single host
+- Validation that pattern transitions are working correctly
+
+**Storage:** The log is returned as part of the TTB computation result. For stored (intermediate) TTB values, the log is **not persisted** in the database — it is ephemeral. A future enhancement MAY persist logs for reporting purposes.
+
+>Design note: The `candidates_count` field helps identify tactics where filtering was too aggressive (count = 1, single technique dominates) vs. too permissive (count = 50, many options). This informs tuning of the priority tolerance parameter.
+
+
+### ALG-REQ-080: Empty Technique Set Handling
+
+If at any point in the TTB loop the candidate technique set becomes empty (after OS filtering, vulnerability filtering, and priority filtering), the system SHALL handle the situation as follows:
+
+**For pattern-based selection (ALG-REQ-076):**
+1. If the pattern transition yields no candidates for the current tactic, **fall back** to first-tactic selection (ALG-REQ-073) — i.e., select all techniques for the current tactic that match the asset's OS, ignoring pattern constraints.
+2. Apply vulnerability filtering (ALG-REQ-074) and priority filtering (ALG-REQ-075) to the fallback set.
+
+**If the set is STILL empty after fallback:**
+1. Log the empty tactic step with `technique_id = null` and `TTT = 0.0` (ALG-REQ-079).
+2. Add only `switchoverTime` to TTB (no TTT contribution) — per ALG-REQ-078.
+3. Set `fastestTechnique = NULL` for this iteration.
+4. Proceed to the next tactic. If the next tactic uses pattern-based selection (ALG-REQ-076), the NULL fastestTechnique triggers a fallback to first-tactic selection for that tactic as well (ALG-REQ-076 design note 3).
+
+**Rationale:** An empty technique set means the MITRE data does not contain applicable techniques for this tactic on this asset's platform, or the pattern graph has a gap. The attacker effectively "skips" this tactic. This is not an error — it reflects a limitation in the MITRE data coverage or pattern completeness. The algorithm continues rather than aborting.
+
+>Design note 1: In practice, empty technique sets are most likely to occur due to incomplete `patterns_to` edges (the pattern data is externally generated and may not cover all transitions). The fallback mechanism ensures robustness.
+
+>Design note 2: The empty-set event SHOULD be logged at warning level in the APP layer, as it may indicate data quality issues that should be addressed (if they can).
+
+>Design note 3: -it is that not all the techniques are observed so frequently that they can be reliably represented as patterns. 
+
+---
+
+
 ## 6. Edge Cases and Constraints
 
 ### ALG-REQ-030: No Path Exists
@@ -893,11 +1269,17 @@ The following capabilities are anticipated but out of scope for v1.0:
 - [ ] Path comparison (before/after mitigation changes)
 - [x] ~~TTB recalculation based on vulnerability presence (`has_vulnerability`)~~ — addressed in ALG-REQ-052 via `rcelpe` technique filter
 - [x] ~~Full TTT formula implementation (ALG-REQ-060–066) defining per-technique execution time considering mitigations~~ — addressed in v1.4
-- [ ] Full TTB formula implementation (ALG-REQ-020/021) integrating TTT results with tactic chain traversal, pattern transitions, priority selection, and orientation/switchover time parameters
+- [x] ~~Full TTB formula implementation (ALG-REQ-020/021) integrating TTT results with tactic chain traversal, pattern transitions, priority selection, and orientation/switchover time parameters~~ — addressed in v1.5 (ALG-REQ-070–080)
 - [ ] Embedded TTT computation within ALG-REQ-052 query for single-round-trip TTB calculation (ALG-REQ-066 option b)
 - [ ] Dynamic tactic chain configuration via database instead of `chains.json`
 - [ ] APP-layer TTB cache for entry/target positions (ALG-REQ-053 optional optimisation)
-
+- [ ] `Asset.TTB` schema type change from int32 to float (required for full-precision TTB storage; ALG-REQ-078 design note 1)
+- [ ] Update ALG-REQ-045/046 to reference ALG-REQ-070 instead of ALG-REQ-044 stub (coordinated SRS/UIS update)
+- [ ] Persist TTB calculation logs for reporting (ALG-REQ-079 future enhancement)
+- [ ] Weighted technique selection using `patterns_to.probability` (ALG-REQ-076 design note 4)
+- [ ] Position-differentiated Orientation Time (ALG-REQ-071 design note 2)
+- [ ] UI controls for Orientation Time, Switchover Time, and Priority Tolerance in Path Inspector (UIS update required)
+- [ ] Adding small relational database (like MariaDB) to keep configuration and calculation results in table format
 
 ---
 
@@ -938,6 +1320,17 @@ The following capabilities are anticipated but out of scope for v1.0:
 | ALG-REQ-064 | —       | (reference query, internal to TTB)          |
 | ALG-REQ-065 | —       | (output contract, internal to TTB)          |
 | ALG-REQ-066 | —       | (relationship to ALG-REQ-052)               |
+| ALG-REQ-070 | —       | (algorithm, replaces ALG-REQ-020/044)       |
+| ALG-REQ-071 | —       | (parameter definition)                      |
+| ALG-REQ-072 | —       | (parameter definition)                      |
+| ALG-REQ-073 | —       | (query, internal to TTB)                    |
+| ALG-REQ-074 | —       | (rule, vulnerability filtering)             |
+| ALG-REQ-075 | —       | (rule + parameter, priority filtering)      |
+| ALG-REQ-076 | —       | (query, pattern transitions)                |
+| ALG-REQ-077 | —       | (rule, fastest technique selection)         |
+| ALG-REQ-078 | —       | (computation rule, accumulation)            |
+| ALG-REQ-079 | —       | (output contract, audit log)                |
+| ALG-REQ-080 | —       | (edge case, empty set handling)             |
 
 
 ### 8.2 ALG-REQ to UI-Requirements
@@ -954,26 +1347,37 @@ The following capabilities are anticipated but out of scope for v1.0:
 
 ### 8.3 ALG-REQ to Schema
 
-| ALG-REQ     | Schema Reference                                                                       | Context                                                   |
-|-------------|----------------------------------------------------------------------------------------|-----------------------------------------------------------|
-| ALG-REQ-001 | ED005 (connects_to)                                                                    | Path traversal follows connects_to edges                  |
-| ALG-REQ-010 | TA001 (Asset.TTB)                                                                      | TTB property used for TTA summation                       |
-| ALG-REQ-020 | ED001 (applied_to), TA005                                                              | Mitigation impact via applied_to edge properties          |
-| ALG-REQ-040 | TA001 (Asset.hash, hash_valid)                                                         | Hash properties on Asset tag                              |
-| ALG-REQ-042 | TA001, ED001, ED006, ED011, TA004, TA002                                               | All hash input sources                                    |
-| ALG-REQ-043 | TA001, TA009                                                                           | Invalidation writes to Asset + SystemState                |
-| ALG-REQ-047 | TA009 (SystemState.merkle_root)                                                        | Merkle root stored in SystemState                         |
-| ALG-REQ-050 | **TA010** (TacticChain), **ED013** (chain_includes), TA007                             | Chain vertices + edges reference tMitreTactic vertices    |
-| ALG-REQ-051 | TA001 (Asset.is_entrance, is_target)                                                   | Distinguishes eligibility (property) from position (path) |
-| ALG-REQ-052 | **TA010**, **ED013**, TA008, TA007, TA005, ED010, ED009, ED001                         | Full chain → MITRE subgraph traversal for TTB             |
-| ALG-REQ-053 | TA001 (Asset.TTB, hash, hash_valid)                                                    | Caching uses existing hash infrastructure                 |
-| ALG-REQ-060 | TA008 (execution_min, execution_max), ED001 (Maturity, Active), ED009                  | TTT formula inputs                                        |
-| ALG-REQ-061 | TA008, ED001, ED009                                                                    | Boundary conditions reference same schema elements        |
-| ALG-REQ-062 | ED011 (runs_on), ED014 (represents), TA011 (MitrePlatform), ED003 (can_be_executed_on) | OS platform filtering traversal path                      |
-| ALG-REQ-063 | ED001 (applied_to.Active)                                                              | Active flag on applied_to edge                            |
-| ALG-REQ-064 | TA001, TA004, TA005, TA008, TA011, ED001, ED003, ED009, ED011, ED014                   | Full TTT query touches all MITRE subgraph elements        |
-| ALG-REQ-065 | TA008 (output fields sourced from technique properties)                                | Output contract reflects technique tag properties         |
-| ALG-REQ-066 | TA010, ED013 (via ALG-REQ-052 relationship)                                            | Links TTT into the TacticChain-based TTB framework        |
+| ALG-REQ     | Schema Reference                                                                                               | Context                                                   |
+|-------------|----------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|
+| ALG-REQ-001 | ED005 (connects_to)                                                                                            | Path traversal follows connects_to edges                  |
+| ALG-REQ-010 | TA001 (Asset.TTB)                                                                                              | TTB property used for TTA summation                       |
+| ALG-REQ-020 | ED001 (applied_to), TA005                                                                                      | Mitigation impact via applied_to edge properties          |
+| ALG-REQ-040 | TA001 (Asset.hash, hash_valid)                                                                                 | Hash properties on Asset tag                              |
+| ALG-REQ-042 | TA001, ED001, ED006, ED011, TA004, TA002                                                                       | All hash input sources                                    |
+| ALG-REQ-043 | TA001, TA009                                                                                                   | Invalidation writes to Asset + SystemState                |
+| ALG-REQ-047 | TA009 (SystemState.merkle_root)                                                                                | Merkle root stored in SystemState                         |
+| ALG-REQ-050 | **TA010** (TacticChain), **ED013** (chain_includes), TA007                                                     | Chain vertices + edges reference tMitreTactic vertices    |
+| ALG-REQ-051 | TA001 (Asset.is_entrance, is_target)                                                                           | Distinguishes eligibility (property) from position (path) |
+| ALG-REQ-052 | **TA010**, **ED013**, TA008, TA007, TA005, ED010, ED009, ED001                                                 | Full chain → MITRE subgraph traversal for TTB             |
+| ALG-REQ-053 | TA001 (Asset.TTB, hash, hash_valid)                                                                            | Caching uses existing hash infrastructure                 |
+| ALG-REQ-060 | TA008 (execution_min, execution_max), ED001 (Maturity, Active), ED009                                          | TTT formula inputs                                        |
+| ALG-REQ-061 | TA008, ED001, ED009                                                                                            | Boundary conditions reference same schema elements        |
+| ALG-REQ-062 | ED011 (runs_on), ED014 (represents), TA011 (MitrePlatform), ED003 (can_be_executed_on)                         | OS platform filtering traversal path                      |
+| ALG-REQ-063 | ED001 (applied_to.Active)                                                                                      | Active flag on applied_to edge                            |
+| ALG-REQ-064 | TA001, TA004, TA005, TA008, TA011, ED001, ED003, ED009, ED011, ED014                                           | Full TTT query touches all MITRE subgraph elements        |
+| ALG-REQ-065 | TA008 (output fields sourced from technique properties)                                                        | Output contract reflects technique tag properties         |
+| ALG-REQ-066 | TA010, ED013 (via ALG-REQ-052 relationship)                                                                    | Links TTT into the TacticChain-based TTB framework        |
+| ALG-REQ-070 | TA010 (TacticChain), ED013 (chain_includes), TA001 (Asset), TA008 (tMitreTechnique)                            | Master algorithm traverses chain and computes TTB         |
+| ALG-REQ-071 | —                                                                                                              | Parameter, no schema dependency                           |
+| ALG-REQ-072 | —                                                                                                              | Parameter, no schema dependency                           |
+| ALG-REQ-073 | ED010 (part_of), ED011 (runs_on), ED014 (represents), TA011 (MitrePlatform), ED003 (can_be_executed_on), TA008 | First-tactic technique selection query                    |
+| ALG-REQ-074 | TA001 (Asset.has_vulnerability), TA008 (tMitreTechnique.rcelpe)                                                | Vulnerability filter inputs                               |
+| ALG-REQ-075 | TA008 (tMitreTechnique.priority)                                                                               | Priority values from technique tag                        |
+| ALG-REQ-076 | TA006 (tMitreState), ED012 (patterns_to)                                                                       | Pattern transition traversal                              |
+| ALG-REQ-077 | —                                                                                                              | Selection rule, no direct schema dependency               |
+| ALG-REQ-078 | TA001 (Asset.TTB)                                                                                              | TTB value written back to Asset                           |
+| ALG-REQ-079 | —                                                                                                              | Log structure, no schema dependency                       |
+| ALG-REQ-080 | —                                                                                                              | Edge case handling, no schema dependency                  |
 
 ---
 
@@ -986,7 +1390,7 @@ The following capabilities are anticipated but out of scope for v1.0:
 | 1.2     | Mar 4, 2026 | KSmirnov | Added §4B: ALG-REQ-050–053 (tactic chains, position assignment, TTB query template, caching strategy). Amended ALG-REQ-001 (per-node query), ALG-REQ-010 (position-aware TTA formula), ALG-REQ-044 (stub accepts chain), ALG-REQ-045 (Regular_chain clarification), ALG-REQ-046 (entry/target computation steps). Cross-reference matrices updated. |
 | 1.3     | Mar 4, 2026 | KSmirnov | Moved tactic chains from chains.json to GrDB graph objects (TA010 TacticChain, ED013 chain_includes). Rewrote ALG-REQ-050 (chain definition), ALG-REQ-052 (TTB query — corrected nGQL syntax). Amended ALG-REQ-051 (VID mapping), ALG-REQ-044 (chain VID parameter). Cross-references updated for new schema elements. |
 | 1.4     | Mar 10, 2026 | KSmirnov | Added §5A: ALG-REQ-060–066 (TTT calculation formula, boundary conditions, OS platform filtering, Active/Inactive mitigation handling, reference nGQL query, output contract, relationship to ALG-REQ-052). TTT definition in §2 expanded. Schema cross-reference updated for SCHEMA v1.9 elements (TA011 MitrePlatform, ED014 represents, ED003 can_be_executed_on). Future extensions updated. |
-
+| 1.5 | Mar 10, 2026 | KSmirnov | Added §5B: ALG-REQ-070–080 (TTB calculation algorithm, orientation/switchover time parameters, first-tactic technique selection, vulnerability filtering, priority selection with tolerance, pattern-based technique transitions, fastest technique selection, TTB accumulation formula, calculation log, empty-set handling). TTB definition in §2 expanded; Orientation Time, Switchover Time, Priority Tolerance definitions added. ALG-REQ-020/021/022 marked as superseded. ALG-REQ-044 supersession notice added. Cross-reference matrices updated. Future extensions updated. |
 
 ---
 
