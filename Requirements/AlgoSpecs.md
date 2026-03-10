@@ -1,11 +1,11 @@
 # Algorithm Requirements Specification (ALGO)
 ## ESP PoC — TTA/TTB Path Calculation and related things
 
-**Version:** 1.3  
-**Date:** March 4, 2026  
+**Version:** 1.4  
+**Date:** March 10, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI  
 **Project:** ESP PoC for Nebula Graph  
-**Reference:** Derived from SRS, UIS, SCHEMA
+**Reference:** Derived from SRS, UIS, SCHEMA, TTB/TTT flows
 **Document code:** ALGO 
 
 ---
@@ -32,11 +32,11 @@ This specification does **not** cover:
 
 ### 1.3 Relationship to Other Documents
 
-| Document                             | Version | Relationship                                                                                                                  |
-|--------------------------------------|---------|-------------------------------------------------------------------------------------------------------------------------------|
-| Requirements.md (SRS)                | v1.12   | Parent document. Stubs REQ-029–032 reference this spec. API summary in Appendix C links here.                                 |
-| UI-Requirements.md  (UIR)            | v1.12   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                              |
-| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.8    | Defines Asset.TTB property (TA001), connects_to edges (ED005), applied_to edges (ED001) and other elements of database schema |
+| Document                             | Version | Relationship                                                                                                                                                                                                                                   |
+|--------------------------------------|---------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Requirements.md (SRS)                | v1.12   | Parent document. Stubs REQ-029–032 reference this spec. API summary in Appendix C links here.                                                                                                                                                  |
+| UI-Requirements.md  (UIR)            | v1.12   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                                                                                                                                               |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.9    | Defines Asset.TTB property (TA001), connects_to edges (ED005), applied_to edges (ED001) and other elements of database schema, like MitrePlatform (TA011), ED014 (represents), ED003 (can_be_executed_on) being used for OS-platform filtering |
 
 ### 1.4 Requirement ID Convention
 
@@ -46,19 +46,19 @@ All requirements in this document use the prefix `ALG-REQ-` followed by a three-
 
 ## 2. Definitions
 
-| Term               | Definition                                                                                                                                                                                                                     |
-|--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **TTA**            | Time To Attack — the cumulative time from initial access to the beginning of actions on objective, computed as the sum of TTB along a path                                                                                     |
-| **TTB**            | Time To Bypass — the time interval to traverse (bypass) a single host; stored as `Asset.TTB` (int32, default 10)                                                                                                               |
-| **TTT**            | Time to execuTe a Technique - time interval required to execute a technioue/subtechniqe on a particular node, considering mitigations applied                                                                                  |
-| **Path**           | An ordered sequence of Asset nodes connected by directed `connects_to` edges, from an entry point to a target, with no repeated nodes                                                                                          |
-| **Hop**            | A single `connects_to` edge traversal between two adjacent nodes in a path                                                                                                                                                     |
-| **Entry Point**    | An Asset where `is_entrance == true`; represents the attacker's starting position                                                                                                                                              |
-| **Target**         | An Asset where `is_target == true`; represents the objective the attacker aims to reach                                                                                                                                        |
-| **Path ID**        | Ephemeral sequential identifier (e.g. P00001) assigned to each calculated path within a single session; not persisted in the database                                                                                          |
-| **Mitigation**     | A MITRE ATT&CK mitigation (`tMitreMitigation`) linked to an Asset via `applied_to` edge, potentially modifying the effective TTB                                                                                               |
-| **Tactic Chain**   | An ordered list of MITRE ATT&CK tactic IDs that an attacker executes on a node, determined by the node's position in the attack path. Defined in `chains.json` (ALG-REQ-050).                                                  |
-| **Chain Position** | The role of an asset within a specific attack path: **Entrance** (first node, N₀), **Intermediate** (middle nodes, N₁..Nₖ₋₁), or **Target** (last node, Nₖ). A single asset may hold different positions in different paths.   |
+| Term               | Definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **TTA**            | Time To Attack — the cumulative time from initial access to the beginning of actions on objective, computed as the sum of TTB along a path                                                                                                                                                                                                                                                                                                                                             |
+| **TTB**            | Time To Bypass — the time interval to traverse (bypass) a single host; stored as `Asset.TTB` (int32, default 10)                                                                                                                                                                                                                                                                                                                                                                       |
+| **TTT**            | Time to execuTe a Technique — time interval (float, in hours) required to execute a technique/subtechnique on a particular asset, considering mitigations applied to that asset and their maturity. TTT is computed per (asset, technique) pair and is consumed by the TTB calculation (ALG-REQ-060). The value ranges from `execution_min` (no mitigations possible or none applied and active) to `execution_max` (all possible mitigations applied and active at maximum maturity). |
+| **Path**           | An ordered sequence of Asset nodes connected by directed `connects_to` edges, from an entry point to a target, with no repeated nodes                                                                                                                                                                                                                                                                                                                                                  |
+| **Hop**            | A single `connects_to` edge traversal between two adjacent nodes in a path                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Entry Point**    | An Asset where `is_entrance == true`; represents the attacker's starting position                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Target**         | An Asset where `is_target == true`; represents the objective the attacker aims to reach                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Path ID**        | Ephemeral sequential identifier (e.g. P00001) assigned to each calculated path within a single session; not persisted in the database                                                                                                                                                                                                                                                                                                                                                  |
+| **Mitigation**     | A MITRE ATT&CK mitigation (`tMitreMitigation`) linked to an Asset via `applied_to` edge, potentially modifying the effective TTB                                                                                                                                                                                                                                                                                                                                                       |
+| **Tactic Chain**   | An ordered list of MITRE ATT&CK tactic IDs that an attacker executes on a node, determined by the node's position in the attack path. Defined in `chains.json` (ALG-REQ-050).                                                                                                                                                                                                                                                                                                          |
+| **Chain Position** | The role of an asset within a specific attack path: **Entrance** (first node, N₀), **Intermediate** (middle nodes, N₁..Nₖ₋₁), or **Target** (last node, Nₖ). A single asset may hold different positions in different paths.                                                                                                                                                                                                                                                           |
 
 
 ---
@@ -613,6 +613,244 @@ _Reserved for: When and how TTA is recalculated after mitigations are added, mod
 
 ---
 
+## Section 5A. TTT Calculation — Time to Execute a Technique
+
+### ALG-REQ-060: TTT Definition and Formula
+
+TTT (Time to Execute a Technique) SHALL be computed for a given `(asset, technique)` pair as a function of:
+- The technique's intrinsic execution time boundaries (`execution_min`, `execution_max` — SCHEMA TA008)
+- The set of mitigations that **can** mitigate this technique (regardless of whether they are applied to the asset)
+- The subset of those mitigations that **are** applied to the asset (via `applied_to` edges — SCHEMA ED001)
+- The **Maturity** and **Active** properties of each `applied_to` edge
+
+**Formal definition:**
+
+Given:
+- `exec_min` = `tMitreTechnique.execution_min` (float, SCHEMA TA008, default 0.1667)
+- `exec_max` = `tMitreTechnique.execution_max` (float, SCHEMA TA008, default 120)
+- `P` = count of all mitigations that mitigate this technique (via `mitigates` edges, SCHEMA ED009) — the **possible mitigations** count
+- `A` = count of mitigations from `P` that are applied to this asset (via `applied_to` edges, SCHEMA ED001) **and** have `Active == true` — the **active applied mitigations** count
+- `M_i` = `Maturity` property (int, values: 25, 50, 80, 100) of the `applied_to` edge for the `i`-th active applied mitigation
+
+The TTT formula has three cases:
+
+**Case 1 — No possible mitigations** (`P == 0`):
+
+    TTT = exec_min
+
+No mitigations exist for this technique in the MITRE knowledge base. The attacker faces no defensive obstacles; execution proceeds at minimum time.
+
+**Case 2 — All possible mitigations are active-applied** (`A == P` and `P > 0`):
+
+    TTT = exec_max
+
+Every known mitigation for this technique is deployed and active on this asset. The attacker faces maximum resistance; execution takes maximum time.
+
+**Case 3 — Partial or no active-applied mitigations** (`0 ≤ A < P` and `P > 0`):
+
+    TTT = exec_min + (Σ 0.01 × M_i for i = 1..A) × (exec_max − exec_min) / P
+
+Where the summation is over all active applied mitigations. If `A == 0` (mitigations exist but none are applied or active), the summation is zero and `TTT = exec_min`.
+
+**Units:** TTT is expressed in the same time unit as `execution_min` / `execution_max` (hours in the current dataset).
+
+>Design note: to be clarified in the subsequent release. Actual units are hours, i.e. 0.1667 h is 10 minutes.
+
+**Return type:** float (matching the type of `execution_min` and `execution_max` in SCHEMA TA008).
+
+>Design note 1: The formula implements a **linear interpolation** between `exec_min` and `exec_max`. The interpolation weight is the ratio of accumulated maturity contribution to the maximum possible maturity contribution. With all mitigations at Maturity=100, the weight reaches 1.0 and TTT = `exec_max`. With no mitigations, the weight is 0.0 and TTT = `exec_min`.
+
+>Design note 2: Case 2 (`A == P`) is a mathematical consequence of Case 3 only when all mitigations have `Maturity == 100`. The explicit `exec_max` assignment for Case 2 is a **design decision**: if all possible mitigations are applied and active (regardless of individual maturity levels), the technique is considered fully defended and assigned maximum execution time. This provides a ceiling guarantee.
+
+>Design note 3: The `0.01` multiplier normalises the Maturity integer (25, 50, 80, 100) into a [0.0, 1.0] range fraction. For example, Maturity=80 contributes 0.8 to the maturity factor.
+
+
+### ALG-REQ-061: TTT Boundary Conditions and Edge Cases
+
+The TTT calculation SHALL handle the following boundary conditions:
+
+| Condition                                                                     | `P` | `A` | Result                    | Rationale                                                                 |
+|-------------------------------------------------------------------------------|-----|-----|---------------------------|---------------------------------------------------------------------------|
+| No possible mitigations                                                       | 0   | 0   | `exec_min`                | No defenses exist in the MITRE knowledge base for this technique          |
+| Possible mitigations exist, none applied                                      | >0  | 0   | `exec_min`                | Defenses exist but the organisation has not deployed them                 |
+| Possible mitigations exist, some applied but all inactive (`Active == false`) | >0  | 0   | `exec_min`                | Applied mitigations with `Active == false` are excluded from count `A`    |
+| All possible mitigations applied and active                                   | >0  | =P  | `exec_max`                | Full mitigation coverage; Case 2 ceiling                                  |
+| Single mitigation, applied, active, Maturity=100                              | 1   | 1   | `exec_max`                | Case 2 applies (A == P)                                                   |
+| Single mitigation, applied, active, Maturity=50                               | 1   | 1   | `exec_max`                | Case 2 applies (A == P), regardless of maturity                           |
+| Multiple mitigations, all applied but mixed maturity                          | >1  | =P  | `exec_max`                | Case 2 applies (A == P), individual maturity irrelevant                   |
+| exec_min == exec_max (degenerate technique)                                   | any | any | `exec_min` (= `exec_max`) | The range is zero; formula returns the constant regardless of mitigations |
+
+**Constraint:** TTT SHALL always satisfy `exec_min ≤ TTT ≤ exec_max`.
+
+>Design note: The boundary table above serves as a test specification. Each row maps directly to a unit test case for TTT computation.
+
+
+### ALG-REQ-062: OS Platform Filtering for TTT
+
+When computing TTT for a given `(asset, technique)` pair, the system SHALL first verify that the technique is **applicable** to the asset's operating system platform. Applicability is established via the graph traversal:
+
+    Asset —[runs_on]→ OS_Type —[represents]→ MitrePlatform ←[can_be_executed_on]— tMitreTechnique
+
+(SCHEMA: ED011, ED014, TA011, ED003, TA008)
+
+If the technique cannot be executed on any platform represented by the asset's OS, the `(asset, technique)` pair is **invalid** — TTT is undefined and the technique SHALL be excluded from further processing.
+
+>Design note 1: This filter is a **precondition** for TTT calculation. It is also used independently by the TTB calculation (see TTB flow, "FilterOS" step). The TTT reference query (ALG-REQ-064) incorporates this filter as the initial MATCH clause.
+
+>Design note 2: There is no explicit "ANY_OS" platform vertex in the schema. A technique applicable to all platforms has individual `can_be_executed_on` edges to every `MitrePlatform` vertex, consistent with MITRE ATT&CK modelling. The traversal handles this naturally.
+
+>Design note 3: The `represents` edge (ED014) bridges the CMDB-oriented OS_Type vocabulary (e.g., "Windows 11 Pro") to the MITRE-oriented MitrePlatform vocabulary (e.g., "Windows"). This mapping was introduced in SCHEMA v1.9.
+
+
+### ALG-REQ-063: Mitigation Active/Inactive Handling in TTT
+
+When counting applied mitigations for the TTT formula (ALG-REQ-060), the system SHALL inspect the `Active` property on the `applied_to` edge (SCHEMA ED001):
+
+- If `Active == true`: the mitigation IS counted as an active applied mitigation. Its `Maturity` value contributes to the maturity factor summation.
+- If `Active == false`: the mitigation is **not** counted as applied. Its `Maturity` value is **disregarded**. The `applied_to` edge relationship may exist in the graph (for audit/history purposes), but it has no effect on TTT.
+
+The practical effect: a mitigation with `Active == false` is treated identically to a mitigation that has no `applied_to` edge to the asset at all, from the TTT formula's perspective.
+
+>Design note 1: The `Active` flag enables "soft disable" of mitigations — e.g., an organisation may temporarily disable a mitigation for maintenance without deleting the relationship. The TTT formula reflects the actual operational state.
+>Design note 2: The enabling/disabling of the mitigation is already implemented in mitigation editor (UI-REQ-250).
+
+
+### ALG-REQ-064: TTT Reference nGQL Query
+
+The TTT for a given `(asset, technique)` pair SHALL be computed using the following nGQL MATCH query, which consolidates all three cases from ALG-REQ-060 into a single query with proper division-by-zero handling:
+
+```nGQL
+MATCH (a:Asset)-[:runs_on]->(os:OS_Type)-[:represents]->(p:MitrePlatform)
+      <-[:can_be_executed_on]-(t:tMitreTechnique)
+WHERE id(a) == "{assetId}" AND id(t) == "{techniqueId}"
+WITH a, t,
+     t.tMitreTechnique.execution_min AS exec_min,
+     t.tMitreTechnique.execution_max AS exec_max,
+     t.tMitreTechnique.Technique_ID AS technique_id,
+     t.tMitreTechnique.Technique_Name AS technique_name
+OPTIONAL MATCH (t)<-[:mitigates]-(m_all:tMitreMitigation)
+WITH a, t, exec_min, exec_max, technique_id, technique_name,
+     count(m_all) AS possible_count
+OPTIONAL MATCH (t)<-[:mitigates]-(m_applied:tMitreMitigation)-[ap:applied_to]->(a)
+WITH technique_id,
+     technique_name,
+     exec_min,
+     exec_max,
+     possible_count,
+     collect({maturity: ap.Maturity, active: ap.Active}) AS applied_raw
+WITH technique_id,
+     technique_name,
+     exec_min,
+     exec_max,
+     possible_count,
+     [x IN applied_raw WHERE x.active == true] AS active_mitigations
+WITH technique_id,
+     technique_name,
+     exec_min,
+     exec_max,
+     possible_count,
+     size(active_mitigations) AS applied_count,
+     CASE WHEN possible_count == 0 THEN 0.0
+          ELSE reduce(s = 0.0, x IN active_mitigations | s + 0.01 * x.maturity)
+     END AS maturity_factor
+RETURN technique_id,
+       technique_name,
+       applied_count,
+       possible_count,
+       exec_min,
+       exec_max,
+       CASE
+         WHEN possible_count == 0 THEN exec_min
+         WHEN applied_count == possible_count THEN exec_max
+         ELSE exec_min + (maturity_factor * (exec_max - exec_min))
+              / toFloat(possible_count)
+       END AS TTT;
+```
+
+**Parameters:**
+- `{assetId}` — VID of the Asset vertex (e.g., `"A00014"`)
+- `{techniqueId}` — VID of the tMitreTechnique vertex (e.g., `"T1071.001"`)
+
+**Query structure explanation:**
+
+| Step | MATCH / WITH clause                                                           | Purpose                                                                                                                 |
+|------|-------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| 1    | `MATCH ... Asset → OS_Type → MitrePlatform ← tMitreTechnique`                 | OS platform filter (ALG-REQ-062). If no path exists, the query returns empty — TTT is undefined for this pair.          |
+| 2    | `WITH a, t, exec_min, exec_max, ...`                                          | Extract technique's execution time boundaries.                                                                          |
+| 3    | `OPTIONAL MATCH (t)<-[:mitigates]-(m_all)` → `count(m_all) AS possible_count` | Count **P** — all mitigations that can mitigate this technique (regardless of asset).                                   |
+| 4    | `OPTIONAL MATCH (t)<-[:mitigates]-(m_applied)-[ap:applied_to]->(a)`           | Find mitigations that both mitigate the technique **and** are applied to this asset. Collect their edge properties.     |
+| 5    | `[x IN applied_raw WHERE x.active == true]`                                   | Filter to active-only mitigations (ALG-REQ-063).                                                                        |
+| 6    | `size(active_mitigations) AS applied_count`                                   | Count **A**.                                                                                                            |
+| 7    | `reduce(s = 0.0, ...)`                                                        | Compute maturity factor **Σ(0.01 × M_i)**. Guarded by `CASE WHEN possible_count == 0` to avoid meaningless computation. |
+| 8    | Final `CASE` in `RETURN`                                                      | Apply the three-case formula from ALG-REQ-060.                                                                          |
+
+**nGQL syntax notes:**
+
+1. `WHERE` cannot follow `OPTIONAL MATCH` in NebulaGraph 3.8. The asset-filtering for applied mitigations is handled by the MATCH pattern itself (`-[ap:applied_to]->(a)`) where `a` is already bound from the initial MATCH clause. This is semantically equivalent to a WHERE filter but does not violate the nGQL grammar constraint.
+
+2. `toFloat(possible_count)` ensures floating-point division in the Case 3 formula. Without it, integer division could truncate the result.
+
+3. The `reduce()` list comprehension iterates over the `active_mitigations` list (already filtered to `active == true`) and sums the normalised maturity values. If the list is empty, `reduce` returns the seed value `0.0`.
+
+4. Both `OPTIONAL MATCH` clauses are necessary: the first counts all mitigations for the technique globally; the second counts only those applied to the specific asset. These are distinct sets — a technique may have 5 possible mitigations, of which only 2 are applied to the asset in question.
+
+>Design note 1: The query is self-contained — it performs OS platform validation, mitigation counting, and TTT computation in a single database round-trip. The APP layer receives the final TTT value directly.
+
+>Design note 2: If the query returns an empty result set (no rows), this means the technique is not applicable to the asset's platform. The APP layer SHALL treat this as "TTT undefined for this (asset, technique) pair" and exclude the technique from TTB processing.
+
+>Design note 3: This query is designed to be called from within the TTB calculation loop (future ALG-REQ-020 replacement). In that context, the `{techniqueId}` is the technique selected by the TTB algorithm's priority/pattern logic, and `{assetId}` is the asset being evaluated.
+
+**Justification for MATCH syntax** (per REQ-244 in SRS): The query requires multi-hop traversal through the OS → Platform → Technique path for platform filtering, OPTIONAL MATCH for mitigation counting with asset-specific filtering, list comprehension for Active-flag filtering, and `reduce()` for maturity accumulation. This combination has no practical nGQL/GO equivalent.
+
+
+### ALG-REQ-065: TTT Output Contract
+
+The TTT calculation (whether performed via ALG-REQ-064 query or equivalent APP-layer logic) SHALL return the following data for a given `(asset, technique)` pair:
+
+| Field            | Type   | Description                                           |
+|------------------|--------|-------------------------------------------------------|
+| `technique_id`   | string | MITRE Technique/Subtechnique ID (e.g., `"T1071.001"`) |
+| `technique_name` | string | Human-readable technique name                         |
+| `applied_count`  | int    | Number of active applied mitigations (`A`)            |
+| `possible_count` | int    | Number of possible mitigations (`P`)                  |
+| `exec_min`       | float  | Technique's minimum execution time                    |
+| `exec_max`       | float  | Technique's maximum execution time                    |
+| `TTT`            | float  | Computed Time to Execute a Technique                  |
+
+This output is consumed by the TTB calculation algorithm (future ALG-REQ-020), specifically at the step where TTT is calculated for each technique in the SelectedTechniques set.
+
+The output is **not** exposed as a standalone API endpoint in the current design. It is an internal computation result passed within the TTB calculation pipeline. A diagnostic/debug endpoint MAY be added in a future version.
+
+>Design note: The `applied_count` and `possible_count` fields are included for transparency and debugging. They allow the operator to understand *why* a particular TTT value was computed — e.g., "3 out of 5 possible mitigations are active on this asset for this technique."
+
+
+### ALG-REQ-066: TTT and ALG-REQ-052 Relationship
+
+ALG-REQ-064 (TTT reference query) SHALL be considered the **implementation** of the TTT sub-component within the broader TTB query template defined in ALG-REQ-052.
+
+The relationship between the two requirements is:
+
+- ALG-REQ-052 defines the overall TTB data retrieval query — it traverses `TacticChain → tMitreTactic → tMitreTechnique` and collects technique/mitigation data for all tactics in a chain.
+- ALG-REQ-064 defines the **per-technique TTT formula** — given one technique and one asset, it computes the execution time considering mitigations.
+
+When the full TTB formula (ALG-REQ-020 replacement) is implemented:
+1. The TTB algorithm iterates through tactics in the chain (per ALG-REQ-052 query results or equivalent logic).
+2. For each tactic, it selects the relevant techniques (filtered by OS, priority, vulnerability — per TTB flow).
+3. For each selected technique, it computes TTT using the formula from ALG-REQ-060 / query from ALG-REQ-064.
+4. The technique with the **minimum TTT** is chosen (the "fastest technique" — the attacker's optimal choice).
+5. That minimum TTT is added to the running TTB sum.
+
+The APP layer MAY choose to:
+- **(a)** Execute ALG-REQ-064 as a standalone query per technique (simple, clear, multiple round-trips), or
+- **(b)** Embed the TTT formula logic directly into the ALG-REQ-052 query (complex, single round-trip, better performance)
+
+For the PoC, option **(a)** is recommended for clarity and debuggability. Option **(b)** is a performance optimisation for future versions.
+
+>Design note: Once TTB flow requirements are defined (next update to ALGO), the exact integration point between ALG-REQ-064 and the TTB loop will be formalised. At that stage, ALG-REQ-052 may be amended to incorporate inline TTT computation.
+
+---
+
+
 ## 6. Edge Cases and Constraints
 
 ### ALG-REQ-030: No Path Exists
@@ -654,7 +892,9 @@ The following capabilities are anticipated but out of scope for v1.0:
 - [ ] Mitigation impact simulation ("what-if" recalculation)
 - [ ] Path comparison (before/after mitigation changes)
 - [x] ~~TTB recalculation based on vulnerability presence (`has_vulnerability`)~~ — addressed in ALG-REQ-052 via `rcelpe` technique filter
-- [ ] Full TTB formula implementation (ALG-REQ-020/021) using ALG-REQ-052 query results
+- [x] ~~Full TTT formula implementation (ALG-REQ-060–066) defining per-technique execution time considering mitigations~~ — addressed in v1.4
+- [ ] Full TTB formula implementation (ALG-REQ-020/021) integrating TTT results with tactic chain traversal, pattern transitions, priority selection, and orientation/switchover time parameters
+- [ ] Embedded TTT computation within ALG-REQ-052 query for single-round-trip TTB calculation (ALG-REQ-066 option b)
 - [ ] Dynamic tactic chain configuration via database instead of `chains.json`
 - [ ] APP-layer TTB cache for entry/target positions (ALG-REQ-053 optional optimisation)
 
@@ -706,19 +946,27 @@ The following capabilities are anticipated but out of scope for v1.0:
 
 ### 8.3 ALG-REQ to Schema
 
-| ALG-REQ     | Schema Reference                                               | Context                                                   |
-|-------------|----------------------------------------------------------------|-----------------------------------------------------------|
-| ALG-REQ-001 | ED005 (connects_to)                                            | Path traversal follows connects_to edges                  |
-| ALG-REQ-010 | TA001 (Asset.TTB)                                              | TTB property used for TTA summation                       |
-| ALG-REQ-020 | ED001 (applied_to), TA005                                      | Mitigation impact via applied_to edge properties          |
-| ALG-REQ-040 | TA001 (Asset.hash, hash_valid)                                 | Hash properties on Asset tag                              |
-| ALG-REQ-042 | TA001, ED001, ED006, ED011, TA004, TA002                       | All hash input sources                                    |
-| ALG-REQ-043 | TA001, TA009                                                   | Invalidation writes to Asset + SystemState                |
-| ALG-REQ-047 | TA009 (SystemState.merkle_root)                                | Merkle root stored in SystemState                         |
-| ALG-REQ-050 | **TA010** (TacticChain), **ED013** (chain_includes), TA007     | Chain vertices + edges reference tMitreTactic vertices    |
-| ALG-REQ-051 | TA001 (Asset.is_entrance, is_target)                           | Distinguishes eligibility (property) from position (path) |
-| ALG-REQ-052 | **TA010**, **ED013**, TA008, TA007, TA005, ED010, ED009, ED001 | Full chain → MITRE subgraph traversal for TTB             |
-| ALG-REQ-053 | TA001 (Asset.TTB, hash, hash_valid)                            | Caching uses existing hash infrastructure                 |
+| ALG-REQ     | Schema Reference                                                                       | Context                                                   |
+|-------------|----------------------------------------------------------------------------------------|-----------------------------------------------------------|
+| ALG-REQ-001 | ED005 (connects_to)                                                                    | Path traversal follows connects_to edges                  |
+| ALG-REQ-010 | TA001 (Asset.TTB)                                                                      | TTB property used for TTA summation                       |
+| ALG-REQ-020 | ED001 (applied_to), TA005                                                              | Mitigation impact via applied_to edge properties          |
+| ALG-REQ-040 | TA001 (Asset.hash, hash_valid)                                                         | Hash properties on Asset tag                              |
+| ALG-REQ-042 | TA001, ED001, ED006, ED011, TA004, TA002                                               | All hash input sources                                    |
+| ALG-REQ-043 | TA001, TA009                                                                           | Invalidation writes to Asset + SystemState                |
+| ALG-REQ-047 | TA009 (SystemState.merkle_root)                                                        | Merkle root stored in SystemState                         |
+| ALG-REQ-050 | **TA010** (TacticChain), **ED013** (chain_includes), TA007                             | Chain vertices + edges reference tMitreTactic vertices    |
+| ALG-REQ-051 | TA001 (Asset.is_entrance, is_target)                                                   | Distinguishes eligibility (property) from position (path) |
+| ALG-REQ-052 | **TA010**, **ED013**, TA008, TA007, TA005, ED010, ED009, ED001                         | Full chain → MITRE subgraph traversal for TTB             |
+| ALG-REQ-053 | TA001 (Asset.TTB, hash, hash_valid)                                                    | Caching uses existing hash infrastructure                 |
+| ALG-REQ-060 | TA008 (execution_min, execution_max), ED001 (Maturity, Active), ED009                  | TTT formula inputs                                        |
+| ALG-REQ-061 | TA008, ED001, ED009                                                                    | Boundary conditions reference same schema elements        |
+| ALG-REQ-062 | ED011 (runs_on), ED014 (represents), TA011 (MitrePlatform), ED003 (can_be_executed_on) | OS platform filtering traversal path                      |
+| ALG-REQ-063 | ED001 (applied_to.Active)                                                              | Active flag on applied_to edge                            |
+| ALG-REQ-064 | TA001, TA004, TA005, TA008, TA011, ED001, ED003, ED009, ED011, ED014                   | Full TTT query touches all MITRE subgraph elements        |
+| ALG-REQ-065 | TA008 (output fields sourced from technique properties)                                | Output contract reflects technique tag properties         |
+| ALG-REQ-066 | TA010, ED013 (via ALG-REQ-052 relationship)                                            | Links TTT into the TacticChain-based TTB framework        |
+
 ---
 
 ## Change Log
@@ -729,6 +977,9 @@ The following capabilities are anticipated but out of scope for v1.0:
 | 1.1     | Mar 2, 2026 | KSmirnov | Added §4A: ALG-REQ-040–048 (asset state hashing, hash computation, invalidation, bulk/path-scoped TTB recalculation, Merkle root, SystemState endpoint). Cross-reference matrices updated (two ALG-REQ sections added to distinguish between older migrated and newly created requirements |
 | 1.2     | Mar 4, 2026 | KSmirnov | Added §4B: ALG-REQ-050–053 (tactic chains, position assignment, TTB query template, caching strategy). Amended ALG-REQ-001 (per-node query), ALG-REQ-010 (position-aware TTA formula), ALG-REQ-044 (stub accepts chain), ALG-REQ-045 (Regular_chain clarification), ALG-REQ-046 (entry/target computation steps). Cross-reference matrices updated. |
 | 1.3     | Mar 4, 2026 | KSmirnov | Moved tactic chains from chains.json to GrDB graph objects (TA010 TacticChain, ED013 chain_includes). Rewrote ALG-REQ-050 (chain definition), ALG-REQ-052 (TTB query — corrected nGQL syntax). Amended ALG-REQ-051 (VID mapping), ALG-REQ-044 (chain VID parameter). Cross-references updated for new schema elements. |
+| 1.4     | Mar 10, 2026 | KSmirnov | Added §5A: ALG-REQ-060–066 (TTT calculation formula, boundary conditions, OS platform filtering, Active/Inactive mitigation handling, reference nGQL query, output contract, relationship to ALG-REQ-052). TTT definition in §2 expanded. Schema cross-reference updated for SCHEMA v1.9 elements (TA011 MitrePlatform, ED014 represents, ED003 can_be_executed_on). Future extensions updated. |
+
+
 ---
 
 **End of Document**
