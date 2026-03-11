@@ -469,7 +469,7 @@ Layout (top to bottom):
    - Columns: Path | Hosts | TTA 
    - Path column: displays the path ID (e.g. P00001)
    - Hosts column: displays the asset chain (e.g. `A00013 -> A00018 -> A00011`). Line wraps are allowed in this column. 
-   - - TTA column: numeric value (hours), right-aligned, formatted as `hhh:mm:ss` (e.g. "12:27:00" for 12.45 hours). The VIS layer converts the float API response to sexagesimal display.
+   - TTA column: numeric value (hours), right-aligned, formatted as `hhh:mm:ss` (e.g. "12:27:00" for 12.45 hours). The VIS layer converts the float API response to sexagesimal display.
    - Table is scrollable vertically if many results 
    - Rows are clickable (see UI-REQ-208)
    - Results sorted by TTA ascending (matching API response order)
