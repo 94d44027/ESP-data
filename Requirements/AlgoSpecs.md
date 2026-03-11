@@ -1,7 +1,7 @@
 # Algorithm Requirements Specification (ALGO)
 ## ESP PoC — TTA/TTB Path Calculation and related things
 
-**Version:** 1.6  
+**Version:** 1.7  
 **Date:** March 11, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI  
 **Project:** ESP PoC for Nebula Graph  
@@ -1299,8 +1299,12 @@ The following capabilities are anticipated but out of scope for v1.0:
 - [ ] Persist TTB calculation logs for reporting (ALG-REQ-079 future enhancement)
 - [ ] Weighted technique selection using `patterns_to.probability` (ALG-REQ-076 design note 4)
 - [ ] Position-differentiated Orientation Time (ALG-REQ-071 design note 2)
-- [ ] UI controls for Orientation Time, Switchover Time, and Priority Tolerance in Path Inspector (UIS update required)
+- [x] ~~UI controls for Orientation Time, Switchover Time, and Priority Tolerance in Path Inspector~~ — addressed in UI-REQ-2091, implemented in v1.14 sprint
 - [ ] Adding small relational database (like MariaDB) to keep configuration and calculation results in table format
+- [ ] **Batch ComputeTTT** — consolidate per-technique TTT queries into a single batch query per tactic, reducing ~90 DB round-trips per ComputeTTB call to ~10 (observed 10.2s for entry+target TTB on 25-asset graph; ALG-REQ-064 design note)
+- [ ] **Re-unify ComputeTTT query** — the current two-query split (technique+P in q1, applied mitigations in q2) was necessitated by nGQL 3.8's prohibition of WHERE after OPTIONAL MATCH. Investigate WITH...WHERE pattern to restore single-query execution (would halve TTT query count)
+- [x] ~~UI controls for Orientation Time, Switchover Time, and Priority Tolerance in Path Inspector~~ — addressed in UI-REQ-2091, implemented in v1.14 sprint
+
 
 ---
 
@@ -1413,7 +1417,7 @@ The following capabilities are anticipated but out of scope for v1.0:
 | 1.4     | Mar 10, 2026 | KSmirnov | Added §5A: ALG-REQ-060–066 (TTT calculation formula, boundary conditions, OS platform filtering, Active/Inactive mitigation handling, reference nGQL query, output contract, relationship to ALG-REQ-052). TTT definition in §2 expanded. Schema cross-reference updated for SCHEMA v1.9 elements (TA011 MitrePlatform, ED014 represents, ED003 can_be_executed_on). Future extensions updated. |
 | 1.5 | Mar 10, 2026 | KSmirnov | Added §5B: ALG-REQ-070–080 (TTB calculation algorithm, orientation/switchover time parameters, first-tactic technique selection, vulnerability filtering, priority selection with tolerance, pattern-based technique transitions, fastest technique selection, TTB accumulation formula, calculation log, empty-set handling). TTB definition in §2 expanded; Orientation Time, Switchover Time, Priority Tolerance definitions added. ALG-REQ-020/021/022 marked as superseded. ALG-REQ-044 supersession notice added. Cross-reference matrices updated. Future extensions updated. |
 | 1.6  | Mar 11, 2026 | KSmirnov | ALG-REQ-042: replaced OPTIONAL MATCH with MATCH for runs_on and has_type per SCHEMA DI-01/DI-03; removed COALESCE fallbacks. Added note to ALG-REQ-064. Updated SCHEMA reference to v1.10. |
-
+| 1.7  | Mar 11, 2026 | KSmirnov | §7: Added batch ComputeTTT and re-unify ComputeTTT query to future extensions. Marked UI controls for TTB params as completed (UI-REQ-2091). |
 ---
 
 **End of Document**

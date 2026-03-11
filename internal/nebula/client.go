@@ -135,9 +135,9 @@ func safeFloat64(record *nebula.Record, idx int, def float64) float64 {
 }
 
 // QueryAssets executes the enriched connectivity query specified in REQ-020.
-// MATCH is used here because OPTIONAL MATCH with multi-hop property
-// retrieval is significantly cleaner than chained GO statements (REQ-244
-// justification recorded in Requirements.md REQ-020).
+// MATCH is used here because multi-hop property retrieval across asset
+// pairs and their types is significantly cleaner than chained GO statements
+// (REQ-244 justification). OPTIONAL MATCH removed per REQ-043 (DI-01).
 func QueryAssets(pool *nebula.ConnectionPool, cfg *config.Config) ([]AssetRow, error) {
 	session, err := openSession(pool, cfg)
 	if err != nil {
@@ -145,10 +145,10 @@ func QueryAssets(pool *nebula.ConnectionPool, cfg *config.Config) ([]AssetRow, e
 	}
 	defer session.Release()
 
-	// REQ-020 query verbatim from requirements
+	// REQ-020 query verbatim from requirements (REQ-043: MATCH for has_type)
 	query := `MATCH (a:Asset)-[e:connects_to]->(b:Asset)
-OPTIONAL MATCH (a)-[:has_type]->(at:Asset_Type)
-OPTIONAL MATCH (b)-[:has_type]->(bt:Asset_Type)
+MATCH (a)-[:has_type]->(at:Asset_Type)
+MATCH (b)-[:has_type]->(bt:Asset_Type)
 RETURN
   a.Asset.Asset_ID          AS src_asset_id,
   a.Asset.Asset_Name        AS src_asset_name,
@@ -212,8 +212,9 @@ LIMIT 300;`
 
 // QueryAssetsWithDetails fetches all assets with their type information
 // for the sidebar entity browser (REQ-021).
-// MATCH is used because OPTIONAL MATCH ensures assets without a has_type
-// edge are still returned (REQ-244 justification).
+// MATCH is used because multi-hop property retrieval is cleaner than
+// chained GO statements (REQ-244 justification). REQ-043: DI-01 guarantees
+// every asset has a has_type edge.
 func QueryAssetsWithDetails(pool *nebula.ConnectionPool, cfg *config.Config) ([]map[string]interface{}, error) {
 	session, err := openSession(pool, cfg)
 	if err != nil {
@@ -221,9 +222,9 @@ func QueryAssetsWithDetails(pool *nebula.ConnectionPool, cfg *config.Config) ([]
 	}
 	defer session.Release()
 
-	// REQ-021 query verbatim from requirements
+	// REQ-021 query verbatim from requirements (REQ-043: MATCH for has_type)
 	query := `MATCH (a:Asset)
-OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
+MATCH (a)-[:has_type]->(t:Asset_Type)
 RETURN
   a.Asset.Asset_ID          AS asset_id,
   a.Asset.Asset_Name        AS asset_name,
@@ -271,8 +272,9 @@ RETURN
 }
 
 // QueryAssetDetail fetches detailed information for a single asset (REQ-022).
-// MATCH is used because OPTIONAL MATCH for type and segment is significantly
+// MATCH is used because type/segment/OS property retrieval is significantly
 // cleaner than chained GO + FETCH statements (REQ-244 justification).
+// REQ-043: DI-01/02/03 guarantee has_type, belongs_to, runs_on edges.
 func QueryAssetDetail(pool *nebula.ConnectionPool, cfg *config.Config, assetID string) (map[string]interface{}, error) {
 	session, err := openSession(pool, cfg)
 	if err != nil {
@@ -280,11 +282,11 @@ func QueryAssetDetail(pool *nebula.ConnectionPool, cfg *config.Config, assetID s
 	}
 	defer session.Release()
 
-	// REQ-022 query — uses parameterised WHERE on Asset_ID property
+	// REQ-022 query — uses parameterised WHERE on Asset_ID property (REQ-043: MATCH for type/segment/OS)
 	query := fmt.Sprintf(`MATCH (a:Asset) WHERE a.Asset.Asset_ID == "%s"
-OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
-OPTIONAL MATCH (a)-[:belongs_to]->(s:Network_Segment)
-OPTIONAL MATCH (a)-[:runs_on]->(os:OS_Type)
+MATCH (a)-[:has_type]->(t:Asset_Type)
+MATCH (a)-[:belongs_to]->(s:Network_Segment)
+MATCH (a)-[:runs_on]->(os:OS_Type)
 RETURN
   a.Asset.Asset_ID            AS asset_id,
   a.Asset.Asset_Name          AS asset_name,
@@ -920,45 +922,70 @@ func ComputeTTT(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, techn
 		}
 	}
 
-	// ALG-REQ-064: unified TTT query
-	query := fmt.Sprintf(
+	// ALG-REQ-064: TTT query — split into two queries to avoid
+	// OPTIONAL MATCH ... WHERE which is not supported in nGQL 3.x.
+
+	// Query 1: Get technique properties and count of possible mitigations (P)
+	q1 := fmt.Sprintf(
 		`MATCH (t:tMitreTechnique) WHERE id(t) == "%s" `+
 			`OPTIONAL MATCH (m:tMitreMitigation)-[:mitigates]->(t) `+
 			`WITH t, count(m) AS P, collect(id(m)) AS mitigation_vids `+
-			`OPTIONAL MATCH (m2:tMitreMitigation)-[ap:applied_to]->(a:Asset) `+
-			`WHERE id(a) == "%s" AND id(m2) IN mitigation_vids AND ap.Active == true `+
-			`WITH t, P, `+
-			`  count(m2) AS A, `+
-			`  CASE WHEN count(m2) > 0 THEN sum(ap.Maturity) ELSE 0 END AS raw_maturity_sum `+
 			`RETURN t.tMitreTechnique.Technique_ID AS technique_id, `+
 			`  t.tMitreTechnique.Technique_Name AS technique_name, `+
 			`  t.tMitreTechnique.execution_min AS exec_min, `+
 			`  t.tMitreTechnique.execution_max AS exec_max, `+
 			`  P AS possible_mitigations, `+
-			`  A AS active_mitigations, `+
-			`  raw_maturity_sum AS maturity_sum;`,
-		techniqueVid, assetVid)
+			`  mitigation_vids AS mit_vids;`,
+		techniqueVid)
 
-	rs, err := session.Execute(query)
+	rs1, err := session.Execute(q1)
 	if err != nil {
-		return nil, fmt.Errorf("ComputeTTT query: %w", err)
+		return nil, fmt.Errorf("ComputeTTT query1: %w", err)
 	}
-	if !rs.IsSucceed() {
-		return nil, fmt.Errorf("ComputeTTT query: %s", rs.GetErrorMsg())
+	if !rs1.IsSucceed() {
+		return nil, fmt.Errorf("ComputeTTT query1: %s", rs1.GetErrorMsg())
 	}
-	if rs.GetRowSize() == 0 {
+	if rs1.GetRowSize() == 0 {
 		return nil, fmt.Errorf("ComputeTTT: technique %s not found", techniqueVid)
 	}
 
-	record, _ := rs.GetRowValuesByIndex(0)
+	rec1, _ := rs1.GetRowValuesByIndex(0)
 	result := &TTTResult{
-		TechniqueID:   safeString(record, 0),
-		TechniqueName: safeString(record, 1),
-		ExecMin:       safeFloat64(record, 2, 0.1667),
-		ExecMax:       safeFloat64(record, 3, 120.0),
-		P:             safeInt(record, 4, 0),
-		A:             safeInt(record, 5, 0),
-		SumMaturity:   safeFloat64(record, 6, 0.0),
+		TechniqueID:   safeString(rec1, 0),
+		TechniqueName: safeString(rec1, 1),
+		ExecMin:       safeFloat64(rec1, 2, 0.1667),
+		ExecMax:       safeFloat64(rec1, 3, 120.0),
+		P:             safeInt(rec1, 4, 0),
+	}
+
+	// Extract mitigation VIDs from the list column
+	mitVids, _ := extractStringList(rec1, 5)
+
+	// Query 2: Count active-applied mitigations on this asset from the P set.
+	if len(mitVids) > 0 {
+		quotedVids := make([]string, len(mitVids))
+		for i, v := range mitVids {
+			quotedVids[i] = fmt.Sprintf(`"%s"`, v)
+		}
+		vidListStr := strings.Join(quotedVids, ",")
+
+		q2 := fmt.Sprintf(
+			`MATCH (m2:tMitreMitigation)-[ap:applied_to]->(a:Asset) `+
+				`WHERE id(a) == "%s" AND id(m2) IN [%s] AND ap.Active == true `+
+				`RETURN count(m2) AS A, `+
+				`  CASE WHEN count(m2) > 0 THEN sum(ap.Maturity) ELSE 0 END AS maturity_sum;`,
+			assetVid, vidListStr)
+
+		rs2, err := session.Execute(q2)
+		if err != nil {
+			log.Printf("nebula: ComputeTTT query2 failed: %v", err)
+		} else if !rs2.IsSucceed() {
+			log.Printf("nebula: ComputeTTT query2: %s", rs2.GetErrorMsg())
+		} else if rs2.GetRowSize() > 0 {
+			rec2, _ := rs2.GetRowValuesByIndex(0)
+			result.A = safeInt(rec2, 0, 0)
+			result.SumMaturity = safeFloat64(rec2, 1, 0.0)
+		}
 	}
 
 	// ALG-REQ-060: TTT formula
@@ -1516,8 +1543,8 @@ WITH a, conn_parts, m, e,
 ORDER BY mit_id
 WITH a, conn_parts,
   collect(concat_ws("|", mit_id, toString(e.Maturity), toString(e.Active))) AS mit_parts
-OPTIONAL MATCH (a)-[:runs_on]->(os:OS_Type)
-OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
+MATCH (a)-[:runs_on]->(os:OS_Type)
+MATCH (a)-[:has_type]->(t:Asset_Type)
 RETURN
   a.Asset.Asset_ID AS asset_id,
   a.Asset.TTB AS current_ttb,
@@ -1526,8 +1553,8 @@ RETURN
     reduce(s = "", x IN conn_parts | s + x + ";"),
     reduce(s = "", x IN mit_parts | s + x + ";"),
     toString(a.Asset.has_vulnerability),
-    COALESCE(os.OS_Type.OS_Name, "none"),
-    COALESCE(t.Asset_Type.Type_Name, "none")
+    os.OS_Type.OS_Name,
+    t.Asset_Type.Type_Name
   )) AS computed_hash;`
 
 	queryStart := time.Now()
@@ -1599,8 +1626,8 @@ WITH a, conn_parts, m, e,
 ORDER BY mit_id
 WITH a, conn_parts,
   collect(concat_ws("|", mit_id, toString(e.Maturity), toString(e.Active))) AS mit_parts
-OPTIONAL MATCH (a)-[:runs_on]->(os:OS_Type)
-OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
+MATCH (a)-[:runs_on]->(os:OS_Type)
+MATCH (a)-[:has_type]->(t:Asset_Type)
 RETURN
   a.Asset.Asset_ID AS asset_id,
   a.Asset.TTB AS current_ttb,
@@ -1609,8 +1636,8 @@ RETURN
     reduce(s = "", x IN conn_parts | s + x + ";"),
     reduce(s = "", x IN mit_parts | s + x + ";"),
     toString(a.Asset.has_vulnerability),
-    COALESCE(os.OS_Type.OS_Name, "none"),
-    COALESCE(t.Asset_Type.Type_Name, "none")
+    os.OS_Type.OS_Name,
+    t.Asset_Type.Type_Name
   )) AS computed_hash;`, inList)
 
 	queryStart := time.Now()
