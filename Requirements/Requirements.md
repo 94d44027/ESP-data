@@ -1,8 +1,8 @@
 # Software Requirements Specification (SRS)
 ## ESP Proof Of Concept system
 
-**Version:** 1.12  
-**Date:** March 2, 2026  
+**Version:** 1.13  
+**Date:** March 11, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
 **Document code:** SRS
@@ -19,11 +19,11 @@ This document describes the complete set of requirements for Version 1.0 of ESP 
 
 ### 1.3 Relationship to Other Documents
 
-| Document                             | Version | Relationship                                                                                                    |
-|--------------------------------------|---------|-----------------------------------------------------------------------------------------------------------------|
-| UI-Requirements.md  (UIR)            | v1.12   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                |
-| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.8    | Defines database schema (ESP01)                                                                                 |
-| AlgoSpecs.md (ALGO)                  | v1.3    | Defines requirements to algorithms regarding attack path calculations ((REQ-029 through REQ-032 migrated there) |
+| Document                             | Version | Relationship                                                                                                                                                     |
+|--------------------------------------|---------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| UI-Requirements.md  (UIR)            | v1.13   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                                                                 |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.9    | Defines database schema (ESP01)                                                                                                                                  |
+| AlgoSpecs.md (ALGO)                  | v1.5    | Defines requirements to algorithms regarding attack path calculations (REQ-029 through REQ-032 migrated there; TTT/TTB computation algorithms added in v1.4–1.5) |
 
 ### 1.4 Intended Audience
 - Software developers and architects
@@ -501,21 +501,23 @@ None so far.
 
 ---
 
-## 4. Definitions, Acronyms, and Abbreviations
+## 4. Definitions, Acronyms, and Abbreviations (Glossary)
 
-| Term           | Definition                                                                                                                           |
-|----------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| **API**        | Application Programming Interface - a set of protocols for building software applications                                            |
-| **TTA**        | Time To Attack, time interval between initial access and the very beginning of actions on objective                                  |
-| **TTB**        | Time To Bypass, time interval to traverse a single host                                                                              |
-| **REST**       | Representational State Transfer - architectural style for web services                                                               |
-| **SMTP**       | Simple Mail Transfer Protocol - protocol for sending email                                                                           |
-| **SQL**        | Structured Query Language - relational database query language                                                                       |
-| **nGQL**       | NebulaGraph Query Language (nGQL)                                                                                                    |
-| **SRS**        | Software Requirements Specification                                                                                                  |
-| **TLS**        | Transport Layer Security - cryptographic protocol for secure communications                                                          |
-| **The system** | All components from section **`2.1`**                                                                                                |
-| **Path ID**    | Ephemeral sequential identifier (e.g. P00001) assigned to each calculated path within a single Path Inspector session; not persisted |
+| Term           | Definition                                                                                                                                                                                                                                          |
+|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **API**        | Application Programming Interface - a set of protocols for building software applications                                                                                                                                                           |
+| **TTA**        | Time To Attack, time interval (hours) between initial access and the very beginning of actions on objective. Computed as the position-aware sum of TTB values along a path (ALG-REQ-010).                                                           |
+| **TTB**        | Time To Bypass, time interval (hours) to traverse a single host. Computed via the tactic-chain TTT loop algorithm (ALG-REQ-070). Stored as `Asset.TTB` for intermediate positions; computed on-the-fly for entrance/target positions (ALG-REQ-053). |
+| **TTT**        | Time To Execute a Technique, time interval (hours) to execute a single MITRE ATT&CK technique on a host, factoring in applicable mitigations. Defined in ALG-REQ-060.                                                                               |
+| **REST**       | Representational State Transfer - architectural style for web services                                                                                                                                                                              |
+| **SMTP**       | Simple Mail Transfer Protocol - protocol for sending email                                                                                                                                                                                          |
+| **SQL**        | Structured Query Language - relational database query language                                                                                                                                                                                      |
+| **nGQL**       | NebulaGraph Query Language (nGQL)                                                                                                                                                                                                                   |
+| **SRS**        | Software Requirements Specification                                                                                                                                                                                                                 |
+| **TLS**        | Transport Layer Security - cryptographic protocol for secure communications                                                                                                                                                                         |
+| **The system** | All components from section **`2.1`**                                                                                                                                                                                                               |
+| **Path ID**    | Ephemeral sequential identifier (e.g. P00001) assigned to each calculated path within a single Path Inspector session; not persisted                                                                                                                |
+| **REST**       | Representational State Transfer - architectural style for web services                                                                                                                                                                              |
 
 
 
@@ -568,7 +570,7 @@ https://github.com/94d44027/ESP-data/blob/main/Data/ESP01_NebulaGraph_Schema.md
 | `/api/system-state`                 | GET    | REQ-041     | SystemState for UI badge                              | `{ state_id, merkle_root, last_recalc_time, ... }` |
 
 ### Appendix D: Algorithm Specification
-AlgoSpec.md — Path calculation and TTA/TTB algorithm requirements (ALG-REQ-001 through ALG-REQ-033)
+AlgoSpec.md — Path calculation, TTA/TTB/TTT algorithm requirements (ALG-REQ-001 through ALG-REQ-080). Includes asset state hashing (040–043), TTB stub and caching (044–053), TTT calculation (060–066), and full TTB calculation algorithm (070–080).
 
 ### Appendix E: nGQL Specification
 https://docs.nebula-graph.io/3.8.0/
@@ -596,6 +598,7 @@ Each requirement shall be considered complete when:
 | 1.10    | Feb 28, 2026 | KSmirnov | REQ-022 and REQ-023 are updated for the new Asset Inspector look. Version skipped to 1.10 to keep in sync with UI-Requirements.                                                                      |
 | 1.11    | Mar 1, 2026  | KSmirnov | REQ-029–032 migrated to AlgoSpec.md (ALG-REQ-001–010). Stubs retained in §3.1.3. Appendix C updated with ALG-REQ refs. Appendix D added (AlgoSpec); old D→E, E→F. §1.2 updated with companion docs.  |
 | 1.12    | Mar 2, 2026  | KSmirnov | REQ-040–042 added (recalculate TTB endpoint, system state endpoint, hash invalidation on mitigation write). §3.1.3B added. Appendix C updated.                                                       |
+| 1.13    | Mar 11, 2026 | KSmirnov | §1.3 companion doc versions updated (ALGO v1.5, SCHEMA v1.9). §4 glossary: TTB definition expanded with units and ALG-REQ refs; TTT definition added. Appendix D ALG-REQ range updated (001–080).    |
 ---
 
 

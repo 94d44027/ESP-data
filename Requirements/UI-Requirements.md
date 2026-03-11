@@ -1,8 +1,8 @@
 # UI Requirements Specification (UIS)
 ## ESP PoC - Visual Layer
 
-**Version:** 1.12  
-**Date:** March 2, 2026  
+**Version:** 1.13  
+**Date:** March 11, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
 **Reference:** Derived from demo UI screenshots and more
@@ -27,11 +27,11 @@ This specification is referenced by **REQ-123** in the main Requirements.md (SRS
 
 ### 1.3 Relationship to Other Documents
 
-| Document                             | Version | Relationship                                                           |
-|--------------------------------------|---------|------------------------------------------------------------------------|
-| Requirements.md  (SRS)               | v1.12   | The document defining main functional requirements for PoC application |
-| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.8    | Defines database schema (ESP01)                                        |
-| AlgoSpecs.md (ALGO)                  | v1.3    | Defines requirements to algorithms regarding attack path calculations  |
+| Document                             | Version | Relationship                                                                                                  |
+|--------------------------------------|---------|---------------------------------------------------------------------------------------------------------------|
+| Requirements.md  (SRS)               | v1.13   | The document defining main functional requirements for PoC application                                        |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.9    | Defines database schema (ESP01)                                                                               |
+| AlgoSpecs.md (ALGO)                  | v1.5    | Defines requirements to algorithms regarding attack path calculations (TTT/TTB computation added in v1.4–1.5) |
 
 
 ---
@@ -469,10 +469,12 @@ Layout (top to bottom):
    - Columns: Path | Hosts | TTA 
    - Path column: displays the path ID (e.g. P00001)
    - Hosts column: displays the asset chain (e.g. `A00013 -> A00018 -> A00011`). Line wraps are allowed in this column. 
-   - TTA column: integer value, right-aligned 
+   - TTA column: numeric value (hours), right-aligned, formatted to 2 decimal places (e.g. "12.45") 
    - Table is scrollable vertically if many results 
    - Rows are clickable (see UI-REQ-208)
    - Results sorted by TTA ascending (matching API response order)
+
+>Design note: TTA column is to be changed into "hh:mm:ss" format in the next version.
 
 Visual style:
 - Background: matches right panel / inspector panel (#202020 – #282828)
@@ -505,9 +507,60 @@ When a row in the Path Inspector results table is clicked:
 
 >Note: A candidate for future change - teh path table persistence is a planned feature.
 
+### UI-REQ-2091: TTB Calculation Parameters
+
+**Location:** Path Inspector panel (UI-REQ-207), between the Hops selector (§3) and the Run button (§4).
+
+The Path Inspector SHALL include an expandable **"Calculation Parameters"** section containing editable fields for the TTB calculation parameters defined in ALG-REQ-071, ALG-REQ-072, and ALG-REQ-075.
+
+**Layout:**
+
+The section is collapsed by default, showing only a header row:
+
+```
+▶ Calculation Parameters (defaults)
+```
+
+When expanded:
+
+```
+▼ Calculation Parameters
+  Orientation Time:    [ 15    ] min
+  Switchover Time:     [ 10    ] min
+  Priority Tolerance:  [ 1     ] ▼
+  [ Reset to Defaults ]
+```
+
+**Fields:**
+
+| Field              | Type         | Default | Range      | Unit    | ALG-REQ     |
+|--------------------|--------------|---------|------------|---------|-------------|
+| Orientation Time   | Number input | 15      | 0 – 1440   | minutes | ALG-REQ-071 |
+| Switchover Time    | Number input | 10      | 0 – 1440   | minutes | ALG-REQ-072 |
+| Priority Tolerance | Dropdown     | 1       | 0, 1, 2, 3 | —       | ALG-REQ-075 |
+
+**Input validation:**
+- Orientation Time and Switchover Time: numeric, non-negative, max 1440 (24 hours). Invalid input is rejected with a red border and tooltip: "Value must be between 0 and 1440 minutes."
+- Priority Tolerance: constrained by dropdown options (0 = "Highest only", 1 = "Top 2 levels", 2 = "Top 3 levels", 3 = "All priorities").
+
+**Unit conversion:**
+- The UI displays values in **minutes** (user-friendly) but passes them to the API in **hours** (ALG-REQ-071/072 define parameters in hours). The VIS layer performs the conversion: `hours = minutes / 60`.
+
+**Behaviour:**
+1. Parameter values persist across Path Inspector sessions within the same page load (stored in `state.js` or equivalent client-side state).
+2. Changing a parameter does NOT automatically re-run the path calculation. The user must click "Run" to apply new parameters.
+3. The "Reset to Defaults" button restores all three fields to their default values.
+4. When the section is collapsed, the header shows "(defaults)" if all values match defaults, or "(custom)" if any value has been changed.
+5. Parameter values are included in the path calculation API call.
+
+>Design note 1: The collapsed-by-default design keeps the Path Inspector clean for users who don't need to adjust parameters. The "(defaults)" / "(custom)" indicator lets experienced users see at a glance whether non-standard parameters are in effect.
+
+>Design note 2: The API transport mechanism for these parameters is not yet defined in SRS. For the PoC, the VIS layer MAY pass them as query parameters on the existing `GET /api/paths` endpoint (e.g., `?from=...&to=...&hops=6&orientation=0.25&switchover=0.1667&priority_tolerance=1`) or as a separate configuration endpoint. This is an implementation decision to be coordinated with SRS when the ALG-REQ-045/046 update happens.
+
+>Design note 3: Displaying time in minutes rather than hours avoids confusing fractional values (0.25 hours vs. 15 minutes). The 0–1440 range covers 0–24 hours, matching ALG-REQ-071/072 valid ranges.
+
+
 ## 6. Right Panel (Detail Inspector)
-
-
 
 ### UI-REQ-210: Asset Inspector Panel Structure
 
@@ -537,20 +590,20 @@ When a row in the Path Inspector results table is clicked:
     - Data source: `GET /api/asset/{id}` endpoint (REQ-022)
     - Layout: CSS grid with two equal columns
 
-   | Left column       | Right column     |
-      |--------------------|-----------------|
+   | Left column                  | Right column             |
+   |------------------------------|--------------------------|
    | **ASSET ID** (label + value) | **NAME** (label + value) |
 
     - Below the first row, full-width:
 
-   | Full width |
-      |---|
+   | Full width                                           |
+   |------------------------------------------------------|
    | **DESCRIPTION** (label + value: `Asset_Description`) |
 
     - Below description, two-column row:
 
    | Left column       | Right column     |
-      |--------------------|-----------------|
+   |--------------------|-----------------|
    | **TYPE** (label + value: `Asset_Type`) | **OS** (label + value: `os_name` from REQ-022) |
 
     - Field behaviour:
@@ -1156,8 +1209,7 @@ The following features are illustrated in reference UI but marked for future rel
 - [ ] Advanced filtering (date ranges, custom properties)
 - [ ] Path probability scoring
 - [x] Mitigation editing (basic CRUD via Mitigations Editor — UI-REQ-250–258)
-- [ ] Mitigation impact simulation (recalculate TTA with modified mitigations)
-
+- [ ] ~~Mitigation impact simulation~~ — partially addressed: TTT/TTB algorithms (ALG-REQ-060–080) compute TTA based on current mitigation state. Real-time "what-if" simulation (preview TTA changes before committing mitigations) remains future work.
 ---
 
 ## 17. Technical Implementation Notes
@@ -1208,21 +1260,22 @@ All files still served from `/opt/asset-viz/static/` as currently configured.
 
 The following API endpoints are defined in Requirements.md (SRS v1.12) and AlgoSpec.md (v1.1). Path-related endpoints (formerly REQ-029–031) are now specified in AlgoSpec.md. See also Appendix C of Requirements.md for the full endpoint summary.
 
-| Endpoint                                   | SRS Req | Purpose                                               | Used by UI-REQ       |
-|--------------------------------------------|---------|-------------------------------------------------------|----------------------|
-| `GET /api/graph`                           | REQ-020 | Graph nodes + edges with properties/types             | UI-REQ-200, 201, 202 |
-| `GET /api/assets`                          | REQ-021 | Asset list for sidebar (with filtering)               | UI-REQ-120, 121, 122 |
-| `GET /api/asset/{id}`                      | REQ-022 | Single asset detail for inspector panel               | UI-REQ-210           |
-| `GET /api/neighbors/{id}`                  | REQ-023 | Immediate neighbors of an asset                       | UI-REQ-210 §3–4      |
-| `GET /api/asset-types`                     | REQ-024 | Distinct asset types for filter checkboxes            | UI-REQ-122           |
-| `GET /api/edges/{sourceId}/{targetId}`     | REQ-026 | All connections between two assets for edge inspector | UI-REQ-212           |
-| `GET /api/paths?from=&to=&hops=`           | ALG-REQ-001 | Path calculation with TTA (AlgoSpec.md)           | UI-REQ-207           |
-| `GET /api/entry-points`                    | ALG-REQ-002 | Entry points for dropdown (AlgoSpec.md)           | UI-REQ-207 §1        |
-| `GET /api/targets`                         | ALG-REQ-003 | Targets for dropdown (AlgoSpec.md)                | UI-REQ-207 §2        |
-| `GET /api/mitigations`                     | REQ-033 | All MITRE mitigations for editor dropdown             | UI-REQ-254           |
-| `GET /api/asset/{id}/mitigations`          | REQ-034 | Applied mitigations for editor table                  | UI-REQ-252           |
-| `PUT /api/asset/{id}/mitigations`          | REQ-035 | Add/update applied mitigation                         | UI-REQ-256           |
-| `DELETE /api/asset/{id}/mitigations/{mid}` | REQ-036 | Remove applied mitigation                             | UI-REQ-257           |
+| Endpoint                                                          | SRS Req     | Purpose                                               | Used by UI-REQ         |
+|-------------------------------------------------------------------|-------------|-------------------------------------------------------|------------------------|
+| `GET /api/graph`                                                  | REQ-020     | Graph nodes + edges with properties/types             | UI-REQ-200, 201, 202   |
+| `GET /api/assets`                                                 | REQ-021     | Asset list for sidebar (with filtering)               | UI-REQ-120, 121, 122   |
+| `GET /api/asset/{id}`                                             | REQ-022     | Single asset detail for inspector panel               | UI-REQ-210             |
+| `GET /api/neighbors/{id}`                                         | REQ-023     | Immediate neighbors of an asset                       | UI-REQ-210 §3–4        |
+| `GET /api/asset-types`                                            | REQ-024     | Distinct asset types for filter checkboxes            | UI-REQ-122             |
+| `GET /api/edges/{sourceId}/{targetId}`                            | REQ-026     | All connections between two assets for edge inspector | UI-REQ-212             |
+| `GET /api/paths?from=&to=&hops=`                                  | ALG-REQ-001 | Path calculation with TTA (AlgoSpec.md)               | UI-REQ-207             |
+| `GET /api/entry-points`                                           | ALG-REQ-002 | Entry points for dropdown (AlgoSpec.md)               | UI-REQ-207 §1          |
+| `GET /api/targets`                                                | ALG-REQ-003 | Targets for dropdown (AlgoSpec.md)                    | UI-REQ-207 §2          |
+| `GET /api/mitigations`                                            | REQ-033     | All MITRE mitigations for editor dropdown             | UI-REQ-254             |
+| `GET /api/asset/{id}/mitigations`                                 | REQ-034     | Applied mitigations for editor table                  | UI-REQ-252             |
+| `PUT /api/asset/{id}/mitigations`                                 | REQ-035     | Add/update applied mitigation                         | UI-REQ-256             |
+| `DELETE /api/asset/{id}/mitigations/{mid}`                        | REQ-036     | Remove applied mitigation                             | UI-REQ-257             |
+| `GET /api/paths?...&orientation=&switchover=&priority_tolerance=` | ALG-REQ-001 | Path calculation with TTB params (AlgoSpec.md)        | UI-REQ-207, UI-REQ-210 |
 
 **`/api/graph` node data format (per REQ-020):**
 ```json
@@ -1402,33 +1455,34 @@ The UI implementation SHALL be considered complete when:
 
 ---
 
-## Appendix B: Mapping to Existing Requirements
+## Appendix B: Mapping to Existing Requirements (cross-reference)
 
-| New UI Req           | Original Req              | Notes                                                        |
-|----------------------|---------------------------|--------------------------------------------------------------|
-| UI-REQ-200, 201, 202 | REQ-010                   | Cytoscape.js usage confirmed                                 |
-| UI-REQ-300, 301      | REQ-011, REQ-101          | Contrast colors specified                                    |
-| UI-REQ-202           | REQ-012                   | Arrowhead on edges                                           |
-| UI-REQ-201           | REQ-013                   | Asset ID fits in/near node                                   |
-| UI-REQ-200           | REQ-020                   | Graph data with asset properties and types                   |
-| UI-REQ-120, 121, 122 | REQ-021                   | Asset list endpoint for sidebar                              |
-| UI-REQ-210           | REQ-022                   | Single asset detail for inspector panel                      |
-| UI-REQ-210 §3–4      | REQ-023                   | Neighbor list and connection summary                         |
-| UI-REQ-122           | REQ-024                   | Asset types list for filter checkboxes                       |
-| UI-REQ-310           | REQ-100                   | 1920x1080 minimum resolution                                 |
-| UI-REQ-400           | REQ-121, REQ-122          | Go backend, JSON API                                         |
-| UI-REQ-401           | REQ-123                   | Multi-file VIS layer (per SRS v1.10)                         |
-| UI-REQ-212           | REQ-026                   | Edge inspector panel, edge detail endpoint                   |
-| UI-REQ-202           | REQ-027                   | Edge consolidation (de-duplication)                          |
-| UI-REQ-206           | ALG-REQ-001 (AlgoSpec.md) | Inspector activation                                         |
-| UI-REQ-207           | ALG-REQ-001, 002, 003 (AlgoSpec.md) | Path Inspector panel with dropdowns and results     |
-| UI-REQ-208           | ALG-REQ-001 (AlgoSpec.md) | Path selection and graph highlighting                        |
-| UI-REQ-209           | ---                       | Stateless close behaviour                                    |
-| UI-REQ-250           | REQ-034                   | Editor activation, fetches applied mitigations               |
-| UI-REQ-252           | REQ-034                   | Table data source                                            |
-| UI-REQ-254           | REQ-033, REQ-039          | Dropdown populated from mitigations list, maturity fixed set |
-| UI-REQ-256           | REQ-035                   | Save triggers UPSERT EDGE                                    |
-| UI-REQ-257           | REQ-036                   | Delete triggers DELETE EDGE                                  |
+| New UI Req           | Original Req                        | Notes                                                        |
+|----------------------|-------------------------------------|--------------------------------------------------------------|
+| UI-REQ-200, 201, 202 | REQ-010                             | Cytoscape.js usage confirmed                                 |
+| UI-REQ-300, 301      | REQ-011, REQ-101                    | Contrast colors specified                                    |
+| UI-REQ-202           | REQ-012                             | Arrowhead on edges                                           |
+| UI-REQ-201           | REQ-013                             | Asset ID fits in/near node                                   |
+| UI-REQ-200           | REQ-020                             | Graph data with asset properties and types                   |
+| UI-REQ-120, 121, 122 | REQ-021                             | Asset list endpoint for sidebar                              |
+| UI-REQ-210           | REQ-022                             | Single asset detail for inspector panel                      |
+| UI-REQ-210 §3–4      | REQ-023                             | Neighbor list and connection summary                         |
+| UI-REQ-122           | REQ-024                             | Asset types list for filter checkboxes                       |
+| UI-REQ-310           | REQ-100                             | 1920x1080 minimum resolution                                 |
+| UI-REQ-400           | REQ-121, REQ-122                    | Go backend, JSON API                                         |
+| UI-REQ-401           | REQ-123                             | Multi-file VIS layer (per SRS v1.10)                         |
+| UI-REQ-212           | REQ-026                             | Edge inspector panel, edge detail endpoint                   |
+| UI-REQ-202           | REQ-027                             | Edge consolidation (de-duplication)                          |
+| UI-REQ-206           | ALG-REQ-001 (AlgoSpec.md)           | Inspector activation                                         |
+| UI-REQ-207           | ALG-REQ-001, 002, 003 (AlgoSpec.md) | Path Inspector panel with dropdowns and results              |
+| UI-REQ-208           | ALG-REQ-001 (AlgoSpec.md)           | Path selection and graph highlighting                        |
+| UI-REQ-209           | ---                                 | Stateless close behaviour                                    |
+| UI-REQ-250           | REQ-034                             | Editor activation, fetches applied mitigations               |
+| UI-REQ-252           | REQ-034                             | Table data source                                            |
+| UI-REQ-254           | REQ-033, REQ-039                    | Dropdown populated from mitigations list, maturity fixed set |
+| UI-REQ-256           | REQ-035                             | Save triggers UPSERT EDGE                                    |
+| UI-REQ-257           | REQ-036                             | Delete triggers DELETE EDGE                                  |
+| UI-REQ-210           | ALG-REQ-071, 072, 075 (AlgoSpec.md) | TTB calculation parameter controls in Path Inspector         |
 
    
 ---
@@ -1451,3 +1505,4 @@ The UI implementation SHALL be considered complete when:
 | 1.10    | Feb 28, 2026 | Changed UI-REQ-210 to reflect the new look of Asset Inspector, updated UI-REQ-212 (Edge inspector title - to be reviwed later).                                                                                                                                                       | AI + K. Smirnov |
 | 1.11    | Mar 1, 2026  | Refactoring: REQ-029/030/031 references updated to ALG-REQ-001/002/003 (AlgoSpec.md). Updated §1.1 SRS version ref, UI-REQ-207 inline refs, UI-REQ-402 table, Appendix B mapping.                                                                                                     | AI + K. Smirnov |
 | 1.12    | Mar 2, 2026  | UI-REQ-112 added (Recalculate TTBs button with stale-count badge). UI-REQ-113 added (stale path warning in Path Inspector). UI-REQ-110 amended (new button in right section). Appendix B updated.                                                                                     | AI + K. Smirnov |  
+| 1.13    | Mar 11, 2026 | KSmirnov | §1.1 ALGO version updated (v1.5). UI-REQ-207 §5: TTA column format changed from integer to float (2 decimal places). UI-REQ-210 added (TTB Calculation Parameters — Orientation Time, Switchover Time, Priority Tolerance controls in Path Inspector). Future features checklist updated (mitigation impact partially addressed). Appendix B updated. |
