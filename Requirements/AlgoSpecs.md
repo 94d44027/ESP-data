@@ -1,8 +1,8 @@
 # Algorithm Requirements Specification (ALGO)
 ## ESP PoC — TTA/TTB Path Calculation and related things
 
-**Version:** 1.5  
-**Date:** March 10, 2026  
+**Version:** 1.6  
+**Date:** March 11, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI  
 **Project:** ESP PoC for Nebula Graph  
 **Reference:** Derived from SRS, UIS, SCHEMA, TTB/TTT flows
@@ -32,11 +32,11 @@ This specification does **not** cover:
 
 ### 1.3 Relationship to Other Documents
 
-| Document                             | Version | Relationship                                                                                                                                                                                                                                   |
-|--------------------------------------|---------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Requirements.md (SRS)                | v1.12   | Parent document. Stubs REQ-029–032 reference this spec. API summary in Appendix C links here.                                                                                                                                                  |
-| UI-Requirements.md  (UIR)            | v1.12   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                                                                                                                                               |
-| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.9    | Defines Asset.TTB property (TA001), connects_to edges (ED005), applied_to edges (ED001) and other elements of database schema, like MitrePlatform (TA011), ED014 (represents), ED003 (can_be_executed_on) being used for OS-platform filtering |
+| Document                             | Version | Relationship                                                                                                                                                                                                                                                                                                                            |
+|--------------------------------------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Requirements.md (SRS)                | v1.14   | Parent document. Stubs REQ-029–032 reference this spec. API summary in Appendix C links here.                                                                                                                                                                                                                                           |
+| UI-Requirements.md  (UIR)            | v1.13   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                                                                                                                                                                                                                                        |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.10   | Defines Asset.TTB property (TA001), connects_to edges (ED005), applied_to edges (ED001) and other elements of database schema, like MitrePlatform (TA011), ED014 (represents), ED003 (can_be_executed_on) being used for OS-platform filtering, defines DI-01/DI-02/DI-03 guarantee has_type, belongs_to, runs_on edges for all Assets. ||
 
 ### 1.4 Requirement ID Convention
 
@@ -248,8 +248,8 @@ WITH a, conn_parts, m, e,
 ORDER BY mit_id
 WITH a, conn_parts,
   collect(concat_ws("|", mit_id, toString(e.Maturity), toString(e.Active))) AS mit_parts
-OPTIONAL MATCH (a)-[:runs_on]->(os:OS_Type)
-OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
+MATCH (a)-[:runs_on]->(os:OS_Type)
+MATCH (a)-[:has_type]->(t:Asset_Type)
 RETURN
   a.Asset.Asset_ID AS asset_id,
   a.Asset.TTB AS current_ttb,
@@ -258,12 +258,18 @@ RETURN
     reduce(s = "", x IN conn_parts | s + x + ";"),
     reduce(s = "", x IN mit_parts | s + x + ";"),
     toString(a.Asset.has_vulnerability),
-    COALESCE(os.OS_Type.OS_Name, "none"),
-    COALESCE(t.Asset_Type.Type_Name, "none")
+    os.OS_Type.OS_Name,
+    t.Asset_Type.Type_Name
   )) AS computed_hash;
 ```
 
->Design note: `hash()` is not a cryptographic hash — it is MurmurHash2 returning int64. This is acceptable for change detection purposes. The stored `hash` property on Asset is a string representation of this int64 (via `toString()` in the APP layer).
+>Design note 1: `hash()` is not a cryptographic hash — it is MurmurHash2 returning int64. This is acceptable for change detection purposes. The stored `hash` property on Asset is a string representation of this int64 (via `toString()` in the APP layer).
+
+> Design note 2: "OPTIONAL MATCH for runs_on and has_type replaced with MATCH per SRS REQ-043 / SCHEMA DI-01 and DI-03. COALESCE() fallbacks removed as these relationships are guaranteed present. (since ver 1.6 of this document)
+
+>Design note 3: The OPTIONAL MATCH for connects_to (inbound connections) and applied_to (mitigations) SHALL remain OPTIONAL MATCH, because an asset MAY have zero inbound connections and MAY have zero applied mitigations. These are not covered by DI invariants. Since version 1.6 of this document.
+
+
 
 >nGQL note: `ORDER BY` operates on column aliases defined in the preceding `WITH` clause, not on raw tag property paths. The pattern `WITH ... AS alias ORDER BY alias WITH ... collect(...)` ensures deterministic ordering before aggregation.
 
@@ -790,6 +796,8 @@ RETURN technique_id,
 3. The `reduce()` list comprehension iterates over the `active_mitigations` list (already filtered to `active == true`) and sums the normalised maturity values. If the list is empty, `reduce` returns the seed value `0.0`.
 
 4. Both `OPTIONAL MATCH` clauses are necessary: the first counts all mitigations for the technique globally; the second counts only those applied to the specific asset. These are distinct sets — a technique may have 5 possible mitigations, of which only 2 are applied to the asset in question.
+5. The `OPTIONAL MATCH` for `mitigates` relationships is retained because a technique MAY have zero mitigations. The `MATCH` clause for OS platform filtering (`runs_on → represents → can_be_executed_on`) is already a plain MATCH and is correct — it serves as a precondition filter per ALG-REQ-062.
+
 
 >Design note 1: The query is self-contained — it performs OS platform validation, mitigation counting, and TTT computation in a single database round-trip. The APP layer receives the final TTT value directly.
 
@@ -1404,6 +1412,7 @@ The following capabilities are anticipated but out of scope for v1.0:
 | 1.3     | Mar 4, 2026 | KSmirnov | Moved tactic chains from chains.json to GrDB graph objects (TA010 TacticChain, ED013 chain_includes). Rewrote ALG-REQ-050 (chain definition), ALG-REQ-052 (TTB query — corrected nGQL syntax). Amended ALG-REQ-051 (VID mapping), ALG-REQ-044 (chain VID parameter). Cross-references updated for new schema elements. |
 | 1.4     | Mar 10, 2026 | KSmirnov | Added §5A: ALG-REQ-060–066 (TTT calculation formula, boundary conditions, OS platform filtering, Active/Inactive mitigation handling, reference nGQL query, output contract, relationship to ALG-REQ-052). TTT definition in §2 expanded. Schema cross-reference updated for SCHEMA v1.9 elements (TA011 MitrePlatform, ED014 represents, ED003 can_be_executed_on). Future extensions updated. |
 | 1.5 | Mar 10, 2026 | KSmirnov | Added §5B: ALG-REQ-070–080 (TTB calculation algorithm, orientation/switchover time parameters, first-tactic technique selection, vulnerability filtering, priority selection with tolerance, pattern-based technique transitions, fastest technique selection, TTB accumulation formula, calculation log, empty-set handling). TTB definition in §2 expanded; Orientation Time, Switchover Time, Priority Tolerance definitions added. ALG-REQ-020/021/022 marked as superseded. ALG-REQ-044 supersession notice added. Cross-reference matrices updated. Future extensions updated. |
+| 1.6  | Mar 11, 2026 | KSmirnov | ALG-REQ-042: replaced OPTIONAL MATCH with MATCH for runs_on and has_type per SCHEMA DI-01/DI-03; removed COALESCE fallbacks. Added note to ALG-REQ-064. Updated SCHEMA reference to v1.10. |
 
 ---
 

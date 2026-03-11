@@ -1,5 +1,5 @@
 # ESP01 NebulaGraph 3.8 Schema - Complete Documentation
-**Version:** 1.9  
+**Version:** 1.10  
 **Created:** March 06, 2026  
 **Prepared by:** Konstantin Smirnov
 **Space:** ESP01 (IT Infrastructure / MITRE ATT&CK Model)  
@@ -26,6 +26,35 @@ vid_type = FIXED_STRING(64)
 | Collate          | utf8_bin         |
 | VID Type         | FIXED_STRING(64) |
 | Comment          | (empty)          |
+
+## DI: Data Integrity Invariants
+
+The following invariants SHALL hold for all data loaded into ESP01. All nGQL queries in the APP layer are written assuming these invariants are true; violating them may produce incorrect or missing results.
+
+| ID    | Invariant                                                            | Tags / Edges involved                                      |
+|-------|----------------------------------------------------------------------|------------------------------------------------------------|
+| DI-01 | Every Asset vertex SHALL have exactly one outgoing `has_type` edge   | TA001 (Asset), ED007 (has_type), TA002 (Asset_Type)        |
+| DI-02 | Every Asset vertex SHALL have exactly one outgoing `belongs_to` edge | TA001 (Asset), ED002 (belongs_to), TA003 (Network_Segment) |
+| DI-03 | Every Asset vertex SHALL have exactly one outgoing `runs_on` edge    | TA001 (Asset), ED011 (runs_on), TA004 (OS_Type)            |
+
+> Design note: These invariants are enforced at data loading time, not by database constraints (NebulaGraph does not support mandatory-edge constraints). The verification queries are:
+>
+> ```nGQL
+> -- Find assets missing has_type:
+> MATCH (a:Asset) OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
+> WITH a, t WHERE t IS NULL RETURN id(a), a.Asset.Asset_Name;
+>
+> -- Find assets missing belongs_to:
+> MATCH (a:Asset) OPTIONAL MATCH (a)-[:belongs_to]->(s:Network_Segment)
+> WITH a, s WHERE s IS NULL RETURN id(a), a.Asset.Asset_Name;
+>
+> -- Find assets missing runs_on:
+> MATCH (a:Asset) OPTIONAL MATCH (a)-[:runs_on]->(os:OS_Type)
+> WITH a, os WHERE os IS NULL RETURN id(a), a.Asset.Asset_Name;
+> ```
+> All three queries SHALL return empty result sets before the application is started.
+
+>Design Note: after internal editor for Asset connections and "has_type", "belongs_to", and "runs_on" is introduced the last limitation may be lifted. Or such assets may be simply ignored and marked as excluded (disabled), till they get all the proper connections by editing.
 
 ## TA: Tags
 MITRE ATT&CK tactics, techniques, subtechniques, mitigations
@@ -263,6 +292,7 @@ This relationship is used to indicate to which network segment an asset belongs 
 | vlan_id        | int16  | YES  | _EMPTY_ | VLAN ID if applicable        |
 #### Notes
 None of the fields are used so far.
+**Invariant DI-02**: Every Asset SHALL have exactly one belongs_to edge. See DI section.
 
 ### ED003: can_be_executed_on
 #### Used for
@@ -331,6 +361,8 @@ This field is used to indicate device type (Asset_Type) to IT infrastructure ass
 | assigned_date | datetime | YES  | datetime()  | _EMPTY_ | 
 #### Notes
 Assigned date is the indirect way to indicate when teh asset was added to an asset database. More properties will be added at later stage (like IT Infrastructure version - for future use).
+**Invariant DI-01**: Every Asset SHALL have exactly one has_type edge. See DI section.
+
 
 ### ED008: implements
 #### Used for
@@ -374,6 +406,7 @@ This is to show the relationship between Asset and the type od operating system 
 | license_key       | string   | YES  | NULL    | _EMPTY_ |
 #### Notes
 The data on connectivity is defined externally, at the data loading or later updated using the built-in ESP PoC system interface. None of the fields are used so far.
+**Invariant DI-03**: Every Asset SHALL have exactly one runs_on edge. See DI section.
 
 ### ED012: patterns_to
 #### Used for
@@ -452,3 +485,4 @@ CREATE EDGE IF NOT EXISTS represents();
 | 1.7     | Mar 01, 2026 | TA001: added hash (string) and hash_valid (bool) properties. TA009 added (SystemState tag). SYS001 vertex created.                               | AI + K.Smirnov     |
 | 1.8     | Mar 4, 2026  | TA010 added (TacticChain tag). ED013 added (chain_includes edge). 3 vertices + 25 edges loaded.                                                  | AI + K.Smirnov     |
 | 1.9     | Mar 6, 2026  | TA011 added (MitrePlatform tag), ED003 has been edited, ED014 added. New indexes (idx_mitre_platform_any, idx_can_exec_on, idx_represents) added | AI + K.Smirnov     |
+| 1.10    | Mar 11, 2026 | Added DI (Data Integrity Invariants) section: DI-01, DI-02, DI-03. Added invariant notes to ED002, ED007, ED011.                                 | AI + K.Smirnov     | 

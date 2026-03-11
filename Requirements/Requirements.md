@@ -1,7 +1,7 @@
 # Software Requirements Specification (SRS)
 ## ESP Proof Of Concept system
 
-**Version:** 1.13  
+**Version:** 1.14  
 **Date:** March 11, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
@@ -22,8 +22,8 @@ This document describes the complete set of requirements for Version 1.0 of ESP 
 | Document                             | Version | Relationship                                                                                                                                                     |
 |--------------------------------------|---------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | UI-Requirements.md  (UIR)            | v1.13   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                                                                 |
-| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.9    | Defines database schema (ESP01)                                                                                                                                  |
-| AlgoSpecs.md (ALGO)                  | v1.5    | Defines requirements to algorithms regarding attack path calculations (REQ-029 through REQ-032 migrated there; TTT/TTB computation algorithms added in v1.4–1.5) |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.10   | Defines database schema (ESP01)                                                                                                                                  |
+| AlgoSpecs.md (ALGO)                  | v1.6    | Defines requirements to algorithms regarding attack path calculations (REQ-029 through REQ-032 migrated there; TTT/TTB computation algorithms added in v1.4–1.5) |
 
 ### 1.4 Intended Audience
 - Software developers and architects
@@ -157,10 +157,10 @@ All paths are for developers workstation and have a base of `~/projects/ESP-data
 
 **REQ-020:** The graph connectivity data, including asset properties and asset types, SHALL be retrieved from the database using the following query. This query serves the `/api/graph` endpoint and provides the data needed for graph visualisation (node colouring, labels) and the sidebar entity list (type badges, filtering). Justification for using MATCH syntax: OPTIONAL MATCH with multi-hop property retrieval is significantly cleaner than chained GO statements; this is an acceptable use per REQ-244.
 
-```
+``` nGQL
 MATCH (a:Asset)-[e:connects_to]->(b:Asset)
-OPTIONAL MATCH (a)-[:has_type]->(at:Asset_Type)
-OPTIONAL MATCH (b)-[:has_type]->(bt:Asset_Type)
+MATCH (a)-[:has_type]->(at:Asset_Type)
+MATCH (b)-[:has_type]->(bt:Asset_Type)
 RETURN
   a.Asset.Asset_ID AS src_asset_id,
   a.Asset.Asset_Name AS src_asset_name,
@@ -175,17 +175,16 @@ RETURN
   b.Asset.is_target AS dst_is_target,
   b.Asset.priority AS dst_priority,
   b.Asset.has_vulnerability AS dst_has_vulnerability,
-  bt.Asset_Type.Type_Name AS dst_asset_type
-LIMIT 300;
+  bt.Asset_Type.Type_Name AS dst_asset_type;
 ```
 
-> **Note:** The MATCH query returns one row per `connects_to` edge, including edges with different rank values. For a pair of assets with N connections (N ranked edges), the query produces N rows. The APP layer de-duplicates these into a single visual edge per REQ-027. The `LIMIT 300` will be uplifted at teh later versions, candidate for future change.
+> **Note:** The MATCH query returns one row per `connects_to` edge, including edges with different rank values. For a pair of assets with N connections (N ranked edges), the query produces N rows. The APP layer de-duplicates these into a single visual edge per REQ-027.
 
 **REQ-021:** The APP layer SHALL provide an API endpoint (`GET /api/assets`) that returns a list of all assets with their associated type names, to populate the sidebar entity browser (UI-REQ-120) and support filtering by asset type (UI-REQ-122). The underlying query:
 
-```
+``` nGQL
 MATCH (a:Asset)
-OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
+MATCH (a)-[:has_type]->(t:Asset_Type)
 RETURN
   a.Asset.Asset_ID AS asset_id,
   a.Asset.Asset_Name AS asset_name,
@@ -204,9 +203,9 @@ _Note “In the current version, filtering is performed client-side from the ful
 
 ```nGQL
 MATCH (a:Asset) WHERE a.Asset.Asset_ID == $assetId
-OPTIONAL MATCH (a)-[:has_type]->(t:Asset_Type)
-OPTIONAL MATCH (a)-[:belongs_to]->(s:Network_Segment)
-OPTIONAL MATCH (a)-[:runs_on]->(os:OS_Type)
+MATCH (a)-[:has_type]->(t:Asset_Type)
+MATCH (a)-[:belongs_to]->(s:Network_Segment)
+MATCH (a)-[:runs_on]->(os:OS_Type)
 RETURN
   a.Asset.Asset_ID AS asset_id,
   a.Asset.Asset_Name AS asset_name,
@@ -426,6 +425,10 @@ Response: HTTP 200 on success. HTTP 500 on database error.
 **REQ-042:** Hash Invalidation on Mitigation Write. When the UPSERT (REQ-035) or DELETE (REQ-036) mitigation operation succeeds, the APP layer SHALL additionally execute the invalidation statements specified in ALG-REQ-043: set `hash_valid = false` on the affected Asset vertex and increment `stale_count` on the SystemState vertex. Invalidation failures SHALL be logged but SHALL NOT cause the mitigation operation to return an error.
 
 
+#### 3.1.3C Data Integrity Precondition
+
+**REQ-043:** The APP layer SHALL assume that every Asset vertex in the database has exactly one `has_type`, `belongs_to`, and `runs_on` edge (SCHEMA invariants DI-01, DI-02, DI-03).
+Queries in REQ-020, REQ-021, REQ-022, and ALG-REQ-042 SHALL use `MATCH` instead of `OPTIONAL MATCH` for these three relationships. `COALESCE()` fallbacks for type, segment, and OS are not required.
 
 
 #### 3.1.4 Data Validation
@@ -599,6 +602,7 @@ Each requirement shall be considered complete when:
 | 1.11    | Mar 1, 2026  | KSmirnov | REQ-029–032 migrated to AlgoSpec.md (ALG-REQ-001–010). Stubs retained in §3.1.3. Appendix C updated with ALG-REQ refs. Appendix D added (AlgoSpec); old D→E, E→F. §1.2 updated with companion docs.  |
 | 1.12    | Mar 2, 2026  | KSmirnov | REQ-040–042 added (recalculate TTB endpoint, system state endpoint, hash invalidation on mitigation write). §3.1.3B added. Appendix C updated.                                                       |
 | 1.13    | Mar 11, 2026 | KSmirnov | §1.3 companion doc versions updated (ALGO v1.5, SCHEMA v1.9). §4 glossary: TTB definition expanded with units and ALG-REQ refs; TTT definition added. Appendix D ALG-REQ range updated (001–080).    |
+| 1.14 | Mar 11, 2026 | KSmirnov | Added REQ-043 (data integrity precondition). Replaced OPTIONAL MATCH with MATCH in REQ-020, REQ-021, REQ-022 per DI-01/02/03. Updated SCHEMA reference to v1.10. |
 ---
 
 
