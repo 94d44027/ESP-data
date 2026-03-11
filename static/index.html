@@ -123,6 +123,45 @@
                 </div>
             </div>
 
+
+            <!-- Calculation Parameters (UI-REQ-2091) -->
+            <div class="calc-params-section">
+                <div class="calc-params-header" onclick="toggleCalcParams()">
+                    <span class="calc-params-toggle" id="calc-params-toggle">&#9654;</span>
+                    <span class="calc-params-title">Calculation Parameters</span>
+                    <span class="calc-params-label" id="calc-params-label">(defaults)</span>
+                </div>
+                <div class="calc-params-content" id="calc-params-content" style="display:none;">
+                    <div class="calc-param-row">
+                        <span class="calc-param-label">Orientation Time</span>
+                        <input type="number" class="calc-param-input" id="param-orientation"
+                               value="15" min="0" max="1440" step="1"
+                               onchange="syncCalcParams()">
+                        <span class="calc-param-unit">min</span>
+                    </div>
+                    <div class="calc-param-row">
+                        <span class="calc-param-label">Switchover Time</span>
+                        <input type="number" class="calc-param-input" id="param-switchover"
+                               value="10" min="0" max="1440" step="1"
+                               onchange="syncCalcParams()">
+                        <span class="calc-param-unit">min</span>
+                    </div>
+                    <div class="calc-param-row">
+                        <span class="calc-param-label">Priority Tolerance</span>
+                        <select class="calc-param-select" id="param-priority"
+                                onchange="syncCalcParams()">
+                            <option value="0">0 &#8212; Highest only</option>
+                            <option value="1" selected>1 &#8212; Top 2 levels</option>
+                            <option value="2">2 &#8212; Top 3 levels</option>
+                            <option value="3">3 &#8212; All priorities</option>
+                        </select>
+                    </div>
+                    <button class="calc-params-reset" onclick="resetCalcParamsToDefaults()">
+                        Reset to Defaults
+                    </button>
+                </div>
+            </div>
+
             <!-- Status message -->
             <div class="path-status" id="path-status"></div>
 

@@ -122,6 +122,19 @@ function initCytoscape(graphData) {
                     'width': 4,
                     'z-index': 10
                 }
+            },
+            // Non-path elements dimmed during path highlighting (UI-REQ-332)
+            {
+                selector: 'node.path-dimmed',
+                style: {
+                    'opacity': 0.3
+                }
+            },
+            {
+                selector: 'edge.path-dimmed',
+                style: {
+                    'opacity': 0.15
+                }
             }
         ],
 

@@ -1555,7 +1555,7 @@ RETURN
 		}
 		results = append(results, StaleAssetHash{
 			AssetID:      safeString(record, 0),
-			CurrentTTB:   safeFloat64(record, 1),
+			CurrentTTB:   safeFloat64(record, 1, 10),
 			StoredHash:   safeString(record, 2),
 			ComputedHash: safeInt64(record, 3),
 		})
@@ -1638,7 +1638,7 @@ RETURN
 		}
 		results = append(results, StaleAssetHash{
 			AssetID:      safeString(record, 0),
-			CurrentTTB:   safeFloat64(record, 1),
+			CurrentTTB:   safeFloat64(record, 1, 10),
 			StoredHash:   safeString(record, 2),
 			ComputedHash: safeInt64(record, 3),
 		})
@@ -1861,7 +1861,7 @@ YIELD Asset.Asset_ID AS asset_id,
 		}
 		aid := safeString(record, 0)
 		validity[aid] = safeBool(record, 1)
-		ttbs[aid] = safeFloat64(record, 2)
+		ttbs[aid] = safeFloat64(record, 2, 10)
 	}
 
 	return validity, ttbs, nil

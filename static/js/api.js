@@ -63,9 +63,29 @@ const API = {
         return await response.json();
     },
 
-    // ALG-REQ-001: Calculate paths between entry and target
-    async fetchPaths(fromId, toId, hops = 6) {
-        const response = await fetch(`/api/paths?from=${fromId}&to=${toId}&hops=${hops}`);
+    // ALG-REQ-001: Calculate paths with optional TTB parameters (UI-REQ-2091)
+    async fetchPaths(fromId, toId, hops = 6, ttbParams = null) {
+        const params = new URLSearchParams({
+            from: fromId,
+            to: toId,
+            hops: hops.toString()
+        });
+
+        // Append TTB calculation parameters if provided (UI-REQ-2091)
+        // UI displays minutes; API expects hours (ALG-REQ-071/072)
+        if (ttbParams) {
+            if (ttbParams.orientationTime != null) {
+                params.append('orientationTime', (ttbParams.orientationTime / 60).toString());
+            }
+            if (ttbParams.switchoverTime != null) {
+                params.append('switchoverTime', (ttbParams.switchoverTime / 60).toString());
+            }
+            if (ttbParams.priorityTolerance != null) {
+                params.append('priorityTolerance', ttbParams.priorityTolerance.toString());
+            }
+        }
+
+        const response = await fetch(`/api/paths?${params.toString()}`);
         if (!response.ok) throw new Error('Failed to calculate paths');
         return await response.json();
     },
