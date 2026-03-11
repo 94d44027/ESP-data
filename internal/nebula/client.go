@@ -3,7 +3,6 @@ package nebula
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -626,7 +625,7 @@ RETURN ids, ttbs;`, maxHops, entryID, targetID)
 			continue
 		}
 
-		ttbs, err := extractIntList(record, 1)
+		ttbs, err := extractFloatList(record, 1)
 		if err != nil {
 			log.Printf("nebula: skipping row %d ttbs: %v", i, err)
 			continue
@@ -852,7 +851,7 @@ func DeleteMitigation(pool *nebula.ConnectionPool, cfg *config.Config, mitigatio
 // StaleAssetHash holds the result of the hash computation query (ALG-REQ-042).
 type StaleAssetHash struct {
 	AssetID      string
-	CurrentTTB   int
+	CurrentTTB   float64
 	StoredHash   string
 	ComputedHash int64
 }
@@ -860,8 +859,8 @@ type StaleAssetHash struct {
 // PathResult holds one discovered path's ordered node IDs and their stored TTBs.
 // Returned by QueryPaths (ALG-REQ-001 v1.3).
 type PathResult struct {
-	IDs  []string // ordered Asset_IDs: [entry, ..intermediates.., target]
-	TTBs []int    // stored TTB per node (Regular_chain values)
+	IDs  []string  // ordered Asset_IDs: [entry, ..intermediates.., target]
+	TTBs []float64 // stored TTB per node (hours, float64 since v1.5)
 }
 
 // ChainVIDForPosition returns the TacticChain vertex ID for a node's
@@ -875,25 +874,6 @@ func ChainVIDForPosition(index, pathLength int) string {
 	default:
 		return "CHAIN_INTERMEDIATE"
 	}
-}
-
-// chainTacticCount returns the number of tactics in a chain.
-// Hardcoded for the stub (ALG-REQ-044 v1.3); will be replaced
-// by a GrDB query when the real TTB formula is implemented.
-var chainTacticCount = map[string]int{
-	"CHAIN_ENTRANCE":     8,
-	"CHAIN_INTERMEDIATE": 7,
-	"CHAIN_TARGET":       10,
-}
-
-// ComputeTTBStub calculates a stub TTB value (ALG-REQ-044 v1.3).
-// new_TTB = current_TTB + random(1,10) + chain_tactic_count(chainVID)
-func ComputeTTBStub(currentTTB int, chainVID string) int {
-	count, ok := chainTacticCount[chainVID]
-	if !ok {
-		count = 7 // default to intermediate
-	}
-	return currentTTB + rand.Intn(10) + 1 + count
 }
 
 // TTTResult holds the output of a single technique's TTT computation (ALG-REQ-065).
@@ -1475,6 +1455,29 @@ func extractIntList(record *nebula.Record, idx int) ([]int, error) {
 	return result, nil
 }
 
+func extractFloatList(record *nebula.Record, idx int) ([]float64, error) {
+	val, err := record.GetValueByIndex(idx)
+	if err != nil {
+		return nil, err
+	}
+	list, err := val.AsList()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]float64, 0, len(list))
+	for _, v := range list {
+		// NebulaGraph may return int or float depending on the stored type
+		if f, err := v.AsFloat(); err == nil {
+			result = append(result, f)
+		} else if n, err := v.AsInt(); err == nil {
+			result = append(result, float64(n))
+		} else {
+			return nil, fmt.Errorf("cannot convert list element to float64")
+		}
+	}
+	return result, nil
+}
+
 // safeInt64 extracts an int64 from a ResultSet value, returning 0 on error.
 func safeInt64(record *nebula.Record, idx int) int64 {
 	val, err := record.GetValueByIndex(idx)
@@ -1552,7 +1555,7 @@ RETURN
 		}
 		results = append(results, StaleAssetHash{
 			AssetID:      safeString(record, 0),
-			CurrentTTB:   safeInt(record, 1, 10),
+			CurrentTTB:   safeFloat64(record, 1),
 			StoredHash:   safeString(record, 2),
 			ComputedHash: safeInt64(record, 3),
 		})
@@ -1635,7 +1638,7 @@ RETURN
 		}
 		results = append(results, StaleAssetHash{
 			AssetID:      safeString(record, 0),
-			CurrentTTB:   safeInt(record, 1, 10),
+			CurrentTTB:   safeFloat64(record, 1),
 			StoredHash:   safeString(record, 2),
 			ComputedHash: safeInt64(record, 3),
 		})
@@ -1647,14 +1650,14 @@ RETURN
 
 // UpdateAssetTTBAndHash writes the new TTB, hash, and sets hash_valid = true
 // for a single asset (ALG-REQ-045 step 2b).
-func UpdateAssetTTBAndHash(pool *nebula.ConnectionPool, cfg *config.Config, assetID string, newTTB int, hashStr string) error {
+func UpdateAssetTTBAndHash(pool *nebula.ConnectionPool, cfg *config.Config, assetID string, newTTB float64, hashStr string) error {
 	session, err := openSession(pool, cfg)
 	if err != nil {
 		return err
 	}
 	defer session.Release()
 
-	query := fmt.Sprintf(`UPDATE VERTEX ON Asset "%s" SET TTB = %d, hash = "%s", hash_valid = true;`,
+	query := fmt.Sprintf(`UPDATE VERTEX ON Asset "%s" SET TTB = %f, hash = "%s", hash_valid = true;`,
 		assetID, newTTB, hashStr)
 
 	resultSet, err := session.Execute(query)
@@ -1819,7 +1822,7 @@ YIELD Asset.Asset_ID AS asset_id, Asset.hash AS hash
 
 // QueryAssetHashValidity fetches hash_valid and TTB for a specific set of
 // asset IDs (ALG-REQ-046 step 3). Uses FETCH PROP for direct VID lookup.
-func QueryAssetHashValidity(pool *nebula.ConnectionPool, cfg *config.Config, assetIDs []string) (map[string]bool, map[string]int, error) {
+func QueryAssetHashValidity(pool *nebula.ConnectionPool, cfg *config.Config, assetIDs []string) (map[string]bool, map[string]float64, error) {
 	if len(assetIDs) == 0 {
 		return nil, nil, nil
 	}
@@ -1850,7 +1853,7 @@ YIELD Asset.Asset_ID AS asset_id,
 	}
 
 	validity := make(map[string]bool, resultSet.GetRowSize())
-	ttbs := make(map[string]int, resultSet.GetRowSize())
+	ttbs := make(map[string]float64, resultSet.GetRowSize())
 	for i := 0; i < resultSet.GetRowSize(); i++ {
 		record, err := resultSet.GetRowValuesByIndex(i)
 		if err != nil {
@@ -1858,7 +1861,7 @@ YIELD Asset.Asset_ID AS asset_id,
 		}
 		aid := safeString(record, 0)
 		validity[aid] = safeBool(record, 1)
-		ttbs[aid] = safeInt(record, 2, 10)
+		ttbs[aid] = safeFloat64(record, 2)
 	}
 
 	return validity, ttbs, nil

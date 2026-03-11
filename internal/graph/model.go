@@ -595,27 +595,15 @@ type RecalculateResponse struct {
 // Path response with recalculation info (ALG-REQ-046)
 // ============================================================
 
-// TTBLogEntry records one step of the TTB calculation for audit/debugging (ALG-REQ-079).
-type TTBLogEntry struct {
-	AssetID       string  `json:"asset_id"`
-	TacticIndex   int     `json:"tactic_index"`
-	TacticID      string  `json:"tactic_id"`
-	TechniqueID   string  `json:"technique_id"`
-	TTT           float64 `json:"ttt"`
-	SwitchoverAdd float64 `json:"switchover_add"`
-	RunningTTB    float64 `json:"running_ttb"`
-	Note          string  `json:"note,omitempty"`
-}
-
 // PathsResponseWithRecalc extends PathsResponse with recalculated asset info.
 type PathsResponseWithRecalc struct {
-	Paths              []PathItem    `json:"paths"`
-	EntryPoint         string        `json:"entry_point"`
-	Target             string        `json:"target"`
-	Hops               int           `json:"hops"`
-	Total              int           `json:"total"`
-	RecalculatedAssets []string      `json:"recalculated_assets"`
-	TTBLog             []TTBLogEntry `json:"ttb_log,omitempty"`
+	Paths              []PathItem           `json:"paths"`
+	EntryPoint         string               `json:"entry_point"`
+	Target             string               `json:"target"`
+	Hops               int                  `json:"hops"`
+	Total              int                  `json:"total"`
+	RecalculatedAssets []string             `json:"recalculated_assets"`
+	TTBLog             []nebula.TTBLogEntry `json:"ttb_log,omitempty"`
 }
 
 // BuildPathsResponseWithRecalc converts raw query maps into a response.
