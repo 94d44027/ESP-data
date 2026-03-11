@@ -901,6 +901,7 @@ function computeTTB(assetId, chainVid, orientationTime, switchoverTime, priority
         // Step 4: Empty set guard
         if len(candidates) == 0:
             // ALG-REQ-080: no techniques available for this tactic
+            // No TTT and no switchover added — attacker skips this tactic entirely
             log.append((currentTactic, NULL, 0))
             previousTactic = currentTactic
             fastestTechnique = NULL
@@ -914,7 +915,10 @@ function computeTTB(assetId, chainVid, orientationTime, switchoverTime, priority
         fastestTechnique = selectFastest(candidates)                            // ALG-REQ-077
 
         // Step 7: Accumulate TTB
-        TTB = TTB + switchoverTime + fastestTechnique.TTT                       // ALG-REQ-078
+        // Switchover is added BEFORE each technique except the first one (ALG-REQ-072/078)
+        if len(log) > 0:                                                        // at least one technique already logged
+            TTB = TTB + switchoverTime
+        TTB = TTB + fastestTechnique.TTT                                        // ALG-REQ-078
 
         // Step 8: Log the result
         log.append((currentTactic, fastestTechnique.id, fastestTechnique.TTT))  // ALG-REQ-079
@@ -980,7 +984,7 @@ The Switchover Time is added **once per technique** in the chain, except for the
 
 >Design note 2: The Switchover Time models the attacker's overhead when pivoting from one technique to the next, whether they (techniques/subtechniques) have the same parent tactic or not.
 
->Design note 3: The Switchover Time is added even when the empty-set guard (ALG-REQ-080) triggers. This is a design choice: the attacker still spends time attempting to find a technique, even if none is available. (An alternative design would skip Switchover Time for empty tactics; this can be revisited based on PoC evaluation).
+>Design note 3: The Switchover Time is NOT added when the empty-set guard (ALG-REQ-080) triggers — since no technique is executed, there is no "switchover" between techniques. Empty-set tactics contribute nothing to TTB.
 
 
 ### ALG-REQ-073: First-Tactic Technique Selection
@@ -1143,7 +1147,7 @@ After all filtering steps (OS, vulnerability, priority) and TTT computation for 
 
 ### ALG-REQ-078: TTB Accumulation Formula
 
-The TTB value SHALL be accumulated across tactic iterations using the following formula:
+The TTB value SHALL be accumulated across tactic iterations using the following formula. Per ALG-REQ-072, Switchover Time is added **between** techniques — i.e., before each technique except the first one. There is no switchover after the last technique.
 
 **Initialisation:**
 
@@ -1151,29 +1155,38 @@ The TTB value SHALL be accumulated across tactic iterations using the following 
 
 **Per-tactic iteration (for each tactic `k` in the chain where a technique was selected):**
 
-    TTB = TTB + switchoverTime + TTT_k
+    if k is the first tactic producing a technique:
+        TTB = TTB + TTT_k
+    else:
+        TTB = TTB + switchoverTime + TTT_k
 
 Where:
 - `switchoverTime` = Switchover Time parameter (ALG-REQ-072)
 - `TTT_k` = TTT of the fastest technique for tactic `k` (ALG-REQ-077)
 
-**Expanded formula for a chain with `K` tactics (all producing techniques):**
+**Expanded formula for `K` tactics that produced techniques (i.e., excluding empty-set tactics):**
 
-    TTB = orientationTime + Σ (switchoverTime + TTT_k) for k = 0..K-1
-        = orientationTime + K × switchoverTime + Σ TTT_k for k = 0..K-1
+    TTB = orientationTime + Σ TTT_k for k = 0..K-1 + (K-1) × switchoverTime
+
+Equivalently, matching the example from ALG-REQ-072:
+
+    TTB = orientationTime + TTT_0 + switchoverTime + TTT_1 + ... + switchoverTime + TTT_{K-1}
+
+For a chain with 2 selected techniques (T002 and T005):
+
+    TTB = orientation + TTT(T002) + switchover + TTT(T005)
 
 **For tactics where the empty-set guard triggered (ALG-REQ-080):**
 
-The Switchover Time is **still added** (the attacker spent time attempting), but no TTT is added (no technique was executed):
-
-    TTB = TTB + switchoverTime + 0
+Neither Switchover Time nor TTT is added — the attacker skips the tactic entirely. Empty-set tactics do NOT count toward `K` in the formula above.
 
 **Return type:** float (same units as TTT — hours in the current dataset).
 
 >Design note 1: The old `Asset.TTB` was int32 (SCHEMA TA001, default 10). The new TTB is float. This requires a schema change to `Asset.TTB` type — **however**, this is deferred to a future SCHEMA update to minimise simultaneous changes. In the interim, the APP layer SHALL round the computed float TTB to int32 when storing to `Asset.TTB`. The full-precision float is used in memory for TTA computation.
 
->Design note 2: For a typical intermediate chain (7 tactics), the minimum possible TTB is: `0.25 + 7 × (0.1667 + 0.1667) ≈ 2.58 hours`. The maximum possible TTB depends on mitigation coverage and execution_max values. This is a significant increase from the previous default TTB of 10 (which had no defined units).
+>Design note 2: For a typical intermediate chain (7 tactics, all producing techniques), the minimum possible TTB is: `0.25 + 7 × 0.1667 + 6 × 0.1667 ≈ 2.42 hours`. The maximum possible TTB depends on mitigation coverage and execution_max values. This is a significant increase from the previous default TTB of 10 (which had no defined units).
 
+>Design note 3: The "first technique producing a technique" check in the pseudocode (ALG-REQ-070, Step 7) is implemented by testing whether the log already contains a successful technique entry. This naturally handles the case where the first tactic(s) in the chain hit the empty-set guard — the first non-empty tactic will still be treated as "first technique" with no preceding switchover.
 
 
 ### ALG-REQ-079: TTB Calculation Log
@@ -1212,7 +1225,7 @@ If at any point in the TTB loop the candidate technique set becomes empty (after
 
 **If the set is STILL empty after fallback:**
 1. Log the empty tactic step with `technique_id = null` and `TTT = 0.0` (ALG-REQ-079).
-2. Add only `switchoverTime` to TTB (no TTT contribution) — per ALG-REQ-078.
+2. Add **nothing** to TTB — neither Switchover Time nor TTT. The attacker skips this tactic entirely (per ALG-REQ-078).
 3. Set `fastestTechnique = NULL` for this iteration.
 4. Proceed to the next tactic. If the next tactic uses pattern-based selection (ALG-REQ-076), the NULL fastestTechnique triggers a fallback to first-tactic selection for that tactic as well (ALG-REQ-076 design note 3).
 
