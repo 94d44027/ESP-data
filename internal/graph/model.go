@@ -179,18 +179,18 @@ func BuildAssetsList(items []map[string]interface{}, totalCount int) AssetsListR
 // Serialised flat (no wrapper) so the front-end can access
 // detail.asset_id directly.
 type AssetDetail struct {
-	AssetID          string `json:"asset_id"`
-	AssetName        string `json:"asset_name"`
-	AssetDescription string `json:"asset_description"`
-	AssetNote        string `json:"asset_note"`
-	AssetType        string `json:"asset_type"`
-	SegmentName      string `json:"segment_name"`
-	IsEntrance       bool   `json:"is_entrance"`
-	IsTarget         bool   `json:"is_target"`
-	Priority         int    `json:"priority"`
-	HasVulnerability bool   `json:"has_vulnerability"`
-	TTB              int    `json:"ttb"`
-	OSName           string `json:"os_name"`
+	AssetID          string  `json:"asset_id"`
+	AssetName        string  `json:"asset_name"`
+	AssetDescription string  `json:"asset_description"`
+	AssetNote        string  `json:"asset_note"`
+	AssetType        string  `json:"asset_type"`
+	SegmentName      string  `json:"segment_name"`
+	IsEntrance       bool    `json:"is_entrance"`
+	IsTarget         bool    `json:"is_target"`
+	Priority         int     `json:"priority"`
+	HasVulnerability bool    `json:"has_vulnerability"`
+	TTB              float64 `json:"ttb"`
+	OSName           string  `json:"os_name"`
 }
 
 // BuildAssetDetailResponse maps the raw query result into a typed struct.
@@ -208,7 +208,7 @@ func BuildAssetDetailResponse(detail map[string]interface{}) AssetDetail {
 		IsTarget:         mapBool(detail, "is_target"),
 		Priority:         mapInt(detail, "priority"),
 		HasVulnerability: mapBool(detail, "has_vulnerability"),
-		TTB:              mapInt(detail, "ttb"),
+		TTB:              mapFloat64(detail, "ttb"),
 		OSName:           mapStr(detail, "os_name"),
 	}
 }
@@ -364,6 +364,20 @@ func mapInt(m map[string]interface{}, key string) int {
 	return 0
 }
 
+func mapFloat64(m map[string]interface{}, key string) float64 {
+	if v, ok := m[key]; ok {
+		switch n := v.(type) {
+		case float64:
+			return n
+		case int:
+			return float64(n)
+		case int64:
+			return float64(n)
+		}
+	}
+	return 0.0
+}
+
 // ====================================================================================
 // Entry points response (ALG-REQ-002, migrated from REQ-030 — Path Inspector dropdown)
 // ====================================================================================
@@ -441,17 +455,17 @@ type PathsResponse struct {
 
 // PathItem represents one loop-free directed path with its TTA metric.
 type PathItem struct {
-	PathID string `json:"path_id"`
-	Hosts  string `json:"hosts"`
-	TTA    int    `json:"tta"`
+	PathID string  `json:"path_id"`
+	Hosts  string  `json:"hosts"`
+	TTA    float64 `json:"tta"`
 }
 
 // BuildPathsResponse converts the raw query maps into the typed response.
 // entryTTB is subtracted from each path's TTA per ALG-REQ-010 (migrated from REQ-032).
-func BuildPathsResponse(items []map[string]interface{}, entryID, targetID string, maxHops, entryTTB int) PathsResponse {
+func BuildPathsResponse(items []map[string]interface{}, entryID, targetID string, maxHops int, entryTTB float64) PathsResponse {
 	paths := make([]PathItem, 0, len(items))
 	for i, item := range items {
-		rawTTA := mapInt(item, "tta")
+		rawTTA := mapFloat64(item, "tta")
 		adjustedTTA := rawTTA - entryTTB
 		if adjustedTTA < 0 {
 			adjustedTTA = 0
@@ -581,23 +595,36 @@ type RecalculateResponse struct {
 // Path response with recalculation info (ALG-REQ-046)
 // ============================================================
 
+// TTBLogEntry records one step of the TTB calculation for audit/debugging (ALG-REQ-079).
+type TTBLogEntry struct {
+	AssetID       string  `json:"asset_id"`
+	TacticIndex   int     `json:"tactic_index"`
+	TacticID      string  `json:"tactic_id"`
+	TechniqueID   string  `json:"technique_id"`
+	TTT           float64 `json:"ttt"`
+	SwitchoverAdd float64 `json:"switchover_add"`
+	RunningTTB    float64 `json:"running_ttb"`
+	Note          string  `json:"note,omitempty"`
+}
+
 // PathsResponseWithRecalc extends PathsResponse with recalculated asset info.
 type PathsResponseWithRecalc struct {
-	Paths              []PathItem `json:"paths"`
-	EntryPoint         string     `json:"entry_point"`
-	Target             string     `json:"target"`
-	Hops               int        `json:"hops"`
-	Total              int        `json:"total"`
-	RecalculatedAssets []string   `json:"recalculated_assets"`
+	Paths              []PathItem    `json:"paths"`
+	EntryPoint         string        `json:"entry_point"`
+	Target             string        `json:"target"`
+	Hops               int           `json:"hops"`
+	Total              int           `json:"total"`
+	RecalculatedAssets []string      `json:"recalculated_assets"`
+	TTBLog             []TTBLogEntry `json:"ttb_log,omitempty"`
 }
 
 // BuildPathsResponseWithRecalc converts raw query maps into a response.
 // DEPRECATED: PathsHandler (v1.3) constructs PathsResponseWithRecalc directly.
 // Retained for backward compatibility with RecalculateTTBHandler.
-func BuildPathsResponseWithRecalc(items []map[string]interface{}, entryID, targetID string, maxHops, entryTTB int, recalculated []string) PathsResponseWithRecalc {
+func BuildPathsResponseWithRecalc(items []map[string]interface{}, entryID, targetID string, maxHops int, entryTTB float64, recalculated []string) PathsResponseWithRecalc {
 	paths := make([]PathItem, 0, len(items))
 	for i, item := range items {
-		rawTTA := mapInt(item, "tta")
+		rawTTA := mapFloat64(item, "tta")
 		adjustedTTA := rawTTA - entryTTB
 		if adjustedTTA < 0 {
 			adjustedTTA = 0
