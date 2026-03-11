@@ -259,7 +259,7 @@ func EdgesHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 			log.Printf("[%s] api: QueryAssetDetail (target) failed: %v", time.Now().Format("15:04:05.000"), err)
 		}
 
-		response := graph.BuildEdgeDetailResponse(connections, srcDetail, tgtDetail, sourceID, targetID)
+		response := graph.BuildEdgeDetailResponse(srcDetail, tgtDetail, connections)
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -427,8 +427,12 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 						for _, asset := range staleHashes {
 							hashStr := fmt.Sprintf("%d", asset.ComputedHash)
 							chainVID := nebula.ChainVIDForPosition(1, 3) // intermediate position
-							ttbResult, err := nebula.ComputeTTB(pool, cfg, asset.AssetID, chainVID,
-								orientationTime, switchoverTime, priorityTolerance)
+							ttbParams := nebula.TTBParams{
+								OrientationTime:   cfg.OrientationTime,
+								SwitchoverTime:    cfg.SwitchoverTime,
+								PriorityTolerance: cfg.PriorityTolerance,
+							}
+							ttbResult, err := nebula.ComputeTTB(pool, cfg, asset.AssetID, chainVID, ttbParams)
 							if err != nil {
 								log.Printf("[%s] api: ComputeTTB failed for %s: %v",
 									time.Now().Format("15:04:05.000"), asset.AssetID, err)
@@ -454,8 +458,7 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 		var allTTBLog []graph.TTBLogEntry
 
 		entryChainVID := nebula.ChainVIDForPosition(0, 2) // entry position
-		entryResult, err := nebula.ComputeTTB(pool, cfg, fromID, entryChainVID,
-			orientationTime, switchoverTime, priorityTolerance)
+		entryResult, err := nebula.ComputeTTB(pool, cfg, asset.AssetID, chainVID, ttbParams)
 		var entryTTB float64
 		if err != nil {
 			log.Printf("[%s] api: ComputeTTB (entry %s) failed: %v, using fallback",
@@ -798,8 +801,12 @@ func RecalculateTTBHandler(pool *nebulago.ConnectionPool, cfg *config.Config) ht
 
 			// ALG-REQ-070: real TTB computation replaces stub
 			chainVID := nebula.ChainVIDForPosition(1, 3) // default intermediate
-			ttbResult, err := nebula.ComputeTTB(pool, cfg, asset.AssetID, chainVID,
-				cfg.OrientationTime, cfg.SwitchoverTime, cfg.PriorityTolerance)
+			ttbParams := nebula.TTBParams{
+				OrientationTime:   cfg.OrientationTime,
+				SwitchoverTime:    cfg.SwitchoverTime,
+				PriorityTolerance: cfg.PriorityTolerance,
+			}
+			ttbResult, err := nebula.ComputeTTB(pool, cfg, asset.AssetID, chainVID, ttbParams)
 			if err != nil {
 				log.Printf("[%s] api: ComputeTTB failed for %s: %v",
 					time.Now().Format("15:04:05.000"), asset.AssetID, err)
