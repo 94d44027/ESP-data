@@ -474,8 +474,6 @@ Layout (top to bottom):
    - Rows are clickable (see UI-REQ-208)
    - Results sorted by TTA ascending (matching API response order)
 
->Design note: TTA column is to be changed into "hh:mm:ss" format in the next version.
-
 Visual style:
 - Background: matches right panel / inspector panel (#202020 – #282828)
 - Table header: bold, slightly darker background
