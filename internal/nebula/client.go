@@ -1322,6 +1322,153 @@ func queryAssetHasVulnerability(session *nebula.Session, assetVid string) (bool,
 }
 
 // ComputeTTB implements the full TTB calculation algorithm (ALG-REQ-070).
+
+// computeBatchTTT computes TTT for ALL technique candidates in a single batch
+// using exactly 2 nGQL queries (regardless of candidate count).
+// Strategy C: Batch ComputeTTT per Tactic.
+//
+// Query 1 fetches technique properties (exec_min, exec_max) and possible
+// mitigation VIDs for every candidate technique in one round-trip.
+// Query 2 fetches active-applied mitigations on the asset for ALL unique
+// mitigation VIDs collected from Q1.
+//
+// The APP layer then maps Q2 results back to each technique and applies
+// the ALG-REQ-060 formula in-process.
+//
+// Precondition: all candidates have already passed OS filtering (ALG-REQ-062)
+// so no OS pre-check is needed here.
+func computeBatchTTT(session *nebula.Session, assetVid string, candidates []techniqueCandidate) error {
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	// Build the IN list of technique VIDs for Q1
+	techVids := make([]string, len(candidates))
+	for i, c := range candidates {
+		techVids[i] = fmt.Sprintf(`"%s"`, c.TechniqueID)
+	}
+
+	q1 := fmt.Sprintf(
+		`MATCH (t:tMitreTechnique) `+
+			`WHERE id(t) IN [%s] `+
+			`OPTIONAL MATCH (t)<-[:mitigates]-(m_all:tMitreMitigation) `+
+			`WITH t, count(m_all) AS P, collect(id(m_all)) AS mit_vids `+
+			`RETURN id(t) AS technique_vid, `+
+			`  t.tMitreTechnique.execution_min AS exec_min, `+
+			`  t.tMitreTechnique.execution_max AS exec_max, `+
+			`  P AS possible_count, `+
+			`  mit_vids AS mitigation_vids;`,
+		strings.Join(techVids, ", "))
+
+	rs1, err := session.Execute(q1)
+	if err != nil {
+		return fmt.Errorf("computeBatchTTT Q1: %w", err)
+	}
+	if !rs1.IsSucceed() {
+		return fmt.Errorf("computeBatchTTT Q1: %s", rs1.GetErrorMsg())
+	}
+
+	// Parse Q1 results into a map keyed by technique VID
+	type techInfo struct {
+		ExecMin float64
+		ExecMax float64
+		P       int
+		MitVids []string
+	}
+	techMap := make(map[string]*techInfo)
+	allMitVidsSet := make(map[string]bool)
+
+	for i := 0; i < rs1.GetRowSize(); i++ {
+		rec, _ := rs1.GetRowValuesByIndex(i)
+		vid := safeString(rec, 0)
+		if vid == "" {
+			continue
+		}
+		info := &techInfo{
+			ExecMin: safeFloat64(rec, 1, 0.1667),
+			ExecMax: safeFloat64(rec, 2, 120.0),
+			P:       safeInt(rec, 3, 0),
+		}
+		mitVids, _ := extractStringList(rec, 4)
+		info.MitVids = mitVids
+		techMap[vid] = info
+
+		for _, mv := range mitVids {
+			allMitVidsSet[mv] = true
+		}
+	}
+
+	// Build set of active-applied mitigations from Q2
+	// Key: mitigation VID -> maturity (int)
+	activeMitMap := make(map[string]int)
+
+	if len(allMitVidsSet) > 0 {
+		quotedMitVids := make([]string, 0, len(allMitVidsSet))
+		for mv := range allMitVidsSet {
+			quotedMitVids = append(quotedMitVids, fmt.Sprintf(`"%s"`, mv))
+		}
+
+		q2 := fmt.Sprintf(
+			`MATCH (m:tMitreMitigation)-[ap:applied_to]->(a:Asset) `+
+				`WHERE id(a) == "%s" AND id(m) IN [%s] AND ap.Active == true `+
+				`RETURN id(m) AS mit_vid, ap.Maturity AS maturity;`,
+			assetVid, strings.Join(quotedMitVids, ", "))
+
+		rs2, err := session.Execute(q2)
+		if err != nil {
+			return fmt.Errorf("computeBatchTTT Q2: %w", err)
+		}
+		if !rs2.IsSucceed() {
+			return fmt.Errorf("computeBatchTTT Q2: %s", rs2.GetErrorMsg())
+		}
+
+		for i := 0; i < rs2.GetRowSize(); i++ {
+			rec, _ := rs2.GetRowValuesByIndex(i)
+			mitVid := safeString(rec, 0)
+			maturity := safeInt(rec, 1, 0)
+			if mitVid != "" {
+				activeMitMap[mitVid] = maturity
+			}
+		}
+	}
+
+	// Apply ALG-REQ-060 formula to each candidate in-place
+	for j := range candidates {
+		info, ok := techMap[candidates[j].TechniqueID]
+		if !ok {
+			candidates[j].TTT = 999999.0
+			continue
+		}
+
+		P := info.P
+		execMin := info.ExecMin
+		execMax := info.ExecMax
+
+		if P == 0 {
+			candidates[j].TTT = execMin
+			continue
+		}
+
+		// Count A and sum maturity_factor for this technique's mitigations
+		A := 0
+		maturityFactor := 0.0
+		for _, mv := range info.MitVids {
+			if mat, found := activeMitMap[mv]; found {
+				A++
+				maturityFactor += 0.01 * float64(mat)
+			}
+		}
+
+		if A == P {
+			candidates[j].TTT = execMax
+		} else {
+			candidates[j].TTT = execMin + (maturityFactor*(execMax-execMin))/float64(P)
+		}
+	}
+
+	return nil
+}
+
 func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chainVid string, params TTBParams) (*TTBResult, error) {
 	session, err := openSession(pool, cfg)
 	if err != nil {
@@ -1403,17 +1550,11 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 			continue
 		}
 
-		for j := range candidates {
-			// Strategy A+B: reuse ComputeTTB session; skip OS pre-check (already filtered)
-			tttResult, err := computeTTTWithSession(session, assetVid, candidates[j].TechniqueID, true)
-			if err != nil {
-				log.Printf("nebula: ComputeTTB ComputeTTT failed for %s: %v", candidates[j].TechniqueID, err)
-				continue
-			}
-			if tttResult == nil {
+		// Strategy C: Batch ComputeTTT — 2 queries per tactic instead of 2×N
+		if err := computeBatchTTT(session, assetVid, candidates); err != nil {
+			log.Printf("nebula: ComputeTTB computeBatchTTT failed for tactic %s: %v", tactic.TacticID, err)
+			for j := range candidates {
 				candidates[j].TTT = 999999.0
-			} else {
-				candidates[j].TTT = tttResult.TTT
 			}
 		}
 
