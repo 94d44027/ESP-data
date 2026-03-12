@@ -385,8 +385,17 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 			PriorityTolerance: priorityTolerance,
 		}
 
+		// Timing buckets for /api/paths phase observability.
+		var queryPathsDuration time.Duration
+		var ttbRecalcDuration time.Duration
+		var ttbEntryDuration time.Duration
+		var ttbTargetDuration time.Duration
+		var jsonEncodeDuration time.Duration
+
 		// Step 1: Find paths — returns per-node IDs and stored TTBs (ALG-REQ-001 v1.3)
+		qpStart := time.Now()
 		pathResults, err := nebula.QueryPaths(pool, cfg, fromID, toID, maxHops)
+		queryPathsDuration = time.Since(qpStart)
 		if err != nil {
 			log.Printf("[%s] api: QueryPaths failed: %v", time.Now().Format("15:04:05.000"), err)
 			http.Error(w, "Failed to calculate paths", http.StatusInternalServerError)
@@ -429,6 +438,7 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 					log.Printf("[%s] api: %d intermediate(s) have stale hashes, recalculating",
 						requestStart.Format("15:04:05.000"), len(staleIDs))
 
+					ttbRecalcStart := time.Now()
 					staleHashes, err := nebula.QueryScopedStaleHashes(pool, cfg, staleIDs)
 					if err != nil {
 						log.Printf("[%s] api: QueryScopedStaleHashes failed: %v",
@@ -453,6 +463,11 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 							log.Printf("[%s] api: path-scoped recalc %s: TTB %.4f -> %.4f",
 								time.Now().Format("15:04:05.000"), asset.AssetID, asset.CurrentTTB, ttbResult.TTB)
 						}
+						ttbRecalcDuration = time.Since(ttbRecalcStart)
+					}
+					// Decrement stale_count to reflect path-scoped recalculations (UI-REQ-112A)
+					if len(recalculatedAssets) > 0 {
+						nebula.DecrementStaleCount(pool, cfg, len(recalculatedAssets))
 					}
 				}
 			}
@@ -470,7 +485,9 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 		}
 
 		entryChainVID := nebula.ChainVIDForPosition(0, pathLen) // entry position
+		entryStart := time.Now()
 		entryResult, err := nebula.ComputeTTB(pool, cfg, fromID, entryChainVID, ttbParams)
+		ttbEntryDuration = time.Since(entryStart)
 		var entryTTB float64
 		if err != nil {
 			log.Printf("[%s] api: ComputeTTB (entry %s) failed: %v, using fallback",
@@ -486,7 +503,9 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 		}
 
 		targetChainVID := nebula.ChainVIDForPosition(pathLen-1, pathLen) // target position
+		targetStart := time.Now()
 		targetResult, err := nebula.ComputeTTB(pool, cfg, toID, targetChainVID, ttbParams)
+		ttbTargetDuration = time.Since(targetStart)
 		var targetTTB float64
 		if err != nil {
 			log.Printf("[%s] api: ComputeTTB (target %s) failed: %v, using fallback",
@@ -558,14 +577,18 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		jsonStart := time.Now()
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
 		}
+		jsonEncodeDuration = time.Since(jsonStart)
 
 		requestDuration := time.Since(requestStart)
-		log.Printf("[%s] api: returned %d paths for %s -> %s in %.3f seconds (recalculated: %d)",
+		log.Printf("[%s] api: returned %d paths for %s -> %s in %.3f seconds (recalculated: %d, qp=%.3f, recalc=%.3f, ttbEntry=%.3f, ttbTarget=%.3f, json=%.3f)",
 			time.Now().Format("15:04:05.000"), len(pathItems), fromID, toID,
-			requestDuration.Seconds(), len(recalculatedAssets))
+			requestDuration.Seconds(), len(recalculatedAssets),
+			queryPathsDuration.Seconds(), ttbRecalcDuration.Seconds(),
+			ttbEntryDuration.Seconds(), ttbTargetDuration.Seconds(), jsonEncodeDuration.Seconds())
 	}
 }
 

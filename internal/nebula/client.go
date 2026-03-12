@@ -1713,6 +1713,46 @@ func UpdateAssetTTBAndHash(pool *nebula.ConnectionPool, cfg *config.Config, asse
 	return nil
 }
 
+// DecrementStaleCount decrements stale_count on SystemState by the given amount
+// after path-scoped recalculation (ALG-REQ-046 cleanup, UI-REQ-112A).
+// Uses a WHEN guard to avoid negative values. Best-effort — errors are logged
+// but do not propagate to the caller.
+func DecrementStaleCount(pool *nebula.ConnectionPool, cfg *config.Config, count int) {
+	if count <= 0 {
+		return
+	}
+	session, err := openSession(pool, cfg)
+	if err != nil {
+		log.Printf("nebula: DecrementStaleCount failed to open session: %v", err)
+		return
+	}
+	defer session.Release()
+
+	// Decrement only when stale_count is large enough (CAS guard).
+	query := fmt.Sprintf(
+		`UPDATE VERTEX ON SystemState "SYS001" `+
+			`SET stale_count = stale_count - %d `+
+			`WHEN stale_count >= %d;`,
+		count, count)
+
+	resultSet, err := session.Execute(query)
+	if err != nil {
+		log.Printf("nebula: DecrementStaleCount failed: %v", err)
+		return
+	}
+	if !resultSet.IsSucceed() {
+		// WHEN condition was false (stale_count < count) — floor to 0.
+		query2 := `UPDATE VERTEX ON SystemState "SYS001" SET stale_count = 0 WHEN stale_count > 0;`
+		if rs2, err2 := session.Execute(query2); err2 != nil {
+			log.Printf("nebula: DecrementStaleCount fallback failed: %v", err2)
+		} else if !rs2.IsSucceed() {
+			log.Printf("nebula: DecrementStaleCount fallback failed: %s", rs2.GetErrorMsg())
+		}
+		return
+	}
+	log.Printf("nebula: decremented stale_count by %d", count)
+}
+
 // InvalidateAssetHash sets hash_valid = false on an asset and increments
 // stale_count on SystemState (ALG-REQ-043). Best-effort — errors are logged
 // but do not propagate to the caller.
