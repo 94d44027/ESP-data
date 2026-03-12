@@ -890,35 +890,36 @@ type TTTResult struct {
 	TTT           float64 // computed Time To Execute Technique (hours)
 }
 
-// ComputeTTT computes the Time To Execute a Technique for a given (asset, technique) pair.
-// Implements ALG-REQ-060 through ALG-REQ-066.
-// Returns (nil, nil) when the technique is not executable on the asset's OS platform (ALG-REQ-062).
-func ComputeTTT(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, techniqueVid string) (*TTTResult, error) {
-	session, err := openSession(pool, cfg)
-	if err != nil {
-		return nil, err
-	}
-	defer session.Release()
+// computeTTTWithSession is the internal implementation of the TTT calculation.
+// It reuses an existing session (Strategy A: Session Reuse) and accepts an
+// osPreChecked flag (Strategy B: Eliminate Redundant OS Pre-Check).
+// When osPreChecked is true, the ALG-REQ-062 OS platform query is skipped
+// because the caller has already guaranteed OS validity — see
+// selectFirstTacticTechniques (ALG-REQ-073) and filterByOS (ALG-REQ-062).
+func computeTTTWithSession(session *nebula.Session, assetVid, techniqueVid string, osPreChecked bool) (*TTTResult, error) {
 
-	// ALG-REQ-062: OS platform pre-check
-	osCheck := fmt.Sprintf(
-		`MATCH (a:Asset)-[:runs_on]->(os:OS_Type)-[:represents]->(p:MitrePlatform)`+
-			`<-[:can_be_executed_on]-(t:tMitreTechnique) `+
-			`WHERE id(a) == "%s" AND id(t) == "%s" `+
-			`RETURN count(*) AS cnt;`, assetVid, techniqueVid)
+	// ALG-REQ-062: OS platform pre-check.
+	// Skipped when osPreChecked == true (caller already filtered by OS).
+	if !osPreChecked {
+		osCheck := fmt.Sprintf(
+			`MATCH (a:Asset)-[:runs_on]->(os:OS_Type)-[:represents]->(p:MitrePlatform)`+
+				`<-[:can_be_executed_on]-(t:tMitreTechnique) `+
+				`WHERE id(a) == "%s" AND id(t) == "%s" `+
+				`RETURN count(*) AS cnt;`, assetVid, techniqueVid)
 
-	osRS, err := session.Execute(osCheck)
-	if err != nil {
-		return nil, fmt.Errorf("ComputeTTT os check: %w", err)
-	}
-	if !osRS.IsSucceed() {
-		return nil, fmt.Errorf("ComputeTTT os check: %s", osRS.GetErrorMsg())
-	}
-	if osRS.GetRowSize() > 0 {
-		rec, _ := osRS.GetRowValuesByIndex(0)
-		cnt := safeInt(rec, 0, 0)
-		if cnt == 0 {
-			return nil, nil
+		osRS, err := session.Execute(osCheck)
+		if err != nil {
+			return nil, fmt.Errorf("ComputeTTT os check: %w", err)
+		}
+		if !osRS.IsSucceed() {
+			return nil, fmt.Errorf("ComputeTTT os check: %s", osRS.GetErrorMsg())
+		}
+		if osRS.GetRowSize() > 0 {
+			rec, _ := osRS.GetRowValuesByIndex(0)
+			cnt := safeInt(rec, 0, 0)
+			if cnt == 0 {
+				return nil, nil
+			}
 		}
 	}
 
@@ -1000,6 +1001,20 @@ func ComputeTTT(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, techn
 	}
 
 	return result, nil
+}
+
+// ComputeTTT computes the Time To Execute a Technique for a given (asset, technique) pair.
+// Implements ALG-REQ-060 through ALG-REQ-066.
+// Returns (nil, nil) when the technique is not executable on the asset's OS platform (ALG-REQ-062).
+// This public wrapper opens its own session and performs the full OS pre-check,
+// preserving backward compatibility for standalone callers.
+func ComputeTTT(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, techniqueVid string) (*TTTResult, error) {
+	session, err := openSession(pool, cfg)
+	if err != nil {
+		return nil, err
+	}
+	defer session.Release()
+	return computeTTTWithSession(session, assetVid, techniqueVid, false)
 }
 
 // ======================================================================================================
@@ -1389,7 +1404,8 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 		}
 
 		for j := range candidates {
-			tttResult, err := ComputeTTT(pool, cfg, assetVid, candidates[j].TechniqueID)
+			// Strategy A+B: reuse ComputeTTB session; skip OS pre-check (already filtered)
+			tttResult, err := computeTTTWithSession(session, assetVid, candidates[j].TechniqueID, true)
 			if err != nil {
 				log.Printf("nebula: ComputeTTB ComputeTTT failed for %s: %v", candidates[j].TechniqueID, err)
 				continue
