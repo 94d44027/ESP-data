@@ -332,4 +332,3 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 			ttbEntryDuration.Seconds(), ttbTargetDuration.Seconds(), jsonEncodeDuration.Seconds())
 	}
 }
-

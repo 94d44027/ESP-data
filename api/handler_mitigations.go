@@ -172,4 +172,3 @@ func handleDeleteAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Conf
 	log.Printf("[%s] api: DELETE %s -> %s completed in %.3f seconds",
 		time.Now().Format("15:04:05.000"), mitigationID, assetID, requestDuration.Seconds())
 }
-

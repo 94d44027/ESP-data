@@ -62,4 +62,3 @@ func extractMitigationID(urlPath string, segmentIndex int) (string, error) {
 
 	return mitigationID, nil
 }
-
