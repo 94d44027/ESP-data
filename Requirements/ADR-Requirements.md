@@ -16,6 +16,8 @@
 
 This document specifies the requirements for the Auxiliary Relational Database (RDBMS) component of the ESP PoC system. The RDBMS provides persistent storage for data that is **derived from** or **supplementary to** the primary graph database (NebulaGraph), but is not suitable for graph storage — specifically: calculation audit trails, cached computation results, application configuration, and session state.
 
+>Note: This document combines both database schema and requirements  - subject for a future change. May be split into two separate documents (similar to SRS and SCHEMA).
+
 ### 1.2 Document Scope
 
 This specification covers:
