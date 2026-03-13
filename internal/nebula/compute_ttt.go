@@ -148,8 +148,6 @@ func ComputeTTT(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, techn
 	return computeTTTWithSession(session, assetVid, techniqueVid, false)
 }
 
-
-
 // computeBatchTTT computes TTT for ALL technique candidates in a single batch
 // using exactly 2 nGQL queries (regardless of candidate count).
 // Strategy C: Batch ComputeTTT per Tactic.
@@ -295,4 +293,3 @@ func computeBatchTTT(session *nebula.Session, assetVid string, candidates []tech
 
 	return nil
 }
-

@@ -182,4 +182,3 @@ func DeleteMitigation(pool *nebula.ConnectionPool, cfg *config.Config, mitigatio
 
 	return nil
 }
-

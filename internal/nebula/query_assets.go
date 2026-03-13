@@ -359,4 +359,3 @@ YIELD
 	log.Printf("nebula: QueryEdgeConnections returned %d connections for %s -> %s", len(connections), sourceID, targetID)
 	return connections, nil
 }
-

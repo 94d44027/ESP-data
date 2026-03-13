@@ -71,7 +71,6 @@ func openSession(pool *nebula.ConnectionPool, cfg *config.Config) (*nebula.Sessi
 	return session, nil
 }
 
-
 func safeString(record *nebula.Record, idx int) string {
 	val, err := record.GetValueByIndex(idx)
 	if err != nil {
@@ -181,7 +180,6 @@ func extractIntList(record *nebula.Record, idx int) ([]int, error) {
 	return result, nil
 }
 
-
 func extractFloatList(record *nebula.Record, idx int) ([]float64, error) {
 	val, err := record.GetValueByIndex(idx)
 	if err != nil {
@@ -218,4 +216,3 @@ func safeInt64(record *nebula.Record, idx int) int64 {
 	}
 	return n
 }
-

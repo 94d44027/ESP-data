@@ -215,4 +215,3 @@ YIELD Asset.TTB AS ttb;`, assetID)
 
 	return safeInt(record, 0, 10), nil
 }
-

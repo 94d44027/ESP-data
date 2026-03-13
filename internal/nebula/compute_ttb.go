@@ -443,4 +443,3 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 
 	return &TTBResult{TTB: ttb, Log: ttbLog}, nil
 }
-
