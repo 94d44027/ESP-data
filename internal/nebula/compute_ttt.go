@@ -274,14 +274,14 @@ func computeBatchTTT(session *nebula.Session, assetVid string, candidates []tech
 			candidates[j].TTT = execMin
 			if audit != nil {
 				audit.TTTDetails = append(audit.TTTDetails, store.TTTDetailRecord{
-					TechniqueVid:  candidates[j].TechniqueID,
-					ExecMin:       execMin,
-					ExecMax:       execMax,
-					PossibleCount: P,
-					AppliedCount:  0,
+					TechniqueVid:   candidates[j].TechniqueID,
+					ExecMin:        execMin,
+					ExecMax:        execMax,
+					PossibleCount:  P,
+					AppliedCount:   0,
 					MaturityFactor: 0,
-					FormulaCase:  "no_mitigations",
-					TTTHours:     execMin,
+					FormulaCase:    "no_mitigations",
+					TTTHours:       execMin,
 				})
 			}
 			continue
