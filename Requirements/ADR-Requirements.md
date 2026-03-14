@@ -91,14 +91,14 @@ CREATE DATABASE IF NOT EXISTS esp_aux
 
 The APP layer SHALL read MariaDB connection parameters from environment variables, consistent with the existing configuration pattern (SRS REQ-002, `config/config.go`):
 
-| Environment Variable | Default     | Description                        |
-|----------------------|-------------|------------------------------------|
-| `MARIA_HOST`         | `127.0.0.1` | MariaDB server hostname            |
-| `MARIA_PORT`         | `3306`      | MariaDB server port                |
-| `MARIA_USER`         | `esp`       | MariaDB user                       |
-| `MARIA_PASS`         | `esp`       | MariaDB password                   |
-| `MARIA_DB`           | `esp_aux`   | Database name                      |
-| `MARIA_ENABLED`      | `true`      | Enable/disable RDBMS functionality |
+| Environment Variable | Default      | Description                        |
+|----------------------|--------------|------------------------------------|
+| `MARIA_HOST`         | `nebbie.m82` | MariaDB server hostname            |
+| `MARIA_PORT`         | `3306`       | MariaDB server port                |
+| `MARIA_USER`         | `esp01`      | MariaDB user                       |
+| `MARIA_PASS`         | `nebula1`    | MariaDB password                   |
+| `MARIA_DB`           | `ESP01`      | Database name                      |
+| `MARIA_ENABLED`      | `true`       | Enable/disable RDBMS functionality |
 
 When `MARIA_ENABLED` is `false` or the connection fails, the APP layer SHALL log a warning and disable all RDBMS-dependent functionality. The application SHALL continue to operate normally using NebulaGraph only (graceful degradation per §1.5).
 

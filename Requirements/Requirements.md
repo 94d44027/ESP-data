@@ -172,7 +172,7 @@ Since this is a PoC default credentials, they are listed below:
 | MARIA_USER    | `esp01`       | MariaDB user                  |
 | MARIA_PASS    | `nebula1`     | MariaDB user password         |
 | MARIA_DB      | `ESP01`       | MariaDB database (tablespace) |
-| MARIA_ENABLED | false         | Enable/disable RDBMS (tbv)    |
+| MARIA_ENABLED | `true`        | Enable/disable RDBMS (tbv)    |
 
 
 **REQ-010:** Cytoscape should be used for visualisation
