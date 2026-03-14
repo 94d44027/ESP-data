@@ -163,7 +163,7 @@ func ComputeTTT(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, techn
 //
 // Precondition: all candidates have already passed OS filtering (ALG-REQ-062)
 // so no OS pre-check is needed here.
-func computeBatchTTT(session *nebula.Session, assetVid string, candidates []techniqueCandidate, audit *store.AuditBuffer) error {
+func computeBatchTTT(session *nebula.Session, assetVid string, candidates []techniqueCandidate, audit *store.AuditBuffer, pendingStepIdx int) error {
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -274,6 +274,7 @@ func computeBatchTTT(session *nebula.Session, assetVid string, candidates []tech
 			candidates[j].TTT = execMin
 			if audit != nil {
 				audit.TTTDetails = append(audit.TTTDetails, store.TTTDetailRecord{
+					StepIdx:        pendingStepIdx,
 					TechniqueVid:   candidates[j].TechniqueID,
 					ExecMin:        execMin,
 					ExecMax:        execMax,
@@ -310,6 +311,7 @@ func computeBatchTTT(session *nebula.Session, assetVid string, candidates []tech
 
 		if audit != nil {
 			audit.TTTDetails = append(audit.TTTDetails, store.TTTDetailRecord{
+				StepIdx:        pendingStepIdx,
 				TechniqueVid:   candidates[j].TechniqueID,
 				ExecMin:        execMin,
 				ExecMax:        execMax,

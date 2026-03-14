@@ -112,14 +112,63 @@ func (s *Store) FlushBatch(buf *AuditBuffer) {
 		}
 	}
 
-	// Layer 3 / 3A / 4: deferred — requires breakdown_id linkage (next implementation step).
-	// TacticSteps and TTTDetails are collected in auditBuf but not yet persisted.
-	// Uncomment once ComputeTTB returns a BreakdownID for cross-linking.
-	/*
-		for i, bd := range buf.Breakdowns { ... }       // calc_ttb_breakdown
-		for j, ts := range buf.TacticSteps { ... }      // calc_ttb_tactic_steps
-		for _, td := range buf.TTTDetails { ... }        // calc_ttt_detail
-	*/
+	// Layer 3: one breakdown per ComputeTTB call (one per asset per request) (ADR-REQ-012)
+	breakdownIDs := make([]int64, len(buf.Breakdowns))
+	for i, bd := range buf.Breakdowns {
+		res, err = tx.Exec(`INSERT INTO calc_ttb_breakdown
+			(session_id, asset_vid, chain_position, chain_vid,
+			 ttb_total, orientation_time, tactic_count, technique_count)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			sessionID, bd.AssetVid, bd.ChainPosition, bd.ChainVid,
+			bd.TTBTotal, bd.OrientationTime, bd.TacticCount, bd.TechniqueCount)
+		if err != nil {
+			return
+		}
+		breakdownIDs[i], _ = res.LastInsertId()
+	}
+
+	// Layer 3A: tactic steps — resolve BreakdownIdx → real breakdown_id (ADR-REQ-013)
+	stepIDs := make([]int64, len(buf.TacticSteps))
+	for j, ts := range buf.TacticSteps {
+		var bdID int64
+		if ts.BreakdownIdx >= 0 && ts.BreakdownIdx < len(breakdownIDs) {
+			bdID = breakdownIDs[ts.BreakdownIdx]
+		}
+		res, err = tx.Exec(`INSERT INTO calc_ttb_tactic_steps
+			(breakdown_id, tactic_seq, tactic_id, tactic_name,
+			 technique_vid, technique_id, technique_name,
+			 ttt_hours, switchover_added, candidates_count)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			bdID, ts.TacticSeq, ts.TacticID, ts.TacticName,
+			sql.NullString{String: ts.TechniqueVid, Valid: ts.TechniqueVid != ""},
+			sql.NullString{String: ts.TechniqueID, Valid: ts.TechniqueID != ""},
+			sql.NullString{String: ts.TechniqueName, Valid: ts.TechniqueName != ""},
+			ts.TTTHours, ts.SwitchoverAdded, ts.CandidatesCount)
+		if err != nil {
+			return
+		}
+		stepIDs[j], _ = res.LastInsertId()
+	}
+
+	// Layer 4: TTT detail — resolve StepIdx → real step_id (ADR-REQ-014)
+	for _, td := range buf.TTTDetails {
+		var sID int64
+		if td.StepIdx >= 0 && td.StepIdx < len(stepIDs) {
+			sID = stepIDs[td.StepIdx]
+		}
+		_, err = tx.Exec(`INSERT INTO calc_ttt_detail
+			(step_id, technique_vid, exec_min, exec_max,
+			 possible_count, applied_count, maturity_factor,
+			 formula_case, ttt_hours)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			sID, td.TechniqueVid,
+			td.ExecMin, td.ExecMax,
+			td.PossibleCount, td.AppliedCount, td.MaturityFactor,
+			td.FormulaCase, td.TTTHours)
+		if err != nil {
+			return
+		}
+	}
 
 	// Cache entries (ADR-REQ-022 — UPSERT via REPLACE)
 	for _, ce := range buf.CacheEntries {
@@ -139,9 +188,10 @@ func (s *Store) FlushBatch(buf *AuditBuffer) {
 		return
 	}
 
-	log.Printf("store: FlushBatch completed in %.3fs — session=%d, paths=%d, cache=%d (layers 3/4 deferred)",
+	log.Printf("store: FlushBatch completed in %.3fs — session=%d paths=%d breakdowns=%d steps=%d details=%d cache=%d",
 		time.Since(flushStart).Seconds(), sessionID,
-		len(buf.Paths), len(buf.CacheEntries))
+		len(buf.Paths), len(buf.Breakdowns), len(buf.TacticSteps),
+		len(buf.TTTDetails), len(buf.CacheEntries))
 }
 
 // InvalidateCache marks cached TTB breakdowns as stale for an asset (ADR-REQ-021).

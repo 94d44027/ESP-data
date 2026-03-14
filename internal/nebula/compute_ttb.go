@@ -340,6 +340,18 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 	var fastestTechID *string
 	techniqueCount := 0
 
+	// ADR-REQ-012: register one BreakdownRecord for this asset before the tactic loop.
+	// breakdownIdx is the index into audit.Breakdowns — used to back-link TacticSteps.
+	breakdownIdx := -1
+	if audit != nil {
+		breakdownIdx = len(audit.Breakdowns)
+		audit.Breakdowns = append(audit.Breakdowns, store.BreakdownRecord{
+			AssetVid:        assetVid,
+			ChainVid:        chainVid,
+			OrientationTime: params.OrientationTime,
+		})
+	}
+
 	for i, tactic := range tactics {
 		var candidates []techniqueCandidate
 		usedFallback := false
@@ -395,6 +407,7 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 			})
 			if audit != nil {
 				audit.TacticSteps = append(audit.TacticSteps, store.TacticStepRecord{
+					BreakdownIdx:    breakdownIdx,
 					TacticSeq:       i,
 					TacticID:        tactic.TacticID,
 					TacticName:      tactic.TacticName,
@@ -409,7 +422,12 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 		}
 
 		// Strategy C: Batch ComputeTTT — 2 queries per tactic instead of 2×N
-		if err := computeBatchTTT(session, assetVid, candidates, audit); err != nil {
+		// pendingStepIdx is the index the TacticStepRecord will occupy after this tactic's batch.
+		pendingStepIdx := 0
+		if audit != nil {
+			pendingStepIdx = len(audit.TacticSteps)
+		}
+		if err := computeBatchTTT(session, assetVid, candidates, audit, pendingStepIdx); err != nil {
 			log.Printf("nebula: ComputeTTB computeBatchTTT failed for tactic %s: %v", tactic.TacticID, err)
 			for j := range candidates {
 				candidates[j].TTT = 999999.0
@@ -428,6 +446,7 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 			})
 			if audit != nil {
 				audit.TacticSteps = append(audit.TacticSteps, store.TacticStepRecord{
+					BreakdownIdx:    breakdownIdx,
 					TacticSeq:       i,
 					TacticID:        tactic.TacticID,
 					TacticName:      tactic.TacticName,
@@ -460,6 +479,7 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 		})
 		if audit != nil {
 			audit.TacticSteps = append(audit.TacticSteps, store.TacticStepRecord{
+				BreakdownIdx:    breakdownIdx,
 				TacticSeq:       i,
 				TacticID:        tactic.TacticID,
 				TacticName:      tactic.TacticName,
@@ -474,6 +494,13 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 
 		previousTacticID = tactic.TacticID
 		fastestTechID = &tid
+	}
+
+	// ADR-REQ-012: backfill final counts into the BreakdownRecord now that the loop is done.
+	if audit != nil && breakdownIdx >= 0 {
+		audit.Breakdowns[breakdownIdx].TTBTotal = ttb
+		audit.Breakdowns[breakdownIdx].TacticCount = len(tactics)
+		audit.Breakdowns[breakdownIdx].TechniqueCount = techniqueCount
 	}
 
 	return &TTBResult{TTB: ttb, Log: ttbLog}, nil
