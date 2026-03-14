@@ -13,6 +13,7 @@ import (
 	"ESP-data/config"
 	"ESP-data/internal/graph"
 	"ESP-data/internal/nebula"
+	"ESP-data/internal/store"
 
 	nebulago "github.com/vesoft-inc/nebula-go/v3"
 )
@@ -68,9 +69,15 @@ func TargetsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Hand
 
 // PathsHandler calculates loop-free paths with position-aware TTB
 // (ALG-REQ-001, ALG-REQ-010, ALG-REQ-046, ALG-REQ-070..080 v1.5).
-func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
+func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config, auditStore *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestStart := time.Now()
+
+		// ADR-REQ-030: create per-request audit buffer (nil if store disabled)
+		var auditBuf *store.AuditBuffer
+		if auditStore.Enabled() {
+			auditBuf = &store.AuditBuffer{}
+		}
 
 		fromID := r.URL.Query().Get("from")
 		toID := r.URL.Query().Get("to")
@@ -188,7 +195,7 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 						for _, asset := range staleHashes {
 							hashStr := fmt.Sprintf("%d", asset.ComputedHash)
 							chainVID := nebula.ChainVIDForPosition(1, 3) // intermediate position
-							ttbResult, err := nebula.ComputeTTB(pool, cfg, asset.AssetID, chainVID, ttbParams)
+							ttbResult, err := nebula.ComputeTTB(pool, cfg, asset.AssetID, chainVID, ttbParams, auditBuf)
 							if err != nil {
 								log.Printf("[%s] api: ComputeTTB failed for %s: %v",
 									time.Now().Format("15:04:05.000"), asset.AssetID, err)
@@ -227,7 +234,7 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 
 		entryChainVID := nebula.ChainVIDForPosition(0, pathLen) // entry position
 		entryStart := time.Now()
-		entryResult, err := nebula.ComputeTTB(pool, cfg, fromID, entryChainVID, ttbParams)
+		entryResult, err := nebula.ComputeTTB(pool, cfg, fromID, entryChainVID, ttbParams, auditBuf)
 		ttbEntryDuration = time.Since(entryStart)
 		var entryTTB float64
 		if err != nil {
@@ -245,7 +252,7 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 
 		targetChainVID := nebula.ChainVIDForPosition(pathLen-1, pathLen) // target position
 		targetStart := time.Now()
-		targetResult, err := nebula.ComputeTTB(pool, cfg, toID, targetChainVID, ttbParams)
+		targetResult, err := nebula.ComputeTTB(pool, cfg, toID, targetChainVID, ttbParams, auditBuf)
 		ttbTargetDuration = time.Since(targetStart)
 		var targetTTB float64
 		if err != nil {
@@ -323,6 +330,33 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 			log.Printf("[%s] api: JSON encode failed: %v", time.Now().Format("15:04:05.000"), err)
 		}
 		jsonEncodeDuration = time.Since(jsonStart)
+
+		// ADR-REQ-031: populate session record and flush audit buffer async after response is sent
+		if auditBuf != nil {
+			totalMs := int(time.Since(requestStart).Milliseconds())
+			auditBuf.Session = store.SessionRecord{
+				EntryAssetID:       fromID,
+				TargetAssetID:      toID,
+				MaxHops:            maxHops,
+				OrientationTime:    orientationTime,
+				SwitchoverTime:     switchoverTime,
+				PriorityTolerance:  priorityTolerance,
+				PathsFound:         len(pathItems),
+				AssetsRecalculated: len(recalculatedAssets),
+				QueryTimeMs:        int(queryPathsDuration.Milliseconds()),
+				TotalTimeMs:        totalMs,
+			}
+			for idx, p := range pathItems {
+				hopCount := len(strings.Split(p.Hosts, " -> "))
+				auditBuf.Paths = append(auditBuf.Paths, store.PathRecord{
+					PathSeq:   idx + 1,
+					HostChain: p.Hosts,
+					HopCount:  hopCount,
+					TTAHours:  p.TTA,
+				})
+			}
+			go auditStore.FlushBatch(auditBuf)
+		}
 
 		requestDuration := time.Since(requestStart)
 		log.Printf("[%s] api: returned %d paths for %s -> %s in %.3f seconds (recalculated: %d, qp=%.3f, recalc=%.3f, ttbEntry=%.3f, ttbTarget=%.3f, json=%.3f)",

@@ -10,6 +10,7 @@ import (
 	"ESP-data/config"
 	"ESP-data/internal/graph"
 	"ESP-data/internal/nebula"
+	"ESP-data/internal/store"
 
 	nebulago "github.com/vesoft-inc/nebula-go/v3"
 )
@@ -83,7 +84,7 @@ type MitigationUpsertRequest struct {
 }
 
 // handleUpsertAssetMitigation adds or updates an applied_to edge (REQ-035).
-func handleUpsertAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
+func handleUpsertAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Config, auditStore *store.Store, w http.ResponseWriter, r *http.Request) {
 	requestStart := time.Now()
 
 	assetID, err := extractAssetID(r.URL.Path, 3)
@@ -124,6 +125,8 @@ func handleUpsertAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Conf
 
 	// REQ-042: invalidate asset hash after mitigation change (ALG-REQ-043)
 	nebula.InvalidateAssetHash(pool, cfg, assetID)
+	// ADR-REQ-021: invalidate TTB cache for this asset
+	auditStore.InvalidateCache(assetID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
@@ -134,7 +137,7 @@ func handleUpsertAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Conf
 }
 
 // handleDeleteAssetMitigation removes an applied_to edge (REQ-036).
-func handleDeleteAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
+func handleDeleteAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Config, auditStore *store.Store, w http.ResponseWriter, r *http.Request) {
 	requestStart := time.Now()
 
 	// URL: /api/asset/{id}/mitigations/{mid}
@@ -164,6 +167,8 @@ func handleDeleteAssetMitigation(pool *nebulago.ConnectionPool, cfg *config.Conf
 
 	// REQ-042: invalidate asset hash after mitigation removal (ALG-REQ-043)
 	nebula.InvalidateAssetHash(pool, cfg, assetID)
+	// ADR-REQ-021: invalidate TTB cache for this asset
+	auditStore.InvalidateCache(assetID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})

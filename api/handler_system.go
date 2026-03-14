@@ -58,7 +58,7 @@ func RecalculateTTBHandler(pool *nebulago.ConnectionPool, cfg *config.Config) ht
 
 			// ALG-REQ-070: real TTB computation replaces stub
 			chainVID := nebula.ChainVIDForPosition(1, 3) // default intermediate
-			ttbResult, err := nebula.ComputeTTB(pool, cfg, asset.AssetID, chainVID, ttbParams)
+			ttbResult, err := nebula.ComputeTTB(pool, cfg, asset.AssetID, chainVID, ttbParams, nil)
 			if err != nil {
 				log.Printf("[%s] api: ComputeTTB failed for %s: %v",
 					time.Now().Format("15:04:05.000"), asset.AssetID, err)

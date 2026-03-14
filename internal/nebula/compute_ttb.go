@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"ESP-data/config"
+	"ESP-data/internal/store"
 
 	nebula "github.com/vesoft-inc/nebula-go/v3"
 )
@@ -316,7 +317,7 @@ func queryAssetHasVulnerability(session *nebula.Session, assetVid string) (bool,
 
 // ComputeTTB implements the full TTB calculation algorithm (ALG-REQ-070).
 
-func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chainVid string, params TTBParams) (*TTBResult, error) {
+func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chainVid string, params TTBParams, audit *store.AuditBuffer) (*TTBResult, error) {
 	session, err := openSession(pool, cfg)
 	if err != nil {
 		return nil, err
@@ -392,13 +393,23 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 				TTT:             0.0,
 				CandidatesCount: 0,
 			})
+			if audit != nil {
+				audit.TacticSteps = append(audit.TacticSteps, store.TacticStepRecord{
+					TacticSeq:       i,
+					TacticID:        tactic.TacticID,
+					TacticName:      tactic.TacticName,
+					TTTHours:        0.0,
+					SwitchoverAdded: false,
+					CandidatesCount: 0,
+				})
+			}
 			previousTacticID = tactic.TacticID
 			fastestTechID = nil
 			continue
 		}
 
 		// Strategy C: Batch ComputeTTT — 2 queries per tactic instead of 2×N
-		if err := computeBatchTTT(session, assetVid, candidates); err != nil {
+		if err := computeBatchTTT(session, assetVid, candidates, audit); err != nil {
 			log.Printf("nebula: ComputeTTB computeBatchTTT failed for tactic %s: %v", tactic.TacticID, err)
 			for j := range candidates {
 				candidates[j].TTT = 999999.0
@@ -415,12 +426,23 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 				TTT:             0.0,
 				CandidatesCount: candidatesCount,
 			})
+			if audit != nil {
+				audit.TacticSteps = append(audit.TacticSteps, store.TacticStepRecord{
+					TacticSeq:       i,
+					TacticID:        tactic.TacticID,
+					TacticName:      tactic.TacticName,
+					TTTHours:        0.0,
+					SwitchoverAdded: false,
+					CandidatesCount: candidatesCount,
+				})
+			}
 			previousTacticID = tactic.TacticID
 			fastestTechID = nil
 			continue
 		}
 
-		if techniqueCount > 0 {
+		switchoverAdded := techniqueCount > 0
+		if switchoverAdded {
 			ttb += params.SwitchoverTime
 		}
 		ttb += fastest.TTT
@@ -436,6 +458,19 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 			TTT:             fastest.TTT,
 			CandidatesCount: candidatesCount,
 		})
+		if audit != nil {
+			audit.TacticSteps = append(audit.TacticSteps, store.TacticStepRecord{
+				TacticSeq:       i,
+				TacticID:        tactic.TacticID,
+				TacticName:      tactic.TacticName,
+				TechniqueVid:    fastest.TechniqueID,
+				TechniqueID:     fastest.TechniqueID,
+				TechniqueName:   fastest.TechniqueName,
+				TTTHours:        fastest.TTT,
+				SwitchoverAdded: switchoverAdded,
+				CandidatesCount: candidatesCount,
+			})
+		}
 
 		previousTacticID = tactic.TacticID
 		fastestTechID = &tid

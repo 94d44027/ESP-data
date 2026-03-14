@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"ESP-data/config"
+	"ESP-data/internal/store"
 
 	nebula "github.com/vesoft-inc/nebula-go/v3"
 )
@@ -162,7 +163,7 @@ func ComputeTTT(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, techn
 //
 // Precondition: all candidates have already passed OS filtering (ALG-REQ-062)
 // so no OS pre-check is needed here.
-func computeBatchTTT(session *nebula.Session, assetVid string, candidates []techniqueCandidate) error {
+func computeBatchTTT(session *nebula.Session, assetVid string, candidates []techniqueCandidate, audit *store.AuditBuffer) error {
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -271,6 +272,18 @@ func computeBatchTTT(session *nebula.Session, assetVid string, candidates []tech
 
 		if P == 0 {
 			candidates[j].TTT = execMin
+			if audit != nil {
+				audit.TTTDetails = append(audit.TTTDetails, store.TTTDetailRecord{
+					TechniqueVid:  candidates[j].TechniqueID,
+					ExecMin:       execMin,
+					ExecMax:       execMax,
+					PossibleCount: P,
+					AppliedCount:  0,
+					MaturityFactor: 0,
+					FormulaCase:  "no_mitigations",
+					TTTHours:     execMin,
+				})
+			}
 			continue
 		}
 
@@ -284,10 +297,28 @@ func computeBatchTTT(session *nebula.Session, assetVid string, candidates []tech
 			}
 		}
 
+		var formulaCase string
+		var tttVal float64
 		if A == P {
-			candidates[j].TTT = execMax
+			tttVal = execMax
+			formulaCase = "full_coverage"
 		} else {
-			candidates[j].TTT = execMin + (maturityFactor*(execMax-execMin))/float64(P)
+			tttVal = execMin + (maturityFactor*(execMax-execMin))/float64(P)
+			formulaCase = "partial"
+		}
+		candidates[j].TTT = tttVal
+
+		if audit != nil {
+			audit.TTTDetails = append(audit.TTTDetails, store.TTTDetailRecord{
+				TechniqueVid:   candidates[j].TechniqueID,
+				ExecMin:        execMin,
+				ExecMax:        execMax,
+				PossibleCount:  P,
+				AppliedCount:   A,
+				MaturityFactor: maturityFactor,
+				FormulaCase:    formulaCase,
+				TTTHours:       tttVal,
+			})
 		}
 	}
 

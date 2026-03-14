@@ -10,6 +10,7 @@ import (
 	"ESP-data/config"
 	"ESP-data/internal/graph"
 	"ESP-data/internal/nebula"
+	"ESP-data/internal/store"
 
 	nebulago "github.com/vesoft-inc/nebula-go/v3"
 )
@@ -80,7 +81,7 @@ func AssetsHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handl
 // AssetHandler dispatches /api/asset/{id}[/mitigations[/{mid}]] requests.
 // It routes to asset detail (REQ-022) or mitigations CRUD (REQ-034/035/036)
 // based on the URL path structure.
-func AssetHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.HandlerFunc {
+func AssetHandler(pool *nebulago.ConnectionPool, cfg *config.Config, auditStore *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.Split(strings.TrimRight(r.URL.Path, "/"), "/")
 		// /api/asset/{id}                       → len 4
@@ -95,13 +96,13 @@ func AssetHandler(pool *nebulago.ConnectionPool, cfg *config.Config) http.Handle
 			case http.MethodGet:
 				handleGetAssetMitigations(pool, cfg, w, r)
 			case http.MethodPut:
-				handleUpsertAssetMitigation(pool, cfg, w, r)
+				handleUpsertAssetMitigation(pool, cfg, auditStore, w, r)
 			case http.MethodDelete:
 				if len(parts) < 6 {
 					http.Error(w, "Missing mitigation ID for DELETE", http.StatusBadRequest)
 					return
 				}
-				handleDeleteAssetMitigation(pool, cfg, w, r)
+				handleDeleteAssetMitigation(pool, cfg, auditStore, w, r)
 			default:
 				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			}

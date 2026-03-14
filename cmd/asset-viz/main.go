@@ -41,9 +41,6 @@ func main() {
 		log.Printf("store: running without RDBMS — no audit trail or TTB cache")
 	}
 
-	// ---- suppress unused import until handlers are wired ----
-	_ = auditStore
-
 	// Register API endpoints
 
 	// REQ-020: Enriched graph data for Cytoscape visualization
@@ -55,7 +52,7 @@ func main() {
 	// REQ-022: Single asset detail for inspector panel
 	// REQ-034 (GET), REQ-035 (PUT), REQ-036 (DELETE): Asset mitigations CRUD
 	// AssetHandler dispatches based on URL path depth and HTTP method
-	http.HandleFunc("/api/asset/", api.AssetHandler(pool, cfg))
+	http.HandleFunc("/api/asset/", api.AssetHandler(pool, cfg, auditStore))
 
 	// REQ-023: Neighbor list for inspector connections summary
 	http.HandleFunc("/api/neighbors/", api.NeighborsHandler(pool, cfg))
@@ -67,7 +64,7 @@ func main() {
 	http.HandleFunc("/api/edges/", api.EdgesHandler(pool, cfg))
 
 	// REQ-029: Path calculation for Path Inspector
-	http.HandleFunc("/api/paths", api.PathsHandler(pool, cfg))
+	http.HandleFunc("/api/paths", api.PathsHandler(pool, cfg, auditStore))
 
 	// REQ-030: Entry points for Path Inspector dropdown
 	http.HandleFunc("/api/entry-points", api.EntryPointsHandler(pool, cfg))
