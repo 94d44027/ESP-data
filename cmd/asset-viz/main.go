@@ -7,15 +7,42 @@ import (
 	"ESP-data/api"
 	"ESP-data/config"
 	"ESP-data/internal/nebula"
+	"ESP-data/internal/store"
 )
 
 func main() {
-	// Load configuration from environment variables (REQ-002)
+	// Load configuration from environment variables (REQ-002, ADR-REQ-002)
 	cfg := config.Load()
 
 	// Initialize Nebula connection pool (REQ-121)
 	pool := nebula.NewPool(cfg)
 	defer pool.Close()
+
+	// Initialize MariaDB store (ADR-REQ-003, ADR-REQ-081)
+	// Graceful degradation: if disabled or connection fails, auditStore is nil (ADR-REQ-033)
+	var auditStore *store.Store
+	if cfg.MariaEnabled {
+		var err error
+		auditStore, err = store.New(cfg.MariaHost, cfg.MariaPort, cfg.MariaUser, cfg.MariaPass, cfg.MariaDB)
+		if err != nil {
+			log.Printf("WARNING: MariaDB store unavailable — audit/cache disabled: %v", err)
+			auditStore = nil
+		} else {
+			defer auditStore.Close()
+		}
+	} else {
+		log.Printf("store: MariaDB disabled (MARIA_ENABLED=false)")
+	}
+
+	// Log store status for operator awareness
+	if auditStore != nil && auditStore.Enabled() {
+		log.Printf("store: audit trail and TTB cache active")
+	} else {
+		log.Printf("store: running without RDBMS — no audit trail or TTB cache")
+	}
+
+	// ---- suppress unused import until handlers are wired ----
+	_ = auditStore
 
 	// Register API endpoints
 

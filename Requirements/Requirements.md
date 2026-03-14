@@ -1,8 +1,8 @@
 # Software Requirements Specification (SRS)
 ## ESP Proof Of Concept system
 
-**Version:** 1.14  
-**Date:** March 11, 2026  
+**Version:** 1.15  
+**Date:** March 14, 2026  
 **Prepared by:** Konstantin Smirnov with the kind assistance of Perplexity AI
 **Project:** ESP PoC for Nebula Graph
 **Document code:** SRS
@@ -23,7 +23,8 @@ This document describes the complete set of requirements for Version 1.0 of ESP 
 |--------------------------------------|---------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | UI-Requirements.md  (UIR)            | v1.13   | UI-REQ-207 consumes path calculation results; UI-REQ-208/332 visualise them on the graph canvas.                                                                 |
 | ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.10   | Defines database schema (ESP01)                                                                                                                                  |
-| AlgoSpecs.md (ALGO)                  | v1.6    | Defines requirements to algorithms regarding attack path calculations (REQ-029 through REQ-032 migrated there; TTT/TTB computation algorithms added in v1.4–1.5) |
+| AlgoSpecs.md (ALGO)                  | v1.8    | Defines requirements to algorithms regarding attack path calculations (REQ-029 through REQ-032 migrated there; TTT/TTB computation algorithms added in v1.4–1.5) |
+| ADR-Requirements.md (ADR)            | v0.1    | Defines RDBMS component schema, audit trail, cache, and async write mechanism. References CMP004.                                                                |
 
 ### 1.4 Intended Audience
 - Software developers and architects
@@ -39,10 +40,10 @@ ESP PoC will provide a web-based platform enabling a user to analyse the fixed (
 - Calculating the paths from entry point to a target (by sum of TTB = TTA) within IT Infrastructure
 - Displaying these paths to the user over the IT infrastructure graph
 - Viewing and editing mitigations applied to assets (add, modify, remove applied_to relationships)
+- Performing calculations of TTA/TTB against the existing set of mitigations
 
 **Out of Scope (Future Releases):**
 - Displaying the network segments
-- Performing calculations of TTA/TTB against the existing set of mitigations
 - Loading new data in the database
 - Administrative functions
 - Secure access
@@ -62,7 +63,7 @@ ESP PoC (also referred as "the system") is a standalone web application that con
 - **CMP001:** Nebula Graph 3.8.0 Graph database (further down referred as GrDB)
 - **CMP002:** Application layer, implementing business logic (further down referred as APP layer)
 - **CMP003:** Presentation layer, implementing visualisation (further down referred as VIS layer)
-- **CMPO04:** Optional relational database like mySQL (further down referred as RDBMS)
+- **CMP004:** MariaDB relational database for audit trail, computation cache, and configuration storage (further down referred as RDBMS). See ADR-Requirements.md. Graceful degradation: application operates normally if RDBMS is unavailable (ADR-REQ-033).
 
 The system is a prototype intended for future updates.
 
@@ -78,7 +79,7 @@ The system is a prototype intended for future updates.
 ### 2.3 Operating Environment
 - **Client side:** Modern web browsers (Chrome 100+, Firefox 98+, Safari 15+, Edge 100+)
 - **Server side:** Linux (Ubuntu Server 24 LTS)
-- **Database:** Nebula Graph 3.8.0, newest versions of mySQL (if needed to store table data)
+- **Database:** Nebula Graph 3.8.0 (graph data), MariaDB 10.6+ (auxiliary relational data per ADR)
 - **Network:** Minimum 1 Mbps internet connection
 
 ### 2.4 Design and Implementation Constraints
@@ -87,7 +88,7 @@ The system is a prototype intended for future updates.
 - **CNST003:** Response time for queries must not exceed 5 seconds
 - **CNST004:** No user concurrency is required
 - **CNST005:** APP layer shall be built in Go programming language for better performance
-- **VNST006:** VIS layer can be built using any framework optimised for graph visualisation
+- **CNST006:** VIS layer can be built using any framework optimised for graph visualisation
 
 ### 2.5 Proposed functional architecture
 
@@ -122,14 +123,23 @@ The proposed architecture is given at the picture below
 
 All paths are for developers workstation and have a base of `~/projects/ESP-data/`
 
-| Path             | Module     | Module purpose                                                                  |
-|------------------|------------|---------------------------------------------------------------------------------|
-| cmd/asset-viz/   | main.go    | entry point, where HTTP server starts                                           |
-| internal/nebula/ | client.go  | SessionPool setup, query execution                                              |
-| internal/graph/  | model.go   | CyNode, CyEdge, CyGraph structs + builder                                       |
-| api/             | handler.go | HTTP handlers for /api/graph and other API endpoints                            |
-| static/          | index.html | Cytoscape.js front-end (entry point; see UI-Requirements.MD for full structure) |
-| config/          | config.go  | Nebula host, port, user, password, space                                        |
+| Path             | Module          | Module purpose                                                                                |
+|------------------|-----------------|-----------------------------------------------------------------------------------------------|
+| cmd/asset-viz/   | main.go         | entry point, where HTTP server starts                                                         |
+| internal/nebula/ | client.go       | Pool, session, all safe*/extract* helpers — the shared infrastructure                         |
+| internal/nebula/ | compute_ttb.go  | TTB: types, all filters/selectors                                                             |
+| internal/nebula/ | compuute_ttt.go | Calculating TT for an asset/technique                                                         |
+| internal/nebula/ | mitigations.go  | Mitigation CRUD                                                                               |
+| internal/nebula/ | query_assets.go | Asset CRUD                                                                                    |
+| internal/nebula/ | query_paths.go  | Path discovery                                                                                |
+| internal/nebula/ | hash_state.go   | Hash/stale/Merkle                                                                             |
+| internal/graph/  | model.go        | CyNode, CyEdge, CyGraph structs + builder                                                     |
+| internal/store/  | audit.go        | Go types for audit buffer, cache entries (ADR-REQ-010–022)                                    |
+| internal/store/  | migrations.go   | CREATE TABLE IF NOT EXISTS for all ADR tables (ADR-REQ-081)                                   |
+| internal/store/  | store.go        | MariaDB connection pool, FlushBatch, cache ops (ADR-REQ-003, ADR-REQ-031)                     |
+| api/             | handler.go      | HTTP handlers for /api/graph and other API endpoints                                          |
+| static/          | index.html      | Cytoscape.js front-end (entry point; see UI-Requirements.MD for full structure)               |
+| config/          | config.go       | Nebula Graph host, port, user, password, space. MariaDB host, port, user, password, database. |
 
 ---
 
@@ -141,9 +151,29 @@ All paths are for developers workstation and have a base of `~/projects/ESP-data
 
 **REQ-001:** No user authentication is required to access VIS layer
 
-**REQ-002:** Host, port, username, password, space for connection to Nebula Graph Database must be read from OS environment variables of NEBULA_HOST, NEBULA_PORT, NEBULA_USER, NEBULA_PASS, NEBULA_SPACE respectfully
+**REQ-002:** Host, port, username, password, space for connection to GrDM and RDBMS must be read from OS environment variables
+Since this is a PoC default credentials, they are listed below:
+**GrDB variables**
 
-#### 3.1.2 Visualisation
+| Variable      | Default value | Purpose                           |
+|---------------|---------------|-----------------------------------|
+| NEBULA_HOST   | `nebbie.m82`  | hostname/IP                       |
+| NEBULA_PORT   | `9669`        | Nebula Graph server listener port |
+| NEBULA_USER   | `root`        | Nebula Graph user                 |
+| NEBULA_PASS   | `nebula`      | Nebula Graph user password        |
+| NEBULA_SPACE  | `ESP01`       | Nebula Graph spece (schema)       |
+
+**RDBMS variables**
+
+| Variable      | Default value | Purpose                       |
+|---------------|---------------|-------------------------------|
+| MARIA_HOST    | `nebbie.m82`  | hostname/IP                   |
+| MARIA_PORT    | `3306`        | MariaDB server listener port  |
+| MARIA_USER    | `esp01`       | MariaDB user                  |
+| MARIA_PASS    | `nebula1`     | MariaDB user password         |
+| MARIA_DB      | `ESP01`       | MariaDB database (tablespace) |
+| MARIA_ENABLED | false         | Enable/disable RDBMS (tbv)    |
+
 
 **REQ-010:** Cytoscape should be used for visualisation
 
@@ -574,6 +604,7 @@ https://github.com/94d44027/ESP-data/blob/main/Data/ESP01_NebulaGraph_Schema.md
 
 ### Appendix D: Algorithm Specification
 AlgoSpec.md — Path calculation, TTA/TTB/TTT algorithm requirements (ALG-REQ-001 through ALG-REQ-080). Includes asset state hashing (040–043), TTB stub and caching (044–053), TTT calculation (060–066), and full TTB calculation algorithm (070–080).
+ADR-Requirements.md — Auxiliary database schema, audit trail, computation cache, and async write mechanism (ADR-REQ-001 through ADR-REQ-081)
 
 ### Appendix E: nGQL Specification
 https://docs.nebula-graph.io/3.8.0/
@@ -603,6 +634,8 @@ Each requirement shall be considered complete when:
 | 1.12    | Mar 2, 2026  | KSmirnov | REQ-040–042 added (recalculate TTB endpoint, system state endpoint, hash invalidation on mitigation write). §3.1.3B added. Appendix C updated.                                                       |
 | 1.13    | Mar 11, 2026 | KSmirnov | §1.3 companion doc versions updated (ALGO v1.5, SCHEMA v1.9). §4 glossary: TTB definition expanded with units and ALG-REQ refs; TTT definition added. Appendix D ALG-REQ range updated (001–080).    |
 | 1.14 | Mar 11, 2026 | KSmirnov | Added REQ-043 (data integrity precondition). Replaced OPTIONAL MATCH with MATCH in REQ-020, REQ-021, REQ-022 per DI-01/02/03. Updated SCHEMA reference to v1.10. |
+| 1.15 | Mar 13, 2026 | KSmirnov | CMP004 activated (MariaDB store stub). §2.1 updated (CMP004 description, typo fix). §2.3 updated (MariaDB in operating environment). REQ-002 extended (6 MARIA_* env vars). Project structure updated (internal/store/ package). §1.3 updated (ADR companion doc). Appendix D updated (ADR reference). |
+
 ---
 
 

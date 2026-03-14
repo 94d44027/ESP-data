@@ -42,7 +42,7 @@ This specification does **not** cover:
 | Requirements.md (SRS)                | v1.14   | CMP004 defines the optional RDBMS component. REQ-040/041 define recalculation triggers that produce audit data. REQ-121 mandates Go for the APP layer.       |
 | ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.10   | TA001 (Asset.TTB, Asset.hash, Asset.hash_valid) drives cache invalidation. ED001 (applied_to) changes trigger stale marking.                                 |
 | AlgoSpecs.md (ALGO)                  | v1.7    | ALG-REQ-060–066 (TTT formula), ALG-REQ-070–080 (TTB algorithm), ALG-REQ-079 (TTB log) define the data structures stored in RDBMS.                           |
-| UI-Requirements.md (UIS)             | v1.14   | UI-REQ-207 (Path Inspector) will consume path detail data from RDBMS. Future UI amendments will add drill-down views.                                        |
+| UI-Requirements.md (UIS)             | v1.13   | UI-REQ-207 (Path Inspector) will consume path detail data from RDBMS. Future UI amendments will add drill-down views.                                        |
 
 ### 1.4 Requirement ID Convention
 

@@ -29,9 +29,9 @@ This specification is referenced by **REQ-123** in the main Requirements.md (SRS
 
 | Document                             | Version | Relationship                                                                                                  |
 |--------------------------------------|---------|---------------------------------------------------------------------------------------------------------------|
-| Requirements.md  (SRS)               | v1.13   | The document defining main functional requirements for PoC application                                        |
-| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.9    | Defines database schema (ESP01)                                                                               |
-| AlgoSpecs.md (ALGO)                  | v1.5    | Defines requirements to algorithms regarding attack path calculations (TTT/TTB computation added in v1.4–1.5) |
+| Requirements.md  (SRS)               | v1.15   | The document defining main functional requirements for PoC application                                        |
+| ESP01_NebulaGraph_Schema.md (SCHEMA) | v1.10   | Defines database schema (ESP01)                                                                               |
+| AlgoSpecs.md (ALGO)                  | v1.8    | Defines requirements to algorithms regarding attack path calculations (TTT/TTB computation added in v1.4–1.5) |
 
 
 ---
