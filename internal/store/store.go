@@ -136,11 +136,10 @@ func (s *Store) FlushBatch(buf *AuditBuffer) {
 		}
 		res, err = tx.Exec(`INSERT INTO calc_ttb_tactic_steps
 			(breakdown_id, tactic_seq, tactic_id, tactic_name,
-			 technique_vid, technique_id, technique_name,
+			 technique_id, technique_name,
 			 ttt_hours, switchover_added, candidates_count)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			bdID, ts.TacticSeq, ts.TacticID, ts.TacticName,
-			sql.NullString{String: ts.TechniqueVid, Valid: ts.TechniqueVid != ""},
 			sql.NullString{String: ts.TechniqueID, Valid: ts.TechniqueID != ""},
 			sql.NullString{String: ts.TechniqueName, Valid: ts.TechniqueName != ""},
 			ts.TTTHours, ts.SwitchoverAdded, ts.CandidatesCount)
@@ -157,11 +156,11 @@ func (s *Store) FlushBatch(buf *AuditBuffer) {
 			sID = stepIDs[td.StepIdx]
 		}
 		_, err = tx.Exec(`INSERT INTO calc_ttt_detail
-			(step_id, technique_vid, exec_min, exec_max,
+			(step_id, technique_id, exec_min, exec_max,
 			 possible_count, applied_count, maturity_factor,
 			 formula_case, ttt_hours)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			sID, td.TechniqueVid,
+			sID, td.TechniqueID,
 			td.ExecMin, td.ExecMax,
 			td.PossibleCount, td.AppliedCount, td.MaturityFactor,
 			td.FormulaCase, td.TTTHours)

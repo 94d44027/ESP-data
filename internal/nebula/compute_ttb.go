@@ -483,7 +483,6 @@ func ComputeTTB(pool *nebula.ConnectionPool, cfg *config.Config, assetVid, chain
 				TacticSeq:       i,
 				TacticID:        tactic.TacticID,
 				TacticName:      tactic.TacticName,
-				TechniqueVid:    fastest.TechniqueID,
 				TechniqueID:     fastest.TechniqueID,
 				TechniqueName:   fastest.TechniqueName,
 				TTTHours:        fastest.TTT,
