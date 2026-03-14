@@ -98,11 +98,12 @@ func getOrderedTactics(session *nebula.Session, chainVid string) ([]struct{ VID,
 	info := make(map[string]tacticRef)
 	for i := 0; i < fs.GetRowSize(); i++ {
 		record, _ := fs.GetRowValuesByIndex(i)
-		vid := safeString(record, 0)
-		info[vid] = tacticRef{
-			VID:        vid,
-			TacticID:   safeString(record, 1),
-			TacticName: safeString(record, 2),
+		//here it was updated to fix tactic name getting into tactic id column
+		tacticID := safeString(record, 0)
+		info[tacticID] = tacticRef{
+			VID:        tacticID,
+			TacticID:   tacticID,              // ← "TA0001" ✓
+			TacticName: safeString(record, 1), // ← "Initial Access" ✓
 		}
 	}
 
