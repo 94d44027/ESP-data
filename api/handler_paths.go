@@ -196,6 +196,9 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config, auditStore 
 							hashStr := fmt.Sprintf("%d", asset.ComputedHash)
 							chainVID := nebula.ChainVIDForPosition(1, 3) // intermediate position
 							ttbResult, err := nebula.ComputeTTB(pool, cfg, asset.AssetID, chainVID, ttbParams, auditBuf)
+							if auditBuf != nil && len(auditBuf.Breakdowns) > 0 {
+								auditBuf.Breakdowns[len(auditBuf.Breakdowns)-1].ChainPosition = "intermediate"
+							}
 							if err != nil {
 								log.Printf("[%s] api: ComputeTTB failed for %s: %v",
 									time.Now().Format("15:04:05.000"), asset.AssetID, err)
@@ -235,6 +238,9 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config, auditStore 
 		entryChainVID := nebula.ChainVIDForPosition(0, pathLen) // entry position
 		entryStart := time.Now()
 		entryResult, err := nebula.ComputeTTB(pool, cfg, fromID, entryChainVID, ttbParams, auditBuf)
+		if auditBuf != nil && len(auditBuf.Breakdowns) > 0 {
+			auditBuf.Breakdowns[len(auditBuf.Breakdowns)-1].ChainPosition = "entrance"
+		}
 		ttbEntryDuration = time.Since(entryStart)
 		var entryTTB float64
 		if err != nil {
@@ -253,6 +259,9 @@ func PathsHandler(pool *nebulago.ConnectionPool, cfg *config.Config, auditStore 
 		targetChainVID := nebula.ChainVIDForPosition(pathLen-1, pathLen) // target position
 		targetStart := time.Now()
 		targetResult, err := nebula.ComputeTTB(pool, cfg, toID, targetChainVID, ttbParams, auditBuf)
+		if auditBuf != nil && len(auditBuf.Breakdowns) > 0 {
+			auditBuf.Breakdowns[len(auditBuf.Breakdowns)-1].ChainPosition = "target"
+		}
 		ttbTargetDuration = time.Since(targetStart)
 		var targetTTB float64
 		if err != nil {
